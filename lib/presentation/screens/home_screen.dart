@@ -65,50 +65,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             SliverAppBar(
               expandedHeight: 120.0,
               floating: true,
-              pinned: true,
+              pinned: false,
+              snap: true,
               elevation: 0,
               backgroundColor: colorScheme.surface,
               toolbarHeight: 70,
               leading: Container(),
               flexibleSpace: LayoutBuilder(
                 builder: (BuildContext context, BoxConstraints constraints) {
-                  final top = constraints.biggest.height;
-                  final expandedHeight = 120.0;
-                  final shrinkOffset = expandedHeight - top;
-                  final progress = (shrinkOffset / (expandedHeight - kToolbarHeight)).clamp(0.0, 1.0);
-                  
                   return FlexibleSpaceBar(
                     expandedTitleScale: 1.0,
-                    titlePadding: EdgeInsets.only(
-                      left: 20 + progress * 40,
+                    titlePadding: const EdgeInsets.only(
+                      left: 20,
                       bottom: 16,
                     ),
-                    title: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 100),
-                      opacity: progress > 0.5 ? 1.0 : 0.0,
-                      child: Text(
-                        AppConstants.appName,
-                        style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                    ),
-                    background: ShaderMask(
-                      shaderCallback: (Rect bounds) {
-                        return LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            colorScheme.surface,
-                            colorScheme.surface.withOpacity(0.8),
-                          ],
-                        ).createShader(bounds);
-                      },
-                      blendMode: BlendMode.dstIn,
-                      child: _buildAppBar(colorScheme),
-                    ),
+                    background: _buildAppBar(colorScheme),
                   );
                 },
               ),
