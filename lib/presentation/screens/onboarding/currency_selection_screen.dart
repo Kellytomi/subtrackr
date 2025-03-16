@@ -17,24 +17,43 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
   late List<Currency> _filteredCurrencies;
   Currency? _selectedCurrency;
   bool _isSearching = false;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
     _filteredCurrencies = _allCurrencies;
-    
-    // Try to get the device's locale currency as default
-    final String? localeCode = Localizations.localeOf(context).countryCode;
-    if (localeCode != null) {
-      _selectedCurrency = _allCurrencies.firstWhere(
-        (currency) => currency.code.contains(localeCode),
-        orElse: () => _allCurrencies.first,
-      );
-    } else {
-      _selectedCurrency = _allCurrencies.first; // Default to USD
-    }
-    
     _searchController.addListener(_filterCurrencies);
+    
+    // Default to USD initially
+    _selectedCurrency = _allCurrencies.first;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Only run this once to avoid unnecessary rebuilds
+    if (!_initialized) {
+      // Try to get the device's locale currency as default
+      try {
+        // Use a safer approach to get the locale
+        final locale = WidgetsBinding.instance.window.locale;
+        final String? localeCode = locale.countryCode;
+        
+        if (localeCode != null) {
+          setState(() {
+            _selectedCurrency = _allCurrencies.firstWhere(
+              (currency) => currency.code.contains(localeCode),
+              orElse: () => _allCurrencies.first,
+            );
+          });
+        }
+      } catch (e) {
+        // If there's an error getting the locale, just use the default
+      }
+      _initialized = true;
+    }
   }
 
   @override

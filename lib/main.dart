@@ -45,15 +45,21 @@ void main() async {
   final subscriptionRepository = SubscriptionRepository();
   await subscriptionRepository.init();
   
-  // Check if onboarding is complete using SettingsService
+  // Check if onboarding is complete and currency is set
   final onboardingComplete = settingsService.isOnboardingComplete();
+  final currencyCode = settingsService.getCurrencyCode();
+  final initialRoute = !onboardingComplete 
+      ? AppConstants.onboardingRoute 
+      : (currencyCode == null || currencyCode.isEmpty) 
+          ? AppConstants.currencySelectionRoute 
+          : AppConstants.homeRoute;
   
   runApp(MyApp(
     settingsService: settingsService,
     notificationService: notificationService,
     logoService: logoService,
     subscriptionRepository: subscriptionRepository,
-    onboardingComplete: onboardingComplete,
+    initialRoute: initialRoute,
   ));
 }
 
@@ -62,7 +68,7 @@ class MyApp extends StatelessWidget {
   final NotificationService notificationService;
   final LogoService logoService;
   final SubscriptionRepository subscriptionRepository;
-  final bool onboardingComplete;
+  final String initialRoute;
   
   const MyApp({
     super.key,
@@ -70,7 +76,7 @@ class MyApp extends StatelessWidget {
     required this.notificationService,
     required this.logoService,
     required this.subscriptionRepository,
-    required this.onboardingComplete,
+    required this.initialRoute,
   });
 
   @override
@@ -100,9 +106,10 @@ class MyApp extends StatelessWidget {
             theme: themeProvider.themeData,
             themeMode: themeProvider.themeMode,
             debugShowCheckedModeBanner: false,
-            initialRoute: onboardingComplete ? AppConstants.homeRoute : AppConstants.onboardingRoute,
+            initialRoute: initialRoute,
             routes: {
               AppConstants.onboardingRoute: (_) => const OnboardingScreen(),
+              AppConstants.currencySelectionRoute: (_) => const CurrencySelectionScreen(),
               AppConstants.homeRoute: (_) => const MainLayout(),
               AppConstants.addSubscriptionRoute: (_) => const AddSubscriptionScreen(),
               AppConstants.editSubscriptionRoute: (_) => const EditSubscriptionScreen(),

@@ -30,6 +30,10 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   String _currencyCode = AppConstants.defaultCurrencyCode;
   String? _logoUrl;
   
+  // Add a list to store logo suggestions
+  List<LogoSuggestion> _logoSuggestions = [];
+  bool _showLogoSuggestions = false;
+
   final List<String> _categories = [
     'Entertainment',
     'Productivity',
@@ -54,7 +58,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     // Add listener to website field to update logo
     _websiteController.addListener(_updateLogoFromWebsite);
     
-    // Add listener to name field to update logo
+    // Add listener to name field to update logo and suggestions
     _nameController.addListener(_updateLogoFromName);
   }
 
@@ -84,12 +88,29 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   void _updateLogoFromName() {
     if (_nameController.text.isNotEmpty) {
       final logoService = Provider.of<LogoService>(context, listen: false);
+      
+      // Get logo suggestions
+      _logoSuggestions = logoService.getLogoSuggestions(_nameController.text);
+      
+      // If we have suggestions, show them
+      if (_logoSuggestions.isNotEmpty) {
+        setState(() {
+          _showLogoSuggestions = true;
+        });
+      }
+      
+      // Try to get a logo directly
       final logoUrl = logoService.getLogoUrl(_nameController.text);
       if (logoUrl != null) {
         setState(() {
           _logoUrl = logoUrl;
         });
       }
+    } else {
+      setState(() {
+        _logoSuggestions = [];
+        _showLogoSuggestions = false;
+      });
     }
   }
 
@@ -151,6 +172,14 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     }
   }
 
+  // Method to select a logo from suggestions
+  void _selectLogo(String logoUrl) {
+    setState(() {
+      _logoUrl = logoUrl;
+      _showLogoSuggestions = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -208,7 +237,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   children: [
-                    // Logo preview
+                    // Logo preview and suggestions
                     Center(
                       child: Column(
                         children: [
@@ -233,15 +262,20 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                                     borderRadius: BorderRadius.circular(16),
                                     child: Image.network(
                                       _logoUrl!,
-                                      fit: BoxFit.cover,
+                                      width: 100,
+                                      height: 100,
+                                      fit: BoxFit.contain,
                                       errorBuilder: (context, error, stackTrace) {
-                                        final logoService = Provider.of<LogoService>(context, listen: false);
-                                        return Container(
-                                          color: colorScheme.primary,
-                                          child: Icon(
-                                            logoService.getFallbackIcon(_nameController.text),
-                                            color: Colors.white,
-                                            size: 40,
+                                        return _buildLogoPlaceholder();
+                                      },
+                                      loadingBuilder: (context, child, loadingProgress) {
+                                        if (loadingProgress == null) return child;
+                                        return Center(
+                                          child: CircularProgressIndicator(
+                                            value: loadingProgress.expectedTotalBytes != null
+                                                ? loadingProgress.cumulativeBytesLoaded /
+                                                    loadingProgress.expectedTotalBytes!
+                                                : null,
                                           ),
                                         );
                                       },
@@ -256,6 +290,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                                       onPressed: () {
                                         setState(() {
                                           _logoUrl = null;
+                                          _showLogoSuggestions = true;
                                         });
                                       },
                                       icon: const Icon(Icons.delete_outline),
@@ -301,6 +336,74 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                                   onPressed: _searchForLogo,
                                   icon: const Icon(Icons.refresh),
                                   label: const Text('Find Logo'),
+                                ),
+                              ],
+                            ),
+                            
+                          // Logo suggestions
+                          if (_showLogoSuggestions && _logoSuggestions.isNotEmpty)
+                            Column(
+                              children: [
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Suggested Logos',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  height: 100,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: _logoSuggestions.length,
+                                    itemBuilder: (context, index) {
+                                      final suggestion = _logoSuggestions[index];
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                        child: Column(
+                                          children: [
+                                            GestureDetector(
+                                              onTap: () => _selectLogo(suggestion.logoUrl),
+                                              child: Container(
+                                                width: 60,
+                                                height: 60,
+                                                decoration: BoxDecoration(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  border: Border.all(
+                                                    color: colorScheme.outline.withOpacity(0.3),
+                                                  ),
+                                                ),
+                                                child: ClipRRect(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  child: Image.network(
+                                                    suggestion.logoUrl,
+                                                    fit: BoxFit.contain, // Use contain instead of cover
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      return Container(
+                                                        color: colorScheme.primary,
+                                                        child: const Icon(
+                                                          Icons.image_not_supported,
+                                                          color: Colors.white,
+                                                          size: 24,
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              suggestion.name,
+                                              style: theme.textTheme.bodySmall,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ],
                             ),
@@ -944,5 +1047,24 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
       // Navigate back
       Navigator.pop(context);
     }
+  }
+
+  Widget _buildLogoPlaceholder() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final logoService = Provider.of<LogoService>(context, listen: false);
+    
+    return Container(
+      width: 100,
+      height: 100,
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Icon(
+        logoService.getFallbackIcon(_nameController.text),
+        color: colorScheme.primary,
+        size: 40,
+      ),
+    );
   }
 } 

@@ -4,51 +4,33 @@ import 'package:subtrackr/data/services/settings_service.dart';
 
 class ThemeProvider extends ChangeNotifier {
   final SettingsService _settingsService;
-  late ThemeMode _themeMode;
   
   ThemeProvider({
     required SettingsService settingsService,
   }) : _settingsService = settingsService {
-    _themeMode = _settingsService.getThemeMode();
+    // Always set to light mode
+    _settingsService.setThemeMode(ThemeMode.light);
   }
   
-  // Get the current theme mode
-  ThemeMode get themeMode => _themeMode;
+  // Get the current theme mode - always light
+  ThemeMode get themeMode => ThemeMode.light;
   
-  // Get the current theme data
-  ThemeData get themeData {
-    switch (_themeMode) {
-      case ThemeMode.light:
-        return AppTheme.lightTheme;
-      case ThemeMode.dark:
-        return AppTheme.darkTheme;
-      case ThemeMode.system:
-        final brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
-        return brightness == Brightness.dark ? AppTheme.darkTheme : AppTheme.lightTheme;
-    }
-  }
+  // Get the current theme data - always light theme
+  ThemeData get themeData => AppTheme.lightTheme;
   
-  // Check if dark mode is enabled
-  bool get isDarkMode {
-    if (_themeMode == ThemeMode.system) {
-      final brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
-      return brightness == Brightness.dark;
-    }
-    return _themeMode == ThemeMode.dark;
-  }
+  // Check if dark mode is enabled - always false
+  bool get isDarkMode => false;
   
-  // Set the theme mode
+  // Set the theme mode - only allows light mode
   Future<void> setThemeMode(ThemeMode themeMode) async {
-    if (_themeMode == themeMode) return;
-    
-    _themeMode = themeMode;
-    await _settingsService.setThemeMode(themeMode);
+    // Only allow light mode
+    await _settingsService.setThemeMode(ThemeMode.light);
     notifyListeners();
   }
   
-  // Toggle between light and dark mode
+  // Toggle between light and dark mode - does nothing now
   Future<void> toggleTheme() async {
-    final newThemeMode = isDarkMode ? ThemeMode.light : ThemeMode.dark;
-    await setThemeMode(newThemeMode);
+    // Do nothing, we only support light mode
+    notifyListeners();
   }
 } 

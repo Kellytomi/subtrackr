@@ -133,6 +133,20 @@ class SubscriptionProvider extends ChangeNotifier {
     
     try {
       _subscriptions = _repository.getAllSubscriptions();
+      
+      // Ensure each subscription has a valid currency code
+      for (int i = 0; i < _subscriptions.length; i++) {
+        final subscription = _subscriptions[i];
+        if (subscription.currencyCode.isEmpty) {
+          // If currency code is empty, use the default currency code
+          final updatedSubscription = subscription.copyWith(
+            currencyCode: _settingsService.getCurrencyCode() ?? AppConstants.defaultCurrencyCode,
+          );
+          _subscriptions[i] = updatedSubscription;
+          await _repository.updateSubscription(updatedSubscription);
+        }
+      }
+      
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -145,14 +159,22 @@ class SubscriptionProvider extends ChangeNotifier {
   // Add a new subscription
   Future<void> addSubscription(Subscription subscription) async {
     try {
-      await _repository.addSubscription(subscription);
-      _subscriptions.add(subscription);
+      // Ensure the subscription has a valid currency code
+      Subscription subscriptionToAdd = subscription;
+      if (subscription.currencyCode.isEmpty) {
+        subscriptionToAdd = subscription.copyWith(
+          currencyCode: _settingsService.getCurrencyCode() ?? AppConstants.defaultCurrencyCode,
+        );
+      }
+      
+      await _repository.addSubscription(subscriptionToAdd);
+      _subscriptions.add(subscriptionToAdd);
       
       // Schedule notification if enabled
-      if (subscription.notificationsEnabled && 
+      if (subscriptionToAdd.notificationsEnabled && 
           _settingsService.areNotificationsEnabled() &&
-          subscription.status == AppConstants.statusActive) {
-        _scheduleNotification(subscription);
+          subscriptionToAdd.status == AppConstants.statusActive) {
+        _scheduleNotification(subscriptionToAdd);
       }
       
       notifyListeners();
@@ -165,21 +187,43 @@ class SubscriptionProvider extends ChangeNotifier {
   // Update an existing subscription
   Future<void> updateSubscription(Subscription updatedSubscription) async {
     try {
-      await _repository.updateSubscription(updatedSubscription);
+      // Ensure the subscription has a valid currency code
+      Subscription subscriptionToUpdate = updatedSubscription;
+      if (updatedSubscription.currencyCode.isEmpty) {
+        // Find the existing subscription to get its currency code
+        final existingSubscription = _subscriptions.firstWhere(
+          (s) => s.id == updatedSubscription.id,
+          orElse: () => updatedSubscription,
+        );
+        
+        // If the existing subscription has a currency code, use it
+        if (existingSubscription.currencyCode.isNotEmpty) {
+          subscriptionToUpdate = updatedSubscription.copyWith(
+            currencyCode: existingSubscription.currencyCode,
+          );
+        } else {
+          // Otherwise, use the default currency code
+          subscriptionToUpdate = updatedSubscription.copyWith(
+            currencyCode: _settingsService.getCurrencyCode() ?? AppConstants.defaultCurrencyCode,
+          );
+        }
+      }
       
-      final index = _subscriptions.indexWhere((s) => s.id == updatedSubscription.id);
+      await _repository.updateSubscription(subscriptionToUpdate);
+      
+      final index = _subscriptions.indexWhere((s) => s.id == subscriptionToUpdate.id);
       if (index != -1) {
-        _subscriptions[index] = updatedSubscription;
+        _subscriptions[index] = subscriptionToUpdate;
       }
       
       // Cancel existing notification
-      await _notificationService.cancelNotification(updatedSubscription.id.hashCode);
+      await _notificationService.cancelNotification(subscriptionToUpdate.id.hashCode);
       
       // Schedule new notification if enabled
-      if (updatedSubscription.notificationsEnabled && 
+      if (subscriptionToUpdate.notificationsEnabled && 
           _settingsService.areNotificationsEnabled() &&
-          updatedSubscription.status == AppConstants.statusActive) {
-        _scheduleNotification(updatedSubscription);
+          subscriptionToUpdate.status == AppConstants.statusActive) {
+        _scheduleNotification(subscriptionToUpdate);
       }
       
       notifyListeners();
@@ -237,7 +281,7 @@ class SubscriptionProvider extends ChangeNotifier {
   void _scheduleNotification(Subscription subscription) {
     if (subscription.renewalDate.isBefore(DateTime.now())) return;
     
-    _notificationService.scheduleRenewalReminder(
+    _notificationService.scheduleNotification(
       id: subscription.id.hashCode,
       title: 'Subscription Renewal Reminder',
       body: '${subscription.name} will renew in ${subscription.notificationDays} days',

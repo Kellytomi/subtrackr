@@ -112,23 +112,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   );
                 },
               ),
-              actions: [
-                // Theme toggle button
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: IconButton(
-                    icon: Icon(
-                      themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
-                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                    ),
-                    tooltip: themeProvider.isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-                    onPressed: () {
-                      themeProvider.toggleTheme();
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
             ),
           ];
         },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
+import 'package:subtrackr/data/services/settings_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -71,14 +72,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _completeOnboarding() async {
-    // Save that onboarding is complete
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('onboarding_complete', true);
-
     if (!mounted) return;
     
-    // Navigate to home screen
-    Navigator.pushReplacementNamed(context, AppConstants.homeRoute);
+    // Navigate to currency selection screen
+    Navigator.pushReplacementNamed(context, AppConstants.currencySelectionRoute);
   }
 
   @override

@@ -90,7 +90,7 @@ class SubscriptionCard extends StatelessWidget {
             SlidableAction(
               onPressed: (_) => onPause!(),
               backgroundColor: theme.colorScheme.surfaceVariant,
-              foregroundColor: theme.colorScheme.tertiary,
+              foregroundColor: Colors.black,
               icon: Icons.pause_rounded,
               borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
               padding: const EdgeInsets.all(0),
@@ -101,7 +101,7 @@ class SubscriptionCard extends StatelessWidget {
             SlidableAction(
               onPressed: (_) => onResume!(),
               backgroundColor: theme.colorScheme.surfaceVariant,
-              foregroundColor: customColors.activeSubscription,
+              foregroundColor: Colors.black,
               icon: Icons.play_arrow_rounded,
               borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
               padding: const EdgeInsets.all(0),
@@ -112,7 +112,7 @@ class SubscriptionCard extends StatelessWidget {
             SlidableAction(
               onPressed: (_) => onCancel!(),
               backgroundColor: theme.colorScheme.surfaceVariant,
-              foregroundColor: customColors.cancelledSubscription,
+              foregroundColor: Colors.black,
               icon: Icons.cancel_rounded,
               padding: const EdgeInsets.all(0),
               autoClose: true,
@@ -122,7 +122,7 @@ class SubscriptionCard extends StatelessWidget {
             SlidableAction(
               onPressed: (_) => onEdit!(),
               backgroundColor: theme.colorScheme.surfaceVariant,
-              foregroundColor: theme.colorScheme.primary,
+              foregroundColor: Colors.black,
               icon: Icons.edit_rounded,
               padding: const EdgeInsets.all(0),
               autoClose: true,
@@ -132,7 +132,7 @@ class SubscriptionCard extends StatelessWidget {
             SlidableAction(
               onPressed: (_) => onDelete!(),
               backgroundColor: theme.colorScheme.surfaceVariant,
-              foregroundColor: theme.colorScheme.error,
+              foregroundColor: Colors.black,
               icon: Icons.delete_rounded,
               borderRadius: const BorderRadius.horizontal(right: Radius.circular(16)),
               padding: const EdgeInsets.all(0),

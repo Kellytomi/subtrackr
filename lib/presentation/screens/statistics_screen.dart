@@ -331,10 +331,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Text(
-                            totalSpending.toStringAsFixed(2),
-                            style: theme.textTheme.displayLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                totalSpending.toStringAsFixed(2),
+                                style: theme.textTheme.displayLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
                         ],

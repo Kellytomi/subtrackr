@@ -74,19 +74,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // Appearance section
-                  _buildSectionHeader('Appearance', Icons.palette, colorScheme),
-                  _buildSettingCard(
-                    title: 'Theme',
-                    subtitle: _getThemeModeText(_themeMode),
-                    icon: _getThemeModeIcon(_themeMode),
-                    iconColor: _getThemeModeColor(_themeMode, isDarkMode, colorScheme),
-                    onTap: _showThemeSelector,
-                    colorScheme: colorScheme,
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
                   // Notifications section
                   _buildSectionHeader('Notifications', Icons.notifications, colorScheme),
                   Card(
@@ -505,11 +492,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _sendTestNotification() async {
     final notificationService = Provider.of<NotificationService>(context, listen: false);
     
-    await notificationService.showNotification(
-      id: 0,
-      title: 'Test Notification',
-      body: 'This is a test notification from SubTrackr',
-    );
+    await notificationService.showTestNotification();
     
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Test notification sent')),

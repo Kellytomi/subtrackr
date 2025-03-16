@@ -15,16 +15,27 @@ class LogoService {
     'apple music': 'https://www.apple.com/v/apple-music/s/images/overview/icon_apple_music__c6i9feyd4kky_large_2x.png',
     'netflix': 'https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.png',
     'disney+': 'https://cnbl-cdn.bamgrid.com/assets/7ecc8bcb60ad77193058d63e321bd21cbac2fc67281dbd9927676ea4a4c83594/original',
+    'disney plus': 'https://cnbl-cdn.bamgrid.com/assets/7ecc8bcb60ad77193058d63e321bd21cbac2fc67281dbd9927676ea4a4c83594/original',
+    'disneyplus': 'https://cnbl-cdn.bamgrid.com/assets/7ecc8bcb60ad77193058d63e321bd21cbac2fc67281dbd9927676ea4a4c83594/original',
     'hulu': 'https://assetshuluimcom-a.akamaihd.net/h3o/facebook_share_thumb_default_hulu.jpg',
     'hbo max': 'https://hbomax-images.warnermediacdn.com/2020-05/square%20social%20logo%20400%20x%20400_0.png',
+    'hbomax': 'https://hbomax-images.warnermediacdn.com/2020-05/square%20social%20logo%20400%20x%20400_0.png',
     'youtube premium': 'https://www.gstatic.com/youtube/img/branding/youtubelogo/svg/youtubelogo.svg',
+    'youtube': 'https://www.gstatic.com/youtube/img/branding/youtubelogo/svg/youtubelogo.svg',
     'amazon prime': 'https://m.media-amazon.com/images/G/01/digital/video/acquisition/amazon_video_light_on_dark.png',
+    'amazon': 'https://m.media-amazon.com/images/G/01/digital/video/acquisition/amazon_video_light_on_dark.png',
+    'prime': 'https://m.media-amazon.com/images/G/01/digital/video/acquisition/amazon_video_light_on_dark.png',
     'paramount+': 'https://www.paramountplus.com/assets/pplus/P+Logo_512x512.png',
+    'paramountplus': 'https://www.paramountplus.com/assets/pplus/P+Logo_512x512.png',
     'apple tv+': 'https://tv.apple.com/assets/knowledge-graph/tv.png',
+    'apple tv': 'https://tv.apple.com/assets/knowledge-graph/tv.png',
+    'appletvplus': 'https://tv.apple.com/assets/knowledge-graph/tv.png',
+    'appletv': 'https://tv.apple.com/assets/knowledge-graph/tv.png',
     'peacock': 'https://www.peacocktv.com/dam/growth/assets/seo/peacock-logo-white-background.png',
     'crunchyroll': 'https://static.crunchyroll.com/cr-assets/icons/beta/apple-touch-icon-152x152.png',
     'tidal': 'https://tidal.com/img/tidal-share-image.png',
     'deezer': 'https://e-cdns-files.dzcdn.net/img/common/opengraph-logo.png',
+    'cursor': 'https://cursor.sh/apple-touch-icon.png',
   };
   
   // Map of common subscription services to their logo URLs
@@ -161,8 +172,11 @@ class LogoService {
     'prime': 'amazon',
     'disney plus': 'disney+',
     'disney+': 'disney+',
+    'disneyplus': 'disney+',
+    'disney': 'disney+',
     'hbo': 'hbo',
     'hbo max': 'hbo max',
+    'hbomax': 'hbo max',
     'hbo now': 'hbo',
     'hulu': 'hulu',
     'hulu + live tv': 'hulu',
@@ -171,19 +185,34 @@ class LogoService {
     'youtube music': 'youtube music',
     'youtube tv': 'youtube tv',
     'apple music': 'apple music',
+    'applemusic': 'apple music',
     'apple tv': 'apple tv',
+    'appletv': 'apple tv',
     'apple tv+': 'apple tv+',
+    'appletvplus': 'apple tv+',
     'apple tv plus': 'apple tv+',
     'apple arcade': 'apple arcade',
+    'applearcade': 'apple arcade',
     'apple one': 'apple one',
+    'appleone': 'apple one',
     'apple news': 'apple news',
+    'applenews': 'apple news',
     'apple news+': 'apple news+',
+    'applenewsplus': 'apple news+',
     'apple fitness+': 'apple fitness+',
+    'applefitness': 'apple fitness+',
     'apple fitness plus': 'apple fitness+',
     'icloud': 'icloud',
     'icloud+': 'icloud',
     'icloud plus': 'icloud',
+    'paramount+': 'paramount+',
+    'paramountplus': 'paramount+',
+    'paramount plus': 'paramount+',
+    'paramount': 'paramount+',
   };
+  
+  // Common word separators to try when matching
+  final List<String> _commonSeparators = ['', ' ', '+', 'plus', '-', '_'];
   
   // Get logo URL from website URL or name
   String? getLogoUrl(String? websiteOrName) {
@@ -192,13 +221,11 @@ class LogoService {
     }
     
     // Normalize the input (lowercase, remove extra spaces)
-    final normalized = websiteOrName.toLowerCase().trim();
+    final normalized = _normalizeInput(websiteOrName);
     
     // STEP 1: Check direct logos for most popular services first
     for (final entry in _directLogos.entries) {
-      if (normalized == entry.key || 
-          normalized.contains(entry.key) || 
-          entry.key.contains(normalized)) {
+      if (_isMatch(normalized, entry.key)) {
         return entry.value;
       }
     }
@@ -211,12 +238,36 @@ class LogoService {
       }
     }
     
-    // STEP 3: Check for exact matches in our predefined map
+    // STEP 3: Try variations with different separators
+    final possibleMatches = _generateVariations(normalized);
+    for (final variation in possibleMatches) {
+      // Check in direct logos
+      for (final entry in _directLogos.entries) {
+        if (_isMatch(variation, entry.key)) {
+          return entry.value;
+        }
+      }
+      
+      // Check in aliases
+      if (_serviceAliases.containsKey(variation)) {
+        final serviceName = _serviceAliases[variation]!;
+        if (_logoMap.containsKey(serviceName)) {
+          return _logoMap[serviceName];
+        }
+      }
+      
+      // Check in logo map
+      if (_logoMap.containsKey(variation)) {
+        return _logoMap[variation];
+      }
+    }
+    
+    // STEP 4: Check for exact matches in our predefined map
     if (_logoMap.containsKey(normalized)) {
       return _logoMap[normalized];
     }
     
-    // STEP 4: Check for partial matches in our predefined map
+    // STEP 5: Check for partial matches in our predefined map
     for (final entry in _logoMap.entries) {
       // Check if the normalized input contains the service name
       if (normalized.contains(entry.key)) {
@@ -229,7 +280,7 @@ class LogoService {
       }
     }
     
-    // STEP 5: Special handling for common services that might be missed
+    // STEP 6: Special handling for common services that might be missed
     if (normalized.contains('spotify')) {
       return _directLogos['spotify'];
     }
@@ -254,7 +305,7 @@ class LogoService {
       return _directLogos['amazon prime'];
     }
     
-    // STEP 6: Try to extract domain from website URL
+    // STEP 7: Try to extract domain from website URL
     String? domain = _extractDomain(websiteOrName);
     
     // If we have a domain, try to get logo from various sources
@@ -263,15 +314,156 @@ class LogoService {
       return 'https://logo.clearbit.com/$domain';
     }
     
-    // STEP 7: Try to construct a domain from the name
+    // STEP 8: Try to construct a domain from the name
     final possibleDomain = _constructDomainFromName(normalized);
     if (possibleDomain != null) {
       // Try with constructed domain
       return 'https://logo.clearbit.com/$possibleDomain';
     }
     
-    // STEP 8: If all else fails, try Google's favicon service with the name
+    // STEP 9: If all else fails, try Google's favicon service with the name
     return 'https://www.google.com/s2/favicons?domain=$normalized&sz=128';
+  }
+  
+  // Normalize input by removing spaces, special characters, etc.
+  String _normalizeInput(String input) {
+    return input.toLowerCase().trim();
+  }
+  
+  // Check if two strings match, considering variations
+  bool _isMatch(String input, String target) {
+    // Direct match
+    if (input == target) return true;
+    
+    // Remove spaces and special characters for comparison
+    final cleanInput = input.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanTarget = target.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    
+    // Check if cleaned strings match
+    if (cleanInput == cleanTarget) return true;
+    
+    // Check if one contains the other
+    if (cleanInput.contains(cleanTarget) || cleanTarget.contains(cleanInput)) return true;
+    
+    return false;
+  }
+  
+  // Generate variations of the input with different separators
+  List<String> _generateVariations(String input) {
+    final result = <String>[];
+    
+    // Remove all spaces and special characters
+    final cleanInput = input.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    
+    // Common service prefixes to try
+    final prefixes = ['', 'apple', 'amazon', 'google', 'microsoft'];
+    
+    // Common words to split on
+    final commonWords = ['plus', 'premium', 'music', 'video', 'tv'];
+    
+    // Add the clean input
+    result.add(cleanInput);
+    
+    // Try with different separators for common splits
+    for (final word in commonWords) {
+      if (cleanInput.contains(word)) {
+        final parts = cleanInput.split(word);
+        if (parts.length > 1) {
+          for (final separator in _commonSeparators) {
+            result.add('${parts[0]}$separator$word');
+            result.add('$word$separator${parts[1]}');
+          }
+        }
+      }
+    }
+    
+    // Try with different prefixes
+    for (final prefix in prefixes) {
+      if (prefix.isNotEmpty && !cleanInput.startsWith(prefix) && !input.contains(prefix)) {
+        for (final separator in _commonSeparators) {
+          result.add('$prefix$separator$cleanInput');
+        }
+      }
+    }
+    
+    return result;
+  }
+  
+  // Get all possible logos for a given input
+  List<LogoSuggestion> getLogoSuggestions(String input) {
+    if (input.isEmpty) return [];
+    
+    final suggestions = <LogoSuggestion>[];
+    final normalized = _normalizeInput(input);
+    final seenUrls = <String>{};
+    
+    // Function to add a suggestion if the URL hasn't been seen yet
+    void addSuggestion(String name, String url) {
+      if (!seenUrls.contains(url)) {
+        suggestions.add(LogoSuggestion(name: name, logoUrl: url));
+        seenUrls.add(url);
+      }
+    }
+    
+    // Check direct logos
+    for (final entry in _directLogos.entries) {
+      if (_isMatch(normalized, entry.key)) {
+        addSuggestion(entry.key, entry.value);
+      }
+    }
+    
+    // Check aliases
+    for (final entry in _serviceAliases.entries) {
+      if (_isMatch(normalized, entry.key)) {
+        final serviceName = entry.value;
+        if (_logoMap.containsKey(serviceName)) {
+          addSuggestion(entry.key, _logoMap[serviceName]!);
+        }
+      }
+    }
+    
+    // Check variations
+    final variations = _generateVariations(normalized);
+    for (final variation in variations) {
+      // Check in direct logos
+      for (final entry in _directLogos.entries) {
+        if (_isMatch(variation, entry.key)) {
+          addSuggestion(entry.key, entry.value);
+        }
+      }
+    }
+    
+    // Add special handling for common services
+    if (normalized.contains('spotify')) {
+      addSuggestion('Spotify', _directLogos['spotify']!);
+    }
+    
+    if (normalized.contains('apple')) {
+      if (_directLogos.containsKey('apple music')) {
+        addSuggestion('Apple Music', _directLogos['apple music']!);
+      }
+      if (_directLogos.containsKey('apple tv+')) {
+        addSuggestion('Apple TV+', _directLogos['apple tv+']!);
+      }
+    }
+    
+    if (normalized.contains('disney')) {
+      addSuggestion('Disney+', _directLogos['disney+']!);
+    }
+    
+    if (normalized.contains('netflix')) {
+      addSuggestion('Netflix', _directLogos['netflix']!);
+    }
+    
+    if (normalized.contains('hbo')) {
+      addSuggestion('HBO Max', _directLogos['hbo max']!);
+    }
+    
+    if (normalized.contains('amazon') || normalized.contains('prime')) {
+      addSuggestion('Amazon Prime', _directLogos['amazon prime']!);
+    }
+    
+    return suggestions;
   }
   
   // Extract domain from a URL or text
@@ -383,4 +575,12 @@ class LogoService {
         return Icons.subscriptions_rounded;
     }
   }
+}
+
+// Class to represent a logo suggestion
+class LogoSuggestion {
+  final String name;
+  final String logoUrl;
+  
+  LogoSuggestion({required this.name, required this.logoUrl});
 } 

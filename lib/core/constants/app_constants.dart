@@ -39,6 +39,7 @@ class AppConstants {
   // Routes
   static const String homeRoute = '/';
   static const String onboardingRoute = '/onboarding';
+  static const String currencySelectionRoute = '/currency-selection';
   static const String addSubscriptionRoute = '/add-subscription';
   static const String editSubscriptionRoute = '/edit-subscription';
   static const String subscriptionDetailsRoute = '/subscription-details';
