@@ -32,13 +32,14 @@ class SubscriptionModelAdapter extends TypeAdapter<SubscriptionModel> {
       notificationsEnabled: fields[12] as bool,
       notificationDays: fields[13] as int,
       paymentHistory: (fields[14] as List?)?.cast<DateTime>(),
+      currencyCode: fields[15] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, SubscriptionModel obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -68,7 +69,9 @@ class SubscriptionModelAdapter extends TypeAdapter<SubscriptionModel> {
       ..writeByte(13)
       ..write(obj.notificationDays)
       ..writeByte(14)
-      ..write(obj.paymentHistory);
+      ..write(obj.paymentHistory)
+      ..writeByte(15)
+      ..write(obj.currencyCode);
   }
 
   @override

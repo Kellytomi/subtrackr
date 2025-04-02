@@ -84,7 +84,7 @@ class NotificationService {
                   AndroidFlutterLocalNotificationsPlugin>();
       
       // Request notification permission for Android 13+
-      final bool? granted = await androidImplementation?.requestPermission();
+      final bool? granted = await androidImplementation?.requestNotificationsPermission();
       debugPrint('Android notification permissions granted: $granted');
       
       return granted ?? false;
@@ -177,8 +177,6 @@ class NotificationService {
           tz.TZDateTime.from(scheduledDate, tz.local),
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
           payload: payload,
         );
         debugPrint('Notification scheduled successfully');
@@ -199,8 +197,6 @@ class NotificationService {
               tz.TZDateTime.from(scheduledDate, tz.local),
               notificationDetails,
               androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-              uiLocalNotificationDateInterpretation:
-                  UILocalNotificationDateInterpretation.absoluteTime,
               payload: payload,
             );
             debugPrint('Notification scheduled with inexact timing (fallback)');
@@ -213,8 +209,6 @@ class NotificationService {
               tz.TZDateTime.from(scheduledDate, tz.local),
               notificationDetails,
               androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-              uiLocalNotificationDateInterpretation:
-                  UILocalNotificationDateInterpretation.absoluteTime,
               payload: payload,
             );
             debugPrint('Notification scheduled with inexact timing (fallback)');
