@@ -1,0 +1,13 @@
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/SubTrackr.png"
+  adaptive_icon_background: "#FFFFFF" # White background
+  adaptive_icon_foreground: "assets/icons/SubTrackr.png"
+  remove_alpha_ios: true
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false 
