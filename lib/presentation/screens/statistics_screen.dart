@@ -6,6 +6,7 @@ import 'package:subtrackr/domain/entities/subscription.dart';
 import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
 import 'package:subtrackr/presentation/screens/onboarding_screen.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
@@ -335,7 +336,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
-                                totalSpending.toStringAsFixed(2),
+                                NumberFormat('#,##0.00', 'en_US').format(totalSpending),
                                 style: theme.textTheme.displayLarge?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -543,7 +544,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                                   ),
                                                 ),
                                                 Text(
-                                                  '${_selectedCurrency?.symbol}${amount.toStringAsFixed(2)}',
+                                                  '${_selectedCurrency?.symbol}${NumberFormat('#,##0.00', 'en_US').format(amount)}',
                                                   style: theme.textTheme.bodyLarge?.copyWith(
                                                     fontWeight: FontWeight.bold,
                                                   ),

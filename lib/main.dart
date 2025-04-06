@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
+import 'package:subtrackr/core/theme/app_theme.dart';
 import 'package:subtrackr/data/repositories/subscription_repository.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
@@ -12,7 +13,6 @@ import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
 import 'package:subtrackr/presentation/blocs/theme_provider.dart';
 import 'package:subtrackr/presentation/screens/home_screen.dart';
 import 'package:subtrackr/presentation/screens/add_subscription_screen.dart';
-import 'package:subtrackr/presentation/screens/edit_subscription_screen.dart';
 import 'package:subtrackr/presentation/screens/main_layout.dart';
 import 'package:subtrackr/presentation/screens/notification_test_screen.dart';
 import 'package:subtrackr/presentation/screens/onboarding_screen.dart';
@@ -112,7 +112,6 @@ class MyApp extends StatelessWidget {
               AppConstants.currencySelectionRoute: (_) => const CurrencySelectionScreen(),
               AppConstants.homeRoute: (_) => const MainLayout(),
               AppConstants.addSubscriptionRoute: (_) => const AddSubscriptionScreen(),
-              AppConstants.editSubscriptionRoute: (_) => const EditSubscriptionScreen(),
               AppConstants.subscriptionDetailsRoute: (_) => const SubscriptionDetailsScreen(),
               AppConstants.settingsRoute: (_) => const SettingsScreen(),
               AppConstants.statisticsRoute: (_) => const StatisticsScreen(),

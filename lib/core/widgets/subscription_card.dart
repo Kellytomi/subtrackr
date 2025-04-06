@@ -11,7 +11,6 @@ import 'package:subtrackr/domain/entities/subscription.dart';
 class SubscriptionCard extends StatelessWidget {
   final Subscription subscription;
   final VoidCallback onTap;
-  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onPause;
   final VoidCallback? onResume;
@@ -22,7 +21,6 @@ class SubscriptionCard extends StatelessWidget {
     Key? key,
     required this.subscription,
     required this.onTap,
-    this.onEdit,
     this.onDelete,
     this.onPause,
     this.onResume,
@@ -118,16 +116,6 @@ class SubscriptionCard extends StatelessWidget {
               autoClose: true,
               label: 'Cancel',
             ),
-          if (onEdit != null)
-            SlidableAction(
-              onPressed: (_) => onEdit!(),
-              backgroundColor: theme.colorScheme.surfaceVariant,
-              foregroundColor: Colors.black,
-              icon: Icons.edit_rounded,
-              padding: const EdgeInsets.all(0),
-              autoClose: true,
-              label: 'Edit',
-            ),
           if (onDelete != null)
             SlidableAction(
               onPressed: (_) => onDelete!(),
@@ -190,7 +178,7 @@ class SubscriptionCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(12),
                                 child: Image.network(
                                   subscription.logoUrl!,
-                                  fit: BoxFit.cover,
+                                  fit: BoxFit.contain,
                                   errorBuilder: (context, error, stackTrace) {
                                     return Icon(
                                       logoService.getFallbackIcon(subscription.name),

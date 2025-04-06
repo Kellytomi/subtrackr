@@ -250,32 +250,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 width: viewportWidth,
                 height: 8, // Increased height to match onboarding indicator
                 margin: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    summaryCards.length,
-                    (index) {
-                      // Calculate which card is currently most visible
-                      final double cardWidth = 180.0 + 16.0; // card width + margin
-                      final double scrollPosition = horizontalScrollController.hasClients 
-                          ? horizontalScrollController.offset 
-                          : 0.0;
-                      final int activeCardIndex = (scrollPosition / cardWidth).round().clamp(0, summaryCards.length - 1);
-                      
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        height: 8,
-                        width: index == activeCardIndex ? 24 : 8,
-                        decoration: BoxDecoration(
-                          color: index == activeCardIndex 
-                              ? (isDark ? Colors.white : colorScheme.primary)
-                              : (isDark ? Colors.white.withOpacity(0.3) : colorScheme.primary.withOpacity(0.3)),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      );
-                    },
-                  ),
+                child: Builder(
+                  builder: (context) {
+                    // Calculate number of scroll positions
+                    final int totalScrollPositions = (totalContentWidth / viewportWidth).ceil();
+                    // Calculate current scroll position as a percentage
+                    final double scrollPercentage = horizontalScrollController.hasClients
+                        ? (horizontalScrollController.offset / (totalContentWidth - viewportWidth)).clamp(0.0, 1.0)
+                        : 0.0;
+                    // Calculate which scroll position is active (0-based index)
+                    final int activePositionIndex = (scrollPercentage * (totalScrollPositions - 1)).round();
+                    
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        totalScrollPositions,
+                        (index) {
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            height: 8,
+                            width: index == activePositionIndex ? 24 : 8,
+                            decoration: BoxDecoration(
+                              color: index == activePositionIndex 
+                                  ? (isDark ? Colors.white : colorScheme.primary)
+                                  : (isDark ? Colors.white.withOpacity(0.3) : colorScheme.primary.withOpacity(0.3)),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  }
                 ),
               ),
           ],
@@ -485,13 +491,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             Navigator.pushNamed(
               context,
               AppConstants.subscriptionDetailsRoute,
-              arguments: subscription.id,
-            );
-          },
-          onEdit: () {
-            Navigator.pushNamed(
-              context,
-              AppConstants.editSubscriptionRoute,
               arguments: subscription.id,
             );
           },

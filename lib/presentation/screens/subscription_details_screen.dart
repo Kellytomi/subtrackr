@@ -114,26 +114,6 @@ class SubscriptionDetailsScreen extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
-                    icon: Icon(
-                      Icons.edit_outlined,
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
-                    onPressed: () {
-                      Navigator.pushNamed(
-                        context,
-                        AppConstants.editSubscriptionRoute,
-                        arguments: subscription.id,
-                      );
-                    },
-                    tooltip: 'Edit',
-                    style: IconButton.styleFrom(
-                      backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -162,7 +142,7 @@ class SubscriptionDetailsScreen extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(16),
                                 child: Image.network(
                                   subscription.logoUrl!,
-                                  fit: BoxFit.cover,
+                                  fit: BoxFit.contain,
                                   errorBuilder: (context, error, stackTrace) {
                                     return Icon(
                                       logoService.getFallbackIcon(subscription.name),

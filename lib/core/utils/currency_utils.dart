@@ -17,7 +17,8 @@ class Currency {
 class CurrencyUtils {
   // Format a number as currency with the given symbol
   static String formatCurrency(double amount, String currencySymbol) {
-    return '$currencySymbol${amount.toStringAsFixed(2)}';
+    final formatter = NumberFormat('#,##0.00', 'en_US');
+    return '$currencySymbol${formatter.format(amount)}';
   }
   
   // Format a number as currency with the given symbol and locale
