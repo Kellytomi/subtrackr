@@ -7,6 +7,8 @@ import 'package:subtrackr/core/utils/date_utils.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
 import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
+import 'package:subtrackr/core/widgets/app_tip.dart';
+import 'package:subtrackr/core/utils/tips_helper.dart';
 
 class SubscriptionDetailsScreen extends StatefulWidget {
   const SubscriptionDetailsScreen({super.key});
@@ -386,81 +388,88 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                           
                           // Quick action buttons instead of status badge
                           Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // Activate button
-                                if (subscription.status != AppConstants.statusActive)
-                                  Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        _updateSubscriptionStatus(
-                                          subscription.id, 
-                                          AppConstants.statusActive
-                                        );
-                                      },
-                                      icon: const Icon(Icons.play_circle_outline, color: Colors.white),
-                                      label: const Text('Start'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                            child: AppTip(
+                              tipKey: TipsHelper.quickActionsKey,
+                              title: 'Quick Actions',
+                              message: 'Easily change your subscription status with these buttons. Pause temporarily or cancel a subscription you no longer need.',
+                              icon: Icons.touch_app,
+                              position: TipPosition.bottom,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  // Activate button
+                                  if (subscription.status != AppConstants.statusActive)
+                                    Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                                      child: ElevatedButton.icon(
+                                        onPressed: () {
+                                          _updateSubscriptionStatus(
+                                            subscription.id, 
+                                            AppConstants.statusActive
+                                          );
+                                        },
+                                        icon: const Icon(Icons.play_circle_outline, color: Colors.white),
+                                        label: const Text('Start'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                         ),
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                       ),
                                     ),
-                                  ),
-                                
-                                // Pause button
-                                if (subscription.status != AppConstants.statusPaused)
-                                  Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        _updateSubscriptionStatus(
-                                          subscription.id, 
-                                          AppConstants.statusPaused
-                                        );
-                                      },
-                                      icon: const Icon(Icons.pause_circle_outline, color: Colors.black87),
-                                      label: const Text('Pause'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.amber,
-                                        foregroundColor: Colors.black87,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                  
+                                  // Pause button
+                                  if (subscription.status != AppConstants.statusPaused)
+                                    Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                                      child: ElevatedButton.icon(
+                                        onPressed: () {
+                                          _updateSubscriptionStatus(
+                                            subscription.id, 
+                                            AppConstants.statusPaused
+                                          );
+                                        },
+                                        icon: const Icon(Icons.pause_circle_outline, color: Colors.black87),
+                                        label: const Text('Pause'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.amber,
+                                          foregroundColor: Colors.black87,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                         ),
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                       ),
                                     ),
-                                  ),
-                                
-                                // Cancel button
-                                if (subscription.status != AppConstants.statusCancelled)
-                                  Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        _updateSubscriptionStatus(
-                                          subscription.id, 
-                                          AppConstants.statusCancelled
-                                        );
-                                      },
-                                      icon: const Icon(Icons.cancel_outlined, color: Colors.white),
-                                      label: const Text('Cancel'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                  
+                                  // Cancel button
+                                  if (subscription.status != AppConstants.statusCancelled)
+                                    Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                                      child: ElevatedButton.icon(
+                                        onPressed: () {
+                                          _updateSubscriptionStatus(
+                                            subscription.id, 
+                                            AppConstants.statusCancelled
+                                          );
+                                        },
+                                        icon: const Icon(Icons.cancel_outlined, color: Colors.white),
+                                        label: const Text('Cancel'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                         ),
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                       ),
                                     ),
-                                  ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                           
@@ -853,18 +862,25 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                               }),
                             ),
                             const SizedBox(height: 24),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 50,
-                              child: ElevatedButton.icon(
-                                onPressed: () => _markAsPaid(subscription),
-                                icon: const Icon(Icons.check_circle_outline_rounded),
-                                label: const Text('Mark as Paid'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: colorScheme.primary,
-                                  foregroundColor: colorScheme.onPrimary,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                            AppTip(
+                              tipKey: TipsHelper.historyTipKey,
+                              title: 'Mark Payments',
+                              message: 'When a subscription is due or overdue, you can mark it as paid here. This will update the renewal date and add to payment history.',
+                              icon: Icons.history,
+                              position: TipPosition.top,
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _markAsPaid(subscription),
+                                  icon: const Icon(Icons.check_circle_outline_rounded),
+                                  label: const Text('Mark as Paid'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: colorScheme.primary,
+                                    foregroundColor: colorScheme.onPrimary,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                   ),
                                 ),
                               ),

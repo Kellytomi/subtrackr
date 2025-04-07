@@ -6,6 +6,7 @@ import 'package:subtrackr/data/services/notification_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
 import 'package:subtrackr/presentation/blocs/theme_provider.dart';
+import 'package:subtrackr/core/utils/tips_helper.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -125,7 +126,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       value: _notificationsEnabled,
                       onChanged: _toggleNotifications,
                       leadingIcon: Icons.notifications,
-                      color: _notificationsEnabled ? Colors.blue : Colors.grey,
+                      iconColor: _notificationsEnabled ? Colors.blue : Colors.grey,
                     ),
                     if (_notificationsEnabled)
                       _buildTimePickerCard(
@@ -196,6 +197,29 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     iconColor: Colors.red,
                     onTap: _showClearDataConfirmation,
                     colorScheme: colorScheme,
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Help & Support Section
+                  Text(
+                    'Help & Support',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Reset Tips and Tutorials
+                  _buildActionCard(
+                    context: context,
+                    title: 'Reset App Tips',
+                    subtitle: 'Show first-time user tips and tutorials again',
+                    leadingIcon: Icons.lightbulb_outline,
+                    iconColor: colorScheme.tertiary,
+                    onTap: _resetAppTips,
                   ),
                   
                   const SizedBox(height: 24),
@@ -697,7 +721,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     required bool value,
     required Function(bool) onChanged,
     required IconData leadingIcon,
-    required Color color,
+    required Color iconColor,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -732,12 +756,12 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           secondary: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: value ? color.withOpacity(0.1) : (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+              color: value ? iconColor.withOpacity(0.1) : (isDark ? Colors.white : Colors.black).withOpacity(0.05),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               leadingIcon,
-              color: value ? color : Colors.grey,
+              color: value ? iconColor : Colors.grey,
               size: 24,
             ),
           ),
@@ -811,6 +835,141 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
                 color: (isDark ? Colors.white : Colors.black).withOpacity(0.3),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _resetAppTips() async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Reset App Tips',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+        content: const Text(
+          'This will reset all app tips and tutorials. You will see the first-time user guides again when you navigate through the app.',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+            },
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: colorScheme.primary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Reset Tips'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result == true) {
+      await TipsHelper.resetAllTips();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('App tips have been reset'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
+  }
+
+  Widget _buildActionCard({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData leadingIcon,
+    required Color iconColor,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: theme.colorScheme.outline.withOpacity(0.2),
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  leadingIcon,
+                  color: iconColor,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.white70 : Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: isDark ? Colors.white54 : Colors.black45,
               ),
             ],
           ),
