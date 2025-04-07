@@ -13,8 +13,8 @@ import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
 import 'package:subtrackr/presentation/blocs/theme_provider.dart';
 import 'package:subtrackr/presentation/screens/home_screen.dart';
 import 'package:subtrackr/presentation/screens/add_subscription_screen.dart';
+import 'package:subtrackr/presentation/screens/edit_subscription_screen.dart';
 import 'package:subtrackr/presentation/screens/main_layout.dart';
-import 'package:subtrackr/presentation/screens/notification_test_screen.dart';
 import 'package:subtrackr/presentation/screens/onboarding_screen.dart';
 import 'package:subtrackr/presentation/screens/subscription_details_screen.dart';
 import 'package:subtrackr/presentation/screens/settings_screen.dart';
@@ -23,6 +23,13 @@ import 'package:subtrackr/presentation/screens/onboarding/currency_selection_scr
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Set status bar style based on theme
+  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarBrightness: Brightness.light, // iOS: dark icons for light background
+    statusBarIconBrightness: Brightness.dark, // Android: dark icons for light background
+  ));
   
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
@@ -103,7 +110,8 @@ class MyApp extends StatelessWidget {
         builder: (context, themeProvider, _) {
           return MaterialApp(
             title: AppConstants.appName,
-            theme: themeProvider.themeData,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
             debugShowCheckedModeBanner: false,
             initialRoute: initialRoute,
@@ -112,10 +120,10 @@ class MyApp extends StatelessWidget {
               AppConstants.currencySelectionRoute: (_) => const CurrencySelectionScreen(),
               AppConstants.homeRoute: (_) => const MainLayout(),
               AppConstants.addSubscriptionRoute: (_) => const AddSubscriptionScreen(),
+              AppConstants.editSubscriptionRoute: (_) => const EditSubscriptionScreen(),
               AppConstants.subscriptionDetailsRoute: (_) => const SubscriptionDetailsScreen(),
               AppConstants.settingsRoute: (_) => const SettingsScreen(),
               AppConstants.statisticsRoute: (_) => const StatisticsScreen(),
-              AppConstants.notificationTestRoute: (_) => const NotificationTestScreen(),
             },
           );
         },

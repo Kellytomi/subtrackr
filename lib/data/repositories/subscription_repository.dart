@@ -82,16 +82,16 @@ class SubscriptionRepository {
     await _subscriptionsBox.delete(id);
   }
   
-  // Get subscriptions due soon (within the next 7 days)
+  // Get subscriptions due soon (within the next 3 days)
   List<Subscription> getSubscriptionsDueSoon() {
     final now = DateTime.now();
-    final sevenDaysLater = now.add(const Duration(days: 7));
+    final threeDaysLater = now.add(const Duration(days: 3));
     
     return _subscriptionsBox.values
         .where((model) => 
             model.status == AppConstants.statusActive &&
             model.renewalDate.isAfter(now) &&
-            model.renewalDate.isBefore(sevenDaysLater))
+            model.renewalDate.isBefore(threeDaysLater))
         .map((model) => model.toEntity())
         .toList();
   }

@@ -152,9 +152,6 @@ class NotificationService {
         category: AndroidNotificationCategory.reminder,
         visibility: NotificationVisibility.public,
         fullScreenIntent: true,
-        actions: [
-          const AndroidNotificationAction('mark_paid', 'Mark as Paid'),
-        ],
       );
 
       final iosDetails = const DarwinNotificationDetails(
@@ -243,6 +240,7 @@ class NotificationService {
       channelDescription: 'This channel is used for subscription renewal reminders',
       importance: Importance.max,
       priority: Priority.high,
+      // No action buttons
     );
 
     const iosDetails = DarwinNotificationDetails(

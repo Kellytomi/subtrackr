@@ -247,7 +247,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                   child: Row(
                     children: [
-                      const SizedBox(width: 16),
                       Text(
                         'Expense Insights',
                         style: theme.textTheme.headlineMedium?.copyWith(

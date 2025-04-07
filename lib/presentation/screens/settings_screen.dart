@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
-import 'package:subtrackr/core/widgets/custom_app_bar.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
 import 'package:subtrackr/presentation/blocs/theme_provider.dart';
-import 'package:subtrackr/presentation/screens/add_subscription_screen.dart';
-import 'package:subtrackr/presentation/screens/onboarding/currency_selection_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,11 +14,13 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProviderStateMixin {
   late TimeOfDay _notificationTime;
   late String _currencyCode;
   late bool _notificationsEnabled;
   late ThemeMode _themeMode;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
   
   @override
   void initState() {
@@ -33,13 +32,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     _themeMode = themeProvider.themeMode;
+    
+    // Setup animations
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    );
+    
+    _animationController.forward();
+  }
+  
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     
     // Get currency details
     final currency = CurrencyUtils.getCurrencyByCode(_currencyCode) ?? 
@@ -51,121 +70,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(
+                    color: colorScheme.outline.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+              ),
               child: Row(
                 children: [
-                  const SizedBox(width: 16),
                   Text(
                     'Settings',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    style: TextStyle(
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                      color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
                     ),
                   ),
                 ],
               ),
             ),
             
-            const SizedBox(height: 16),
-            
             // Settings list
             Expanded(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 children: [
-                  // Notifications section
-                  _buildSectionHeader('Notifications', Icons.notifications, colorScheme),
-                  Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    // Theme section
+                    _buildSectionHeader('Appearance', Icons.palette_outlined, colorScheme),
+                    _buildSettingCard(
+                      title: 'Theme',
+                      subtitle: _getThemeModeText(_themeMode),
+                      icon: _getThemeModeIcon(_themeMode),
+                      iconColor: _getThemeModeColor(_themeMode, isDarkMode, colorScheme),
+                      onTap: _showThemeSelector,
+                      colorScheme: colorScheme,
                     ),
-                    elevation: 0,
-                    color: Theme.of(context).colorScheme.surface,
-                    child: SwitchListTile(
-                      title: Text(
-                        'Enable Notifications',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w500,
-                          color: Theme.of(context).brightness == Brightness.dark 
-                              ? Colors.white 
-                              : Colors.black,
-                        ),
-                      ),
-                      subtitle: Text(
-                        'Get reminders for upcoming renewals',
-                        style: TextStyle(
-                          color: (Theme.of(context).brightness == Brightness.dark 
-                              ? Colors.white 
-                              : Colors.black).withOpacity(0.7),
-                          fontSize: 13,
-                        ),
-                      ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Notifications section
+                    _buildSectionHeader('Notifications', Icons.notifications_outlined, colorScheme),
+                    _buildToggleCard(
+                      context: context,
+                      title: 'Enable Notifications',
+                      subtitle: _notificationsEnabled ? 'Enabled' : 'Disabled',
                       value: _notificationsEnabled,
                       onChanged: _toggleNotifications,
-                      secondary: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: (Theme.of(context).brightness == Brightness.dark 
-                              ? Colors.white 
-                              : Colors.black).withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          _notificationsEnabled ? Icons.notifications_active : Icons.notifications_off,
-                          color: _notificationsEnabled 
-                              ? colorScheme.primary 
-                              : Colors.grey,
-                        ),
+                      leadingIcon: Icons.notifications,
+                      color: _notificationsEnabled ? Colors.blue : Colors.grey,
+                    ),
+                    if (_notificationsEnabled)
+                      _buildTimePickerCard(
+                        context: context,
+                        title: 'Notification Time',
+                        subtitle:
+                            'Notifications will be sent at ${_formatTimeOfDay(_notificationTime)}',
+                        onTap: _showTimePicker,
+                        leadingIcon: Icons.access_time,
+                        color: Colors.orange,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    ),
-                  ),
-                  
-                  if (_notificationsEnabled) ...[
-                    const SizedBox(height: 16),
-                    _buildSettingCard(
-                      title: 'Notification Time',
-                      subtitle: _formatTimeOfDay(_notificationTime),
-                      icon: Icons.access_time,
-                      iconColor: colorScheme.primary,
-                      onTap: _showTimePicker,
-                      colorScheme: colorScheme,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSettingCard(
-                      title: 'Test Notification',
-                      subtitle: 'Send a test notification to verify settings',
-                      icon: Icons.send,
-                      iconColor: colorScheme.tertiary,
-                      onTap: _sendTestNotification,
-                      colorScheme: colorScheme,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSettingCard(
-                      title: 'Notification Test Screen',
-                      subtitle: 'Advanced notification testing options',
-                      icon: Icons.notifications_active,
-                      iconColor: colorScheme.secondary,
-                      onTap: () {
-                        Navigator.pushNamed(context, AppConstants.notificationTestRoute);
-                      },
-                      colorScheme: colorScheme,
-                    ),
-                  ],
                   
                   const SizedBox(height: 24),
                   
                   // Currency section
-                  _buildSectionHeader('Currency', Icons.attach_money, colorScheme),
+                    _buildSectionHeader('Currency', Icons.attach_money_rounded, colorScheme),
                   _buildSettingCard(
                     title: 'Default Currency',
                     subtitle: '${currency.flag} ${currency.code} - ${currency.name} (${currency.symbol})',
-                    icon: Icons.currency_exchange,
+                      icon: Icons.currency_exchange_rounded,
                     iconColor: colorScheme.tertiary,
                     onTap: _showCurrencySelector,
                     colorScheme: colorScheme,
@@ -174,16 +154,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 24),
                   
                   // Data management section
-                  _buildSectionHeader('Data Management', Icons.storage, colorScheme),
+                    _buildSectionHeader('Data Management', Icons.storage_rounded, colorScheme),
                   _buildSettingCard(
                     title: 'Export Data',
                     subtitle: 'Export your subscriptions as JSON',
-                    icon: Icons.file_download,
+                      icon: Icons.file_download_outlined,
                     iconColor: colorScheme.primary,
                     onTap: () {
                       // TODO: Implement export functionality
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Export functionality coming soon')),
+                          SnackBar(
+                            content: const Text('Export functionality coming soon'),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
                       );
                     },
                     colorScheme: colorScheme,
@@ -191,12 +175,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildSettingCard(
                     title: 'Import Data',
                     subtitle: 'Import subscriptions from JSON',
-                    icon: Icons.file_upload,
+                      icon: Icons.file_upload_outlined,
                     iconColor: colorScheme.secondary,
                     onTap: () {
                       // TODO: Implement import functionality
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Import functionality coming soon')),
+                          SnackBar(
+                            content: const Text('Import functionality coming soon'),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
                       );
                     },
                     colorScheme: colorScheme,
@@ -204,7 +192,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildSettingCard(
                     title: 'Clear All Data',
                     subtitle: 'Delete all subscriptions and reset settings',
-                    icon: Icons.delete_forever,
+                      icon: Icons.delete_forever_rounded,
                     iconColor: Colors.red,
                     onTap: _showClearDataConfirmation,
                     colorScheme: colorScheme,
@@ -213,11 +201,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 24),
                   
                   // About section
-                  _buildSectionHeader('About', Icons.info, colorScheme),
+                    _buildSectionHeader('About', Icons.info_outline_rounded, colorScheme),
                   _buildSettingCard(
                     title: 'Version',
                     subtitle: AppConstants.appVersion,
-                    icon: Icons.android,
+                      icon: Icons.android_rounded,
                     iconColor: colorScheme.tertiary,
                     onTap: null,
                     colorScheme: colorScheme,
@@ -225,12 +213,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildSettingCard(
                     title: 'Privacy Policy',
                     subtitle: 'Read our privacy policy',
-                    icon: Icons.privacy_tip,
+                      icon: Icons.privacy_tip_outlined,
                     iconColor: colorScheme.primary,
                     onTap: () {
                       // TODO: Open privacy policy
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Privacy policy coming soon')),
+                          SnackBar(
+                            content: const Text('Privacy policy coming soon'),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
                       );
                     },
                     colorScheme: colorScheme,
@@ -238,12 +230,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildSettingCard(
                     title: 'Terms of Service',
                     subtitle: 'Read our terms of service',
-                    icon: Icons.description,
+                      icon: Icons.description_outlined,
                     iconColor: colorScheme.secondary,
                     onTap: () {
                       // TODO: Open terms of service
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Terms of service coming soon')),
+                          SnackBar(
+                            content: const Text('Terms of service coming soon'),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
                       );
                     },
                     colorScheme: colorScheme,
@@ -251,6 +247,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   
                   const SizedBox(height: 40),
                 ],
+                ),
               ),
             ),
           ],
@@ -267,16 +264,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.only(bottom: 16, left: 8),
       child: Row(
         children: [
-          Icon(
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
             icon, 
-            size: 20, 
-            color: isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)
+              size: 18, 
+              color: colorScheme.primary,
           ),
-          const SizedBox(width: 8),
+          ),
+          const SizedBox(width: 12),
           Text(
             title,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: isDark ? Colors.white : Colors.black,
             ),
@@ -298,45 +302,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final isDark = theme.brightness == Brightness.dark;
     
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
       elevation: 0,
       color: theme.colorScheme.surface,
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: iconColor),
-        ),
-        title: Text(
+                  color: iconColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
           title,
           style: TextStyle(
-            fontWeight: FontWeight.w500,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
             color: isDark ? Colors.white : Colors.black,
           ),
         ),
-        subtitle: Text(
+                    const SizedBox(height: 4),
+                    Text(
           subtitle,
           style: TextStyle(
+                        fontSize: 14,
             color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
-            fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (onTap != null)
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: (isDark ? Colors.white : Colors.black).withOpacity(0.3),
+                ),
+            ],
           ),
-        ),
-        trailing: onTap != null 
-            ? Icon(
-                Icons.chevron_right, 
-                color: (isDark ? Colors.white : Colors.black).withOpacity(0.5)
-              ) 
-            : null,
-        onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
         ),
       ),
     );
@@ -358,9 +376,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case ThemeMode.system:
         return Icons.brightness_auto;
       case ThemeMode.light:
-        return Icons.brightness_7;
+        return Icons.light_mode_rounded;
       case ThemeMode.dark:
-        return Icons.brightness_3;
+        return Icons.dark_mode_rounded;
     }
   }
 
@@ -383,15 +401,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showThemeSelector() async {
-    final result = await showDialog<ThemeMode>(
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
+    final result = await showModalBottomSheet<ThemeMode>(
       context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('Select Theme'),
+      backgroundColor: colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildThemeOption(ThemeMode.system, 'System default', Icons.brightness_auto),
-          _buildThemeOption(ThemeMode.light, 'Light mode', Icons.brightness_7),
-          _buildThemeOption(ThemeMode.dark, 'Dark mode', Icons.brightness_3),
-        ],
+            Padding(
+              padding: const EdgeInsets.only(left: 16, bottom: 16),
+              child: Text(
+                'Select Theme',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ),
+            ),
+            _buildThemeOption(ThemeMode.system, 'System default', Icons.brightness_auto, colorScheme),
+            const SizedBox(height: 8),
+            _buildThemeOption(ThemeMode.light, 'Light mode', Icons.light_mode_rounded, colorScheme),
+            const SizedBox(height: 8),
+            _buildThemeOption(ThemeMode.dark, 'Dark mode', Icons.dark_mode_rounded, colorScheme),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
     
@@ -405,36 +449,112 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Widget _buildThemeOption(ThemeMode mode, String title, IconData icon) {
-    return SimpleDialogOption(
-      onPressed: () {
+  Widget _buildThemeOption(ThemeMode mode, String title, IconData icon, ColorScheme colorScheme) {
+    final isSelected = _themeMode == mode;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    Color iconColor;
+    
+    switch (mode) {
+      case ThemeMode.system:
+        iconColor = colorScheme.tertiary;
+        break;
+      case ThemeMode.light:
+        iconColor = colorScheme.primary;
+        break;
+      case ThemeMode.dark:
+        iconColor = colorScheme.secondary;
+        break;
+    }
+    
+    return InkWell(
+      onTap: () {
         Navigator.pop(context, mode);
       },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? iconColor.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? iconColor : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
       child: Row(
         children: [
-          Icon(icon),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor),
+            ),
           const SizedBox(width: 16),
-          Text(title),
-          if (_themeMode == mode) ...[
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
             const Spacer(),
-            Icon(Icons.check, color: Theme.of(context).colorScheme.primary),
+            if (isSelected)
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: iconColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 14,
+                ),
+              ),
           ],
-        ],
+        ),
       ),
     );
   }
 
   Future<void> _showTimePicker() async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     final result = await showTimePicker(
       context: context,
       initialTime: _notificationTime,
+      builder: (context, child) {
+        return Theme(
+          data: theme.copyWith(
+            timePickerTheme: TimePickerThemeData(
+              dayPeriodShape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              hourMinuteShape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     
     if (result != null) {
+      // Update local state
       setState(() {
         _notificationTime = result;
       });
       
+      // Save to settings
       final settingsService = Provider.of<SettingsService>(context, listen: false);
       await settingsService.setNotificationTime(result);
       
@@ -443,7 +563,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await subscriptionProvider.rescheduleAllNotifications();
       
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notification time updated')),
+        SnackBar(
+          content: const Text('Notification time updated'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       );
     }
   }
@@ -463,6 +587,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(value ? 'Notifications enabled' : 'Notifications disabled'),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -484,55 +610,213 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await settingsService.setCurrencyCode(result.code);
       
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Currency updated to ${result.name}')),
+        SnackBar(
+          content: Text('Currency updated to ${result.name}'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       );
     }
   }
 
-  Future<void> _sendTestNotification() async {
-    final notificationService = Provider.of<NotificationService>(context, listen: false);
-    
-    await notificationService.showTestNotification();
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Test notification sent')),
-    );
-  }
-
   Future<void> _showClearDataConfirmation() async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear All Data'),
+        title: Text(
+          'Clear All Data',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
         content: const Text(
           'Are you sure you want to delete all subscriptions and reset settings? This action cannot be undone.',
         ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context, false);
             },
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: colorScheme.primary),
           ),
-          TextButton(
+          ),
+          ElevatedButton(
             onPressed: () {
               Navigator.pop(context, true);
             },
-            child: const Text(
-              'Clear All Data',
-              style: TextStyle(color: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
+            child: const Text('Clear All Data'),
           ),
         ],
       ),
     );
     
     if (result == true) {
-      // TODO: Implement clear all data functionality
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      await subscriptionProvider.deleteAllSubscriptions();
+      
+      // Reset settings to defaults by updating them to initial values
+      final settingsService = Provider.of<SettingsService>(context, listen: false);
+      await settingsService.setNotificationsEnabled(true);
+      await settingsService.setNotificationTime(const TimeOfDay(hour: 9, minute: 0));
+      await settingsService.setCurrencyCode('USD');
+      
+      // Update UI with new settings
+      setState(() {
+        _notificationTime = const TimeOfDay(hour: 9, minute: 0);
+        _currencyCode = 'USD';
+        _notificationsEnabled = true;
+      });
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All data cleared')),
+        SnackBar(
+          content: const Text('All data cleared'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       );
     }
+  }
+
+  Widget _buildToggleCard({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required Function(bool) onChanged,
+    required IconData leadingIcon,
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      elevation: 0,
+      color: colorScheme.surface,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: SwitchListTile(
+          title: Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.white : Colors.black,
+            ),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: TextStyle(
+              color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
+              fontSize: 13,
+            ),
+          ),
+          value: value,
+          onChanged: onChanged,
+          secondary: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: value ? color.withOpacity(0.1) : (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              leadingIcon,
+              color: value ? color : Colors.grey,
+              size: 24,
+            ),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimePickerCard({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    required IconData leadingIcon,
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      elevation: 0,
+      color: theme.colorScheme.surface,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(leadingIcon, color: color, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: (isDark ? Colors.white : Colors.black).withOpacity(0.3),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -548,11 +832,13 @@ class CurrencySelectorScreen extends StatefulWidget {
   State<CurrencySelectorScreen> createState() => _CurrencySelectorScreenState();
 }
 
-class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> {
+class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   late List<Currency> _allCurrencies;
   late List<Currency> _filteredCurrencies;
   late String _selectedCurrencyCode;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
   
   @override
   void initState() {
@@ -561,12 +847,26 @@ class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> {
     _filteredCurrencies = List.from(_allCurrencies);
     _selectedCurrencyCode = widget.initialCurrencyCode;
     _searchController.addListener(_filterCurrencies);
+    
+    // Setup animations
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    );
+    
+    _animationController.forward();
   }
   
   @override
   void dispose() {
     _searchController.removeListener(_filterCurrencies);
     _searchController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
   
@@ -590,54 +890,102 @@ class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Select Currency'),
-        backgroundColor: colorScheme.surface,
-        foregroundColor: colorScheme.onSurface,
-        elevation: 0,
-      ),
-      body: Column(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(
+                    color: colorScheme.outline.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
         children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_rounded,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Select Currency',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Search bar
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search currencies...',
-                prefixIcon: const Icon(Icons.search),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
+                  ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: colorScheme.primary,
+                      width: 1.5,
+                    ),
                 ),
                 filled: true,
-                fillColor: colorScheme.surface,
+                  fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               ),
               onChanged: (value) => _filterCurrencies(),
             ),
           ),
+            
+            // Currency list
           Expanded(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
             child: ListView.builder(
               itemCount: _filteredCurrencies.length,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
               itemBuilder: (context, index) {
                 final currency = _filteredCurrencies[index];
                 final isSelected = currency.code == _selectedCurrencyCode;
                 
-                return ListTile(
-                  leading: Text(
-                    currency.flag,
-                    style: const TextStyle(fontSize: 24),
-                  ),
-                  title: Text(
-                    '${currency.code} - ${currency.name}',
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
-                  subtitle: Text(currency.symbol),
-                  trailing: isSelected 
-                      ? Icon(Icons.check_circle, color: colorScheme.primary)
-                      : null,
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                      color: isSelected 
+                          ? colorScheme.primary.withOpacity(0.1)
+                          : theme.colorScheme.surface,
+                      child: InkWell(
                   onTap: () {
                     setState(() {
                       _selectedCurrencyCode = currency.code;
@@ -646,12 +994,70 @@ class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> {
                     // Return the selected currency to the previous screen
                     Navigator.pop(context, currency);
                   },
-                  tileColor: isSelected ? colorScheme.primaryContainer.withOpacity(0.2) : null,
-                );
-              },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  currency.flag,
+                                  style: const TextStyle(fontSize: 24),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${currency.code} - ${currency.name}',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                        color: isDark ? Colors.white : Colors.black,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Symbol: ${currency.symbol}',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
             ),
           ),
         ],
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/core/utils/date_utils.dart';
@@ -7,715 +8,948 @@ import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
 import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
 
-class SubscriptionDetailsScreen extends StatelessWidget {
-  const SubscriptionDetailsScreen({Key? key}) : super(key: key);
+class SubscriptionDetailsScreen extends StatefulWidget {
+  const SubscriptionDetailsScreen({super.key});
+
+  @override
+  State<SubscriptionDetailsScreen> createState() => _SubscriptionDetailsScreenState();
+}
+
+class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+  bool _isLoading = true;
+  String? _errorMessage;
+  
+  @override
+  void initState() {
+    super.initState();
+    
+    // Initialize animations
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.1),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    
+    // Load data after widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSubscription();
+    });
+  }
+  
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+  
+  void _loadSubscription() {
+    // We'll set a brief delay to show loading indicator for better UX
+    Future.delayed(const Duration(milliseconds: 300), () {
+      setState(() {
+        _isLoading = false;
+      });
+      _animationController.forward();
+    });
+  }
+
+  void _deleteSubscription(BuildContext context, String subscriptionId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Subscription'),
+          content: const Text('Are you sure you want to delete this subscription? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      final provider = Provider.of<SubscriptionProvider>(context, listen: false);
+      provider.deleteSubscription(subscriptionId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppConstants.subscriptionDeletedSuccess)),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  void _updateSubscriptionStatus(String subscriptionId, String newStatus) {
+    final provider = Provider.of<SubscriptionProvider>(context, listen: false);
+    
+    // Find the subscription
+    final subscription = provider.subscriptions.firstWhere(
+      (s) => s.id == subscriptionId,
+      orElse: () => throw Exception('Subscription not found'),
+    );
+    
+    if (subscription != null) {
+      // Create updated subscription with new status
+      final updatedSubscription = subscription.copyWith(status: newStatus);
+      
+      // Update in provider
+      provider.updateSubscription(updatedSubscription);
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Subscription ${_getStatusActionText(newStatus)}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      
+      // Refresh state
+      setState(() {});
+    }
+  }
+  
+  String _getStatusActionText(String status) {
+    switch (status) {
+      case AppConstants.statusActive:
+        return 'activated';
+      case AppConstants.statusPaused:
+        return 'paused';
+      case AppConstants.statusCancelled:
+        return 'cancelled';
+      default:
+        return 'updated';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     
-    // Get the subscription ID from the route arguments
-    final subscriptionId = ModalRoute.of(context)?.settings.arguments as String?;
+    // Get subscription ID from route arguments
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final subscriptionId = args?['id'] as String?;
     
     if (subscriptionId == null) {
-      return _buildErrorScreen(context, 'Subscription ID not found');
-    }
-    
-    // Get the subscription from the provider
-    final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
-    
-    // Find the subscription
-    Subscription? foundSubscription;
-    try {
-      foundSubscription = subscriptionProvider.subscriptions.firstWhere(
-        (s) => s.id == subscriptionId,
+      return Scaffold(
+        appBar: AppBar(title: const Text('Subscription Details')),
+        body: const Center(child: Text('Subscription not found')),
       );
-    } catch (e) {
-      // Subscription not found
     }
     
-    if (foundSubscription == null) {
-      return _buildErrorScreen(context, 'Subscription not found');
-    }
-    
-    // Use a non-nullable subscription from here on
-    final subscription = foundSubscription;
-    
-    // Get the logo service
-    final logoService = Provider.of<LogoService>(context, listen: false);
-    
-    // Get currency information
-    final currency = CurrencyUtils.getCurrencyByCode(subscription.currencyCode) ?? 
-        CurrencyUtils.getAllCurrencies().first;
-    
-    // Format the amount with the currency symbol
-    final formattedAmount = CurrencyUtils.formatCurrencyWithBillingCycle(
-      subscription.amount,
-      currency.symbol,
-      subscription.billingCycle,
+    // Get subscription from provider
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
+    final subscription = subscriptionProvider.subscriptions.firstWhere(
+      (s) => s.id == subscriptionId,
+      orElse: () => throw Exception('Subscription not found'),
     );
     
-    // Determine the status color
+    if (subscription == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Subscription Details')),
+        body: const Center(child: Text('Subscription not found')),
+      );
+    }
+    
+    // Format subscription details
+    final currencyFormatter = NumberFormat.currency(
+      symbol: CurrencyUtils.getCurrencyByCode(subscription.currencyCode)?.symbol ?? '\$',
+      decimalDigits: 2,
+    );
+    
+    // Determine status color
     Color statusColor;
+    IconData statusIcon;
+    String statusText;
+    
     switch (subscription.status) {
       case AppConstants.statusActive:
         statusColor = colorScheme.primary;
+        statusIcon = Icons.check_circle_rounded;
+        statusText = 'Active';
         break;
       case AppConstants.statusPaused:
         statusColor = colorScheme.tertiary;
+        statusIcon = Icons.pause_circle_rounded;
+        statusText = 'Paused';
         break;
       case AppConstants.statusCancelled:
         statusColor = Colors.grey;
+        statusIcon = Icons.cancel_rounded;
+        statusText = 'Cancelled';
         break;
       default:
-        statusColor = Colors.grey;
+        statusColor = colorScheme.primary;
+        statusIcon = Icons.check_circle_rounded;
+        statusText = 'Active';
     }
+    
+    // Calculate days until renewal
+    final daysUntilRenewal = subscription.renewalDate != null
+      ? _calculateDaysUntil(subscription.renewalDate!)
+      : null;
+      
+    // Get currency data
+    final currency = CurrencyUtils.getCurrencyByCode(subscription.currencyCode);
     
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with back button
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.arrow_back, 
-                      color: isDark ? Colors.white : Colors.black
-                    ),
-                    onPressed: () {
-                      if (Navigator.canPop(context)) {
-                        Navigator.pop(context);
-                      } else {
-                        Navigator.pushReplacementNamed(context, '/');
-                      }
-                    },
-                    tooltip: 'Back',
-                    style: IconButton.styleFrom(
-                      backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      'Subscription Details',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Subscription content
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
-                  // Subscription header with logo and basic info
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with back and edit buttons
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Logo
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(16),
+                      IconButton(
+                        icon: Icon(
+                          Icons.arrow_back, 
+                          color: isDark ? Colors.white : Colors.black
                         ),
-                        child: subscription.logoUrl != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: Image.network(
-                                  subscription.logoUrl!,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Icon(
-                                      logoService.getFallbackIcon(subscription.name),
-                                      color: isDark ? Colors.white : Colors.black,
-                                      size: 40,
-                                    );
-                                  },
-                                ),
-                              )
-                            : Icon(
-                                logoService.getFallbackIcon(subscription.name),
-                                color: isDark ? Colors.white : Colors.black,
-                                size: 40,
-                              ),
-                      ),
-                      const SizedBox(width: 20),
-                      // Basic info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              subscription.name,
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : Colors.black,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: statusColor.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    _getStatusText(subscription.status),
-                                    style: TextStyle(
-                                      color: statusColor,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  currency.flag,
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  currency.code,
-                                  style: TextStyle(
-                                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                        onPressed: () => Navigator.pop(context),
+                        tooltip: 'Back',
+                        style: IconButton.styleFrom(
+                          backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 32),
-                  
-                  // Price section
-                  _buildInfoSection(
-                    context,
-                    title: 'Price',
-                    icon: Icons.attach_money,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          formattedAmount,
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _getBillingCycleText(subscription.billingCycle),
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Renewal section
-                  _buildInfoSection(
-                    context,
-                    title: 'Renewal',
-                    icon: Icons.event,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (subscription.status == AppConstants.statusActive) ...[
-                          Text(
-                            subscription.isOverdue
-                                ? 'Overdue'
-                                : 'Next renewal in ${AppDateUtils.getDaysRemainingText(subscription.renewalDate)}',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: subscription.isOverdue
-                                  ? Colors.red
-                                  : (isDark ? Colors.white : Colors.black),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'on ${_formatDate(subscription.renewalDate)}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
-                            ),
-                          ),
-                        ] else if (subscription.status == AppConstants.statusPaused) ...[
-                          Text(
-                            'Subscription is paused',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
+                      
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.edit_outlined,
                               color: isDark ? Colors.white : Colors.black,
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Resume to continue billing',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
+                            onPressed: () {
+                              Navigator.pushNamed(
+                                context, 
+                                '/edit-subscription',
+                                arguments: {'id': subscription.id},
+                              );
+                            },
+                            tooltip: 'Edit',
+                            style: IconButton.styleFrom(
+                              backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
-                        ] else ...[
-                          Text(
-                            'Subscription is cancelled',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: isDark ? Colors.white : Colors.black,
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: Icon(
+                              Icons.delete_outline,
+                              color: theme.colorScheme.error,
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'No further billing will occur',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
+                            onPressed: () => _deleteSubscription(context, subscription.id),
+                            tooltip: 'Delete',
+                            style: IconButton.styleFrom(
+                              backgroundColor: theme.colorScheme.error.withOpacity(0.1),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         ],
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Description section
-                  if (subscription.description != null && subscription.description!.isNotEmpty)
-                    _buildInfoSection(
-                      context,
-                      title: 'Description',
-                      icon: Icons.description,
-                      child: Text(
-                        subscription.description!,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isDark ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    ),
-                  
-                  if (subscription.description != null && subscription.description!.isNotEmpty)
-                    const SizedBox(height: 24),
-                  
-                  // Website section
-                  if (subscription.website != null && subscription.website!.isNotEmpty)
-                    _buildInfoSection(
-                      context,
-                      title: 'Website',
-                      icon: Icons.language,
-                      child: Text(
-                        subscription.website!,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: colorScheme.primary,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ),
-                  
-                  const SizedBox(height: 40),
-                  
-                  // Action buttons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      if (subscription.status == AppConstants.statusActive)
-                        _buildActionButton(
-                          context,
-                          icon: Icons.pause,
-                          label: 'Pause',
-                          color: colorScheme.tertiary,
-                          onPressed: () => _showPauseConfirmationDialog(context, subscription),
-                        )
-                      else if (subscription.status == AppConstants.statusPaused)
-                        _buildActionButton(
-                          context,
-                          icon: Icons.play_arrow,
-                          label: 'Resume',
-                          color: colorScheme.primary,
-                          onPressed: () => _showResumeConfirmationDialog(context, subscription),
-                        ),
-                      
-                      if (subscription.status != AppConstants.statusCancelled)
-                        _buildActionButton(
-                          context,
-                          icon: Icons.cancel,
-                          label: 'Cancel',
-                          color: Colors.orange,
-                          onPressed: () => _showCancelConfirmationDialog(context, subscription),
-                        ),
-                      
-                      _buildActionButton(
-                        context,
-                        icon: Icons.delete,
-                        label: 'Delete',
-                        color: Colors.red,
-                        onPressed: () => _showDeleteConfirmationDialog(context, subscription),
                       ),
                     ],
                   ),
-                  
-                  const SizedBox(height: 40),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildErrorScreen(BuildContext context, String message) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with back button
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.arrow_back, 
-                      color: isDark ? Colors.white : Colors.black
-                    ),
-                    onPressed: () {
-                      if (Navigator.canPop(context)) {
-                        Navigator.pop(context);
-                      } else {
-                        Navigator.pushReplacementNamed(context, '/');
-                      }
-                    },
-                    tooltip: 'Back',
-                    style: IconButton.styleFrom(
-                      backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    'Subscription Details',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      message,
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
                 ),
-              ),
+                
+                Expanded(
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: ListView(
+                        padding: const EdgeInsets.all(20),
+                        children: [
+                          // Logo and name
+                          Center(
+                            child: Column(
+                              children: [
+                                if (subscription.logoUrl != null)
+                                  Container(
+                                    width: 100,
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: colorScheme.primary.withOpacity(0.2),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Hero(
+                                        tag: 'no_hero_animation_details_${subscription.id}',
+                                        flightShuttleBuilder: (_, __, ___, ____, _____) => 
+                                          const SizedBox.shrink(),
+                                        child: Image.network(
+                                          subscription.logoUrl!,
+                                          key: ValueKey('details_${subscription.id}_logo'),
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            final logoService = Provider.of<LogoService>(context, listen: false);
+                                            return Container(
+                                              color: colorScheme.primary,
+                                              child: Icon(
+                                                logoService.getFallbackIcon(subscription.name),
+                                                color: Colors.white,
+                                                size: 40,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Container(
+                                    width: 100,
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primary,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        subscription.name.substring(0, 1).toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 40,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  subscription.name,
+                                  style: theme.textTheme.headlineMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                if (subscription.website != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      subscription.website!,
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: colorScheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Quick action buttons instead of status badge
+                          Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Activate button
+                                if (subscription.status != AppConstants.statusActive)
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        _updateSubscriptionStatus(
+                                          subscription.id, 
+                                          AppConstants.statusActive
+                                        );
+                                      },
+                                      icon: const Icon(Icons.play_circle_outline, color: Colors.white),
+                                      label: const Text('Start'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      ),
+                                    ),
+                                  ),
+                                
+                                // Pause button
+                                if (subscription.status != AppConstants.statusPaused)
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        _updateSubscriptionStatus(
+                                          subscription.id, 
+                                          AppConstants.statusPaused
+                                        );
+                                      },
+                                      icon: const Icon(Icons.pause_circle_outline, color: Colors.black87),
+                                      label: const Text('Pause'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.amber,
+                                        foregroundColor: Colors.black87,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      ),
+                                    ),
+                                  ),
+                                
+                                // Cancel button
+                                if (subscription.status != AppConstants.statusCancelled)
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        _updateSubscriptionStatus(
+                                          subscription.id, 
+                                          AppConstants.statusCancelled
+                                        );
+                                      },
+                                      icon: const Icon(Icons.cancel_outlined, color: Colors.white),
+                                      label: const Text('Cancel'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 32),
+                          
+                          // Price and billing info
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: theme.colorScheme.outline.withOpacity(0.2),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Payment Details',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Amount',
+                                      style: theme.textTheme.bodyLarge,
+                                    ),
+                                    Row(
+                                      children: [
+                                        if (currency != null)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            margin: const EdgeInsets.only(right: 8),
+                                            decoration: BoxDecoration(
+                                              color: colorScheme.primary.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              currency.flag,
+                                              style: const TextStyle(fontSize: 14),
+                                            ),
+                                          ),
+                                        Text(
+                                          currencyFormatter.format(subscription.amount),
+                                          style: theme.textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                
+                                const Divider(height: 32),
+                                
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Billing Cycle',
+                                      style: theme.textTheme.bodyLarge,
+                                    ),
+                                    Text(
+                                      _getBillingCycleText(subscription.billingCycle),
+                                      style: theme.textTheme.bodyLarge?.copyWith(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                
+                                const SizedBox(height: 12),
+                                
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Start Date',
+                                      style: theme.textTheme.bodyLarge,
+                                    ),
+                                    Text(
+                                      AppDateUtils.formatDate(subscription.startDate),
+                                      style: theme.textTheme.bodyLarge?.copyWith(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                
+                                if (subscription.renewalDate != null) ...[
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Next Renewal',
+                                        style: theme.textTheme.bodyLarge,
+                                      ),
+                                      Flexible(
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                AppDateUtils.formatDate(subscription.renewalDate!),
+                                                style: theme.textTheme.bodyLarge?.copyWith(
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (subscription.isOverdue && subscription.status == AppConstants.statusActive)
+                                              Container(
+                                                margin: const EdgeInsets.only(left: 8),
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.red.withOpacity(0.1),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Text(
+                                                  'Overdue',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.red,
+                                                  ),
+                                                ),
+                                              ),
+                                            if (daysUntilRenewal != null && daysUntilRenewal < 3 && daysUntilRenewal >= 0 && subscription.status == AppConstants.statusActive)
+                                              Container(
+                                                margin: const EdgeInsets.only(left: 8),
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: daysUntilRenewal == 0 
+                                                      ? Colors.red.withOpacity(0.1)
+                                                      : Colors.orange.withOpacity(0.1),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  daysUntilRenewal == 0
+                                                      ? 'Today'
+                                                      : daysUntilRenewal == 1
+                                                          ? 'Tomorrow'
+                                                          : 'In $daysUntilRenewal days',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: daysUntilRenewal == 0
+                                                        ? Colors.red
+                                                        : Colors.orange,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Additional details
+                          if (subscription.category != null || subscription.description != null)
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surface,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: theme.colorScheme.outline.withOpacity(0.2),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Additional Details',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  
+                                  if (subscription.category != null) ...[
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.category_rounded,
+                                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Category:',
+                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                            color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          subscription.category!,
+                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                  
+                                  if (subscription.description != null) ...[
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          Icons.description_rounded,
+                                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Notes:',
+                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                            color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      subscription.description!,
+                                      style: theme.textTheme.bodyMedium,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Notification settings
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: theme.colorScheme.outline.withOpacity(0.2),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.notifications_active_rounded,
+                                      color: colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Notification Settings',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Renewal Notifications',
+                                      style: theme.textTheme.bodyLarge,
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: subscription.notificationsEnabled
+                                            ? colorScheme.primary.withOpacity(0.1)
+                                            : Colors.grey.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        subscription.notificationsEnabled ? 'Enabled' : 'Disabled',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: subscription.notificationsEnabled
+                                              ? colorScheme.primary
+                                              : Colors.grey,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                
+                                if (subscription.notificationsEnabled) ...[
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Flexible(
+                                        flex: 2,
+                                        child: Text(
+                                          'Notification Schedule',
+                                          style: theme.textTheme.bodyLarge,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        flex: 3,
+                                        child: Text(
+                                          '${subscription.notificationDays} days before renewal',
+                                          style: theme.textTheme.bodyLarge?.copyWith(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          textAlign: TextAlign.end,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 32),
+                          
+                          // Annual cost calculation
+                          if (subscription.status == AppConstants.statusActive)
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: colorScheme.primary.withOpacity(0.2),
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Total Annual Cost',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    currencyFormatter.format(_calculateAnnualCost(subscription)),
+                                    style: theme.textTheme.headlineSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                  Text(
+                                    'per year',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: colorScheme.primary.withOpacity(0.7),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Add "Mark as Paid" button for active subscriptions when today or overdue
+                          if (subscription.status == AppConstants.statusActive && 
+                              daysUntilRenewal != null && daysUntilRenewal <= 0) ...[
+                            // Debug print before the widget
+                            SizedBox(
+                              height: 1,
+                              child: Builder(builder: (context) {
+                                print('DEBUG DETAILS: Status: ${subscription.status}, daysUntilRenewal: $daysUntilRenewal, RenewalDate: ${subscription.renewalDate}, isOverdue: ${subscription.isOverdue}');
+                                return Container();
+                              }),
+                            ),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton.icon(
+                                onPressed: () => _markAsPaid(subscription),
+                                icon: const Icon(Icons.check_circle_outline_rounded),
+                                label: const Text('Mark as Paid'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: colorScheme.primary,
+                                  foregroundColor: colorScheme.onPrimary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
       ),
     );
-  }
-  
-  Widget _buildInfoSection(
-    BuildContext context, {
-    required String title,
-    required IconData icon,
-    required Widget child,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: child,
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildActionButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          icon: Icon(icon),
-          onPressed: onPressed,
-          color: color,
-          style: IconButton.styleFrom(
-            backgroundColor: color.withOpacity(0.1),
-            padding: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-  
-  String _getStatusText(String status) {
-    switch (status) {
-      case AppConstants.statusActive:
-        return 'Active';
-      case AppConstants.statusPaused:
-        return 'Paused';
-      case AppConstants.statusCancelled:
-        return 'Cancelled';
-      default:
-        return 'Unknown';
-    }
   }
   
   String _getBillingCycleText(String billingCycle) {
     switch (billingCycle) {
       case AppConstants.billingCycleMonthly:
-        return 'Billed monthly';
+        return 'Monthly';
       case AppConstants.billingCycleQuarterly:
-        return 'Billed quarterly';
+        return 'Quarterly';
       case AppConstants.billingCycleYearly:
-        return 'Billed yearly';
-      case AppConstants.billingCycleCustom:
-        return 'Custom billing cycle';
+        return 'Yearly';
       default:
-        return 'Unknown billing cycle';
+        return billingCycle;
     }
   }
   
-  String _formatDate(DateTime date) {
-    final months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
+  double _calculateAnnualCost(Subscription subscription) {
+    switch (subscription.billingCycle) {
+      case AppConstants.billingCycleMonthly:
+        return subscription.amount * 12;
+      case AppConstants.billingCycleQuarterly:
+        return subscription.amount * 4;
+      case AppConstants.billingCycleYearly:
+        return subscription.amount;
+      default:
+        return subscription.amount;
+    }
+  }
+
+  int _calculateDaysUntil(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final renewalDate = DateTime(date.year, date.month, date.day);
+    return renewalDate.difference(today).inDays;
+  }
+
+  void _markAsPaid(Subscription subscription) {
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
     
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
-  
-  void _showPauseConfirmationDialog(BuildContext context, Subscription subscription) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Pause Subscription'),
-        content: Text(
-          'Are you sure you want to pause ${subscription.name}?',
-        ),
-        actions: [
-          TextButton(
+    // Call the markSubscriptionAsPaid method
+    subscriptionProvider.markSubscriptionAsPaid(subscription.id).then((_) {
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${subscription.name} marked as paid'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'View',
+            textColor: Colors.white,
             onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Provider.of<SubscriptionProvider>(context, listen: false)
-                  .pauseSubscription(subscription.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Subscription paused'),
-                ),
+              // Refresh the current screen to show updated renewal date
+              Navigator.popAndPushNamed(
+                context, 
+                '/subscription_details',
+                arguments: {'id': subscription.id},
               );
             },
-            child: const Text('Pause'),
           ),
-        ],
-      ),
-    );
-  }
-  
-  void _showResumeConfirmationDialog(BuildContext context, Subscription subscription) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Resume Subscription'),
-        content: Text(
-          'Are you sure you want to resume ${subscription.name}?',
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Provider.of<SubscriptionProvider>(context, listen: false)
-                  .resumeSubscription(subscription.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Subscription resumed'),
-                ),
-              );
-            },
-            child: const Text('Resume'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  void _showCancelConfirmationDialog(BuildContext context, Subscription subscription) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Subscription'),
-        content: Text(
-          'Are you sure you want to cancel ${subscription.name}?',
+      );
+      
+      // Navigate back to refresh the screen
+      Navigator.pop(context);
+    }).catchError((error) {
+      // Show error message if something went wrong
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: Could not mark subscription as paid'),
+          backgroundColor: Colors.red,
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('No'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Provider.of<SubscriptionProvider>(context, listen: false)
-                  .cancelSubscription(subscription.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Subscription cancelled'),
-                ),
-              );
-            },
-            child: const Text('Yes'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  void _showDeleteConfirmationDialog(BuildContext context, Subscription subscription) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Subscription'),
-        content: Text(
-          'Are you sure you want to delete ${subscription.name}? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Provider.of<SubscriptionProvider>(context, listen: false)
-                  .deleteSubscription(subscription.id);
-              Navigator.pop(context); // Pop back to previous screen
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${subscription.name} deleted'),
-                ),
-              );
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+      );
+    });
   }
 } 

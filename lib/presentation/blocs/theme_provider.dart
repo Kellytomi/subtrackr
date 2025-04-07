@@ -1,36 +1,78 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:subtrackr/core/theme/app_theme.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 
 class ThemeProvider extends ChangeNotifier {
   final SettingsService _settingsService;
+  late ThemeMode _themeMode;
   
   ThemeProvider({
     required SettingsService settingsService,
   }) : _settingsService = settingsService {
-    // Always set to light mode
-    _settingsService.setThemeMode(ThemeMode.light);
+    // Initialize theme from saved settings
+    loadTheme();
   }
   
-  // Get the current theme mode - always light
-  ThemeMode get themeMode => ThemeMode.light;
+  // Get the current theme mode
+  ThemeMode get themeMode => _themeMode;
   
-  // Get the current theme data - always light theme
-  ThemeData get themeData => AppTheme.lightTheme;
+  // Get the current theme data
+  ThemeData get themeData => _themeMode == ThemeMode.dark 
+      ? AppTheme.darkTheme 
+      : AppTheme.lightTheme;
   
-  // Check if dark mode is enabled - always false
-  bool get isDarkMode => false;
+  // Check if dark mode is enabled
+  bool get isDarkMode => _themeMode == ThemeMode.dark;
   
-  // Set the theme mode - only allows light mode
-  Future<void> setThemeMode(ThemeMode themeMode) async {
-    // Only allow light mode
-    await _settingsService.setThemeMode(ThemeMode.light);
+  // Initialize theme from saved settings
+  Future<void> loadTheme() async {
+    final savedThemeMode = await _settingsService.getThemeMode();
+    _themeMode = savedThemeMode;
+    
+    // Set initial status bar style based on theme mode
+    _updateStatusBarStyle(_themeMode);
+    
     notifyListeners();
   }
   
-  // Toggle between light and dark mode - does nothing now
+  // Helper method to update status bar style
+  void _updateStatusBarStyle(ThemeMode mode) {
+    final isDark = mode == ThemeMode.dark || 
+      (mode == ThemeMode.system && 
+       WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark);
+      
+    if (isDark) {
+      SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarBrightness: Brightness.dark, // iOS: light icons for dark background
+        statusBarIconBrightness: Brightness.light, // Android: light icons for dark background
+      ));
+    } else {
+      SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarBrightness: Brightness.light, // iOS: dark icons for light background
+        statusBarIconBrightness: Brightness.dark, // Android: dark icons for light background
+      ));
+    }
+  }
+
+  // Set the theme mode
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    await _settingsService.setThemeMode(mode);
+    
+    // Update status bar style based on theme mode
+    _updateStatusBarStyle(mode);
+    
+    notifyListeners();
+  }
+  
+  // Toggle between light and dark mode
   Future<void> toggleTheme() async {
-    // Do nothing, we only support light mode
-    notifyListeners();
+    final newThemeMode = _themeMode == ThemeMode.light 
+        ? ThemeMode.dark 
+        : ThemeMode.light;
+    await setThemeMode(newThemeMode);
   }
 } 

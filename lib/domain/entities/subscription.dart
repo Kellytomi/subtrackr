@@ -195,13 +195,13 @@ class Subscription {
     }
   }
   
-  // Check if the subscription is due soon (within the next 7 days)
+  // Check if the subscription is due soon (within the next 3 days)
   bool get isDueSoon {
     if (status != AppConstants.statusActive) return false;
     
     final now = DateTime.now();
     final difference = renewalDate.difference(now).inDays;
-    return difference >= 0 && difference <= 7;
+    return difference >= 0 && difference <= 3;
   }
   
   // Check if the subscription is overdue
@@ -209,7 +209,14 @@ class Subscription {
     if (status != AppConstants.statusActive) return false;
     
     final now = DateTime.now();
-    return renewalDate.isBefore(now);
+    // Compare only the dates, not the times
+    final today = DateTime(now.year, now.month, now.day);
+    final renewalDateOnly = DateTime(renewalDate.year, renewalDate.month, renewalDate.day);
+    
+    // Only overdue if strictly before today (not today)
+    final isOverdueResult = renewalDateOnly.isBefore(today);
+    print('DEBUG isOverdue: ${this.name}, renewalDate: $renewalDate, now: $now, today: $today, isOverdue: $isOverdueResult, status: $status');
+    return isOverdueResult;
   }
   
   // Get days until renewal
@@ -238,5 +245,131 @@ class Subscription {
   // Cancel the subscription
   Subscription cancel() {
     return copyWith(status: AppConstants.statusCancelled);
+  }
+  
+  // Mark subscription as paid and update renewal date
+  Subscription markAsPaid() {
+    // Add current date to payment history
+    final updatedHistory = paymentHistory?.toList() ?? [];
+    final paymentDate = DateTime.now();
+    updatedHistory.add(paymentDate);
+    
+    // Calculate next renewal date based on the original pattern
+    // We calculate from the current renewal date, not from the payment date
+    DateTime nextRenewal;
+    switch (billingCycle) {
+      case AppConstants.billingCycleMonthly:
+        // Keep the same day of month for the next renewal
+        final nextMonth = renewalDate.month + 1;
+        final nextYear = renewalDate.year + (nextMonth > 12 ? 1 : 0);
+        final adjustedMonth = nextMonth > 12 ? nextMonth - 12 : nextMonth;
+        
+        // Handle edge cases like the 31st of a month that doesn't have 31 days
+        final lastDayOfMonth = DateTime(nextYear, adjustedMonth + 1, 0).day;
+        final nextDay = renewalDate.day > lastDayOfMonth ? lastDayOfMonth : renewalDate.day;
+        
+        nextRenewal = DateTime(nextYear, adjustedMonth, nextDay);
+        
+        // If the calculated date is in the past, move forward another month
+        if (nextRenewal.isBefore(paymentDate)) {
+          final oneMoreMonth = nextRenewal.month + 1;
+          final oneMoreYear = nextRenewal.year + (oneMoreMonth > 12 ? 1 : 0);
+          final finalMonth = oneMoreMonth > 12 ? oneMoreMonth - 12 : oneMoreMonth;
+          
+          // Handle edge cases again
+          final daysInFinalMonth = DateTime(oneMoreYear, finalMonth + 1, 0).day;
+          final finalDay = nextRenewal.day > daysInFinalMonth ? daysInFinalMonth : nextRenewal.day;
+          
+          nextRenewal = DateTime(oneMoreYear, finalMonth, finalDay);
+        }
+        break;
+      case AppConstants.billingCycleQuarterly:
+        // Keep the same day but add 3 months
+        final nextMonth = renewalDate.month + 3;
+        final nextYear = renewalDate.year + (nextMonth > 12 ? 1 : 0);
+        final adjustedMonth = nextMonth > 12 ? nextMonth - 12 : nextMonth;
+        
+        // Handle edge cases
+        final lastDayOfMonth = DateTime(nextYear, adjustedMonth + 1, 0).day;
+        final nextDay = renewalDate.day > lastDayOfMonth ? lastDayOfMonth : renewalDate.day;
+        
+        nextRenewal = DateTime(nextYear, adjustedMonth, nextDay);
+        
+        // If the calculated date is in the past, move forward another quarter
+        if (nextRenewal.isBefore(paymentDate)) {
+          final oneMoreQuarter = nextRenewal.month + 3;
+          final oneMoreYear = nextRenewal.year + (oneMoreQuarter > 12 ? 1 : 0);
+          final finalMonth = oneMoreQuarter > 12 ? oneMoreQuarter - 12 : oneMoreQuarter;
+          
+          // Handle edge cases again
+          final daysInFinalMonth = DateTime(oneMoreYear, finalMonth + 1, 0).day;
+          final finalDay = nextRenewal.day > daysInFinalMonth ? daysInFinalMonth : nextRenewal.day;
+          
+          nextRenewal = DateTime(oneMoreYear, finalMonth, finalDay);
+        }
+        break;
+      case AppConstants.billingCycleYearly:
+        // Keep the same day and month, but add a year
+        final nextYear = renewalDate.year + 1;
+        
+        // Handle Feb 29 for leap years
+        if (renewalDate.month == 2 && renewalDate.day == 29) {
+          final isLeapYear = (nextYear % 4 == 0 && nextYear % 100 != 0) || nextYear % 400 == 0;
+          final nextDay = isLeapYear ? 29 : 28;
+          nextRenewal = DateTime(nextYear, 2, nextDay);
+        } else {
+          nextRenewal = DateTime(nextYear, renewalDate.month, renewalDate.day);
+        }
+        
+        // If the calculated date is in the past, add another year
+        if (nextRenewal.isBefore(paymentDate)) {
+          nextRenewal = DateTime(nextRenewal.year + 1, nextRenewal.month, nextRenewal.day);
+        }
+        break;
+      case AppConstants.billingCycleCustom:
+        if (customBillingDays != null) {
+          // For custom, we do add from the renewal date
+          nextRenewal = renewalDate.add(Duration(days: customBillingDays!));
+          
+          // If next renewal is in the past, keep adding cycles until it's in the future
+          while (nextRenewal.isBefore(paymentDate)) {
+            nextRenewal = nextRenewal.add(Duration(days: customBillingDays!));
+          }
+        } else {
+          // Default to monthly if custom days is not provided
+          final nextMonth = renewalDate.month + 1;
+          final nextYear = renewalDate.year + (nextMonth > 12 ? 1 : 0);
+          final adjustedMonth = nextMonth > 12 ? nextMonth - 12 : nextMonth;
+          nextRenewal = DateTime(nextYear, adjustedMonth, renewalDate.day);
+          
+          if (nextRenewal.isBefore(paymentDate)) {
+            final oneMoreMonth = nextRenewal.month + 1;
+            final oneMoreYear = nextRenewal.year + (oneMoreMonth > 12 ? 1 : 0);
+            final finalMonth = oneMoreMonth > 12 ? oneMoreMonth - 12 : oneMoreMonth;
+            nextRenewal = DateTime(oneMoreYear, finalMonth, nextRenewal.day);
+          }
+        }
+        break;
+      default:
+        // Default to monthly
+        final nextMonth = renewalDate.month + 1;
+        final nextYear = renewalDate.year + (nextMonth > 12 ? 1 : 0);
+        final adjustedMonth = nextMonth > 12 ? nextMonth - 12 : nextMonth;
+        nextRenewal = DateTime(nextYear, adjustedMonth, renewalDate.day);
+        
+        if (nextRenewal.isBefore(paymentDate)) {
+          final oneMoreMonth = nextRenewal.month + 1;
+          final oneMoreYear = nextRenewal.year + (oneMoreMonth > 12 ? 1 : 0);
+          final finalMonth = oneMoreMonth > 12 ? oneMoreMonth - 12 : oneMoreMonth;
+          nextRenewal = DateTime(oneMoreYear, finalMonth, nextRenewal.day);
+        }
+    }
+    
+    // Return updated subscription
+    return copyWith(
+      paymentHistory: updatedHistory,
+      renewalDate: nextRenewal,
+      status: AppConstants.statusActive, // Ensure subscription is active
+    );
   }
 } 

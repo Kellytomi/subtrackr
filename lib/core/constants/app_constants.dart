@@ -41,10 +41,10 @@ class AppConstants {
   static const String onboardingRoute = '/onboarding';
   static const String currencySelectionRoute = '/currency-selection';
   static const String addSubscriptionRoute = '/add-subscription';
+  static const String editSubscriptionRoute = '/edit-subscription';
   static const String subscriptionDetailsRoute = '/subscription-details';
   static const String settingsRoute = '/settings';
   static const String statisticsRoute = '/statistics';
-  static const String notificationTestRoute = '/notification-test';
   
   // Error Messages
   static const String errorLoadingSubscriptions = 'Failed to load subscriptions';

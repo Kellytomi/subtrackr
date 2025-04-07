@@ -64,6 +64,15 @@ class SettingsService {
   
   // Get the notification time
   TimeOfDay getNotificationTime() {
+    // Try to get from separate hour and minute fields first (new format)
+    final hour = _settingsBox.get(AppConstants.notificationTimeSetting + '_hour');
+    final minute = _settingsBox.get(AppConstants.notificationTimeSetting + '_minute');
+    
+    if (hour != null && minute != null) {
+      return TimeOfDay(hour: hour, minute: minute);
+    }
+    
+    // Fall back to old format if separate fields don't exist
     final timeString = _settingsBox.get(
       AppConstants.notificationTimeSetting,
       defaultValue: const TimeOfDay(hour: 9, minute: 0).toString(),
@@ -76,14 +85,16 @@ class SettingsService {
     final hourMatch = hourRegex.firstMatch(timeString);
     final minuteMatch = minuteRegex.firstMatch(timeString);
     
-    final hour = hourMatch != null ? int.parse(hourMatch.group(1)!) : 9;
-    final minute = minuteMatch != null ? int.parse(minuteMatch.group(1)!) : 0;
+    final parsedHour = hourMatch != null ? int.parse(hourMatch.group(1)!) : 9;
+    final parsedMinute = minuteMatch != null ? int.parse(minuteMatch.group(1)!) : 0;
     
-    return TimeOfDay(hour: hour, minute: minute);
+    return TimeOfDay(hour: parsedHour, minute: parsedMinute);
   }
   
   // Set the notification time
   Future<void> setNotificationTime(TimeOfDay time) async {
+    await _settingsBox.put(AppConstants.notificationTimeSetting + '_hour', time.hour);
+    await _settingsBox.put(AppConstants.notificationTimeSetting + '_minute', time.minute);
     await _settingsBox.put(AppConstants.notificationTimeSetting, time.toString());
   }
   

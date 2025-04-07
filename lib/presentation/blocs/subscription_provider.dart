@@ -43,7 +43,7 @@ class SubscriptionProvider extends ChangeNotifier {
       .where((subscription) => subscription.status == AppConstants.statusCancelled)
       .toList();
   
-  // Get subscriptions due soon (within the next 7 days)
+  // Get subscriptions due soon (within the next 3 days)
   List<Subscription> get subscriptionsDueSoon => _subscriptions
       .where((subscription) => 
           subscription.status == AppConstants.statusActive &&
@@ -277,15 +277,61 @@ class SubscriptionProvider extends ChangeNotifier {
     await updateSubscription(updatedSubscription);
   }
   
+  // Mark a subscription as paid
+  Future<void> markSubscriptionAsPaid(String id) async {
+    final subscription = _subscriptions.firstWhere((s) => s.id == id);
+    final updatedSubscription = subscription.markAsPaid();
+    await updateSubscription(updatedSubscription);
+  }
+  
   // Schedule a notification for a subscription
   void _scheduleNotification(Subscription subscription) {
-    if (subscription.renewalDate.isBefore(DateTime.now())) return;
+    // Skip if renewal date is in the past
+    if (subscription.renewalDate.isBefore(DateTime.now())) {
+      print('DEBUG: Skipping notification for ${subscription.name} because renewal date ${subscription.renewalDate} is in the past');
+      return;
+    }
     
+    // Get notification time from settings
+    final notificationTime = _settingsService.getNotificationTime();
+    
+    // Calculate notification date (X days before renewal date)
+    final renewalDate = subscription.renewalDate;
+    final notificationDate = DateTime(
+      renewalDate.year,
+      renewalDate.month,
+      renewalDate.day - subscription.notificationDays,
+      notificationTime.hour,
+      notificationTime.minute,
+    );
+    
+    // Skip if notification date is in the past
+    if (notificationDate.isBefore(DateTime.now())) {
+      print('DEBUG: Notification date ${notificationDate} for ${subscription.name} is in the past');
+      
+      // If renewal is still in the future, schedule for now + 1 minute as fallback
+      if (renewalDate.isAfter(DateTime.now())) {
+        final fallbackDate = DateTime.now().add(const Duration(minutes: 1));
+        print('DEBUG: Using fallback date ${fallbackDate} for ${subscription.name}');
+        
+        _notificationService.scheduleNotification(
+          id: subscription.id.hashCode,
+          title: 'Upcoming Subscription Renewal',
+          body: '${subscription.name} will renew ${subscription.notificationDays == 0 ? "today" : "soon"}',
+          scheduledDate: fallbackDate,
+        );
+      }
+      return;
+    }
+    
+    print('DEBUG: Scheduling notification for ${subscription.name} on ${notificationDate}');
+    
+    // Schedule notification
     _notificationService.scheduleNotification(
       id: subscription.id.hashCode,
       title: 'Subscription Renewal Reminder',
       body: '${subscription.name} will renew in ${subscription.notificationDays} days',
-      scheduledDate: subscription.renewalDate,
+      scheduledDate: notificationDate,
     );
   }
   
@@ -308,5 +354,68 @@ class SubscriptionProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+  
+  // Delete all subscriptions
+  Future<void> deleteAllSubscriptions() async {
+    try {
+      // Get all subscription IDs
+      final ids = List<String>.from(_subscriptions.map((s) => s.id));
+      
+      // Delete each subscription from repository
+      for (final id in ids) {
+        await _repository.deleteSubscription(id);
+      }
+      
+      // Clear the in-memory list
+      _subscriptions.clear();
+      
+      // Cancel all notifications
+      await _notificationService.cancelAllNotifications();
+      
+      notifyListeners();
+    } catch (e) {
+      _error = 'Error deleting all subscriptions';
+      notifyListeners();
+    }
+  }
+  
+  // Debug notifications - print all pending notifications to console
+  Future<void> debugNotifications() async {
+    final pendingNotifications = await _notificationService.getPendingNotifications();
+    print('DEBUG: ===== PENDING NOTIFICATIONS =====');
+    print('DEBUG: Total pending notifications: ${pendingNotifications.length}');
+    
+    for (final notification in pendingNotifications) {
+      print('DEBUG: Notification ID: ${notification.id}');
+      print('DEBUG: Title: ${notification.title}');
+      print('DEBUG: Body: ${notification.body}');
+      print('DEBUG: Payload: ${notification.payload}');
+      print('DEBUG: ---------------------');
+    }
+    
+    // Debug active subscriptions and their renewal dates
+    print('DEBUG: ===== ACTIVE SUBSCRIPTIONS =====');
+    final now = DateTime.now();
+    for (final subscription in activeSubscriptions) {
+      final notificationTime = _settingsService.getNotificationTime();
+      final renewalDate = subscription.renewalDate;
+      final notificationDate = DateTime(
+        renewalDate.year,
+        renewalDate.month,
+        renewalDate.day - subscription.notificationDays,
+        notificationTime.hour,
+        notificationTime.minute,
+      );
+      
+      print('DEBUG: Subscription: ${subscription.name}');
+      print('DEBUG: Renewal date: ${subscription.renewalDate}');
+      print('DEBUG: Scheduled notification date: $notificationDate');
+      print('DEBUG: Days until renewal: ${subscription.daysUntilRenewal}');
+      print('DEBUG: Notification days before: ${subscription.notificationDays}');
+      print('DEBUG: Is notification date in past: ${notificationDate.isBefore(now)}');
+      print('DEBUG: Is renewal date in past: ${renewalDate.isBefore(now)}');
+      print('DEBUG: ---------------------');
+    }
   }
 } 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
+import 'package:subtrackr/data/services/notification_service.dart';
 
 class CurrencySelectionScreen extends StatefulWidget {
   const CurrencySelectionScreen({Key? key}) : super(key: key);
@@ -242,7 +243,7 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
             Padding(
               padding: const EdgeInsets.all(24),
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_selectedCurrency != null) {
                     // Save the selected currency
                     final settingsService = Provider.of<SettingsService>(context, listen: false);
@@ -250,6 +251,10 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
                     
                     // Mark onboarding as complete
                     settingsService.setOnboardingComplete(true);
+                    
+                    // Request notification permissions
+                    final notificationService = Provider.of<NotificationService>(context, listen: false);
+                    await notificationService.requestPermissions();
                     
                     // Navigate to home screen
                     Navigator.pushReplacementNamed(context, AppConstants.homeRoute);

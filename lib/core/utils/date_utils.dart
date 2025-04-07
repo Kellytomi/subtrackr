@@ -17,53 +17,99 @@ class AppDateUtils {
   }
   
   // Calculate the next renewal date based on the billing cycle
-  static DateTime calculateNextRenewalDate(DateTime startDate, String billingCycle, [int? customDays]) {
+  static DateTime calculateNextRenewalDate(DateTime startDate, String billingCycle, [int? customDays, bool skipPastDates = true]) {
     final now = DateTime.now();
     DateTime nextRenewal = startDate;
     
-    // Keep adding billing cycles until we find a date in the future
-    while (nextRenewal.isBefore(now)) {
-      switch (billingCycle) {
-        case 'monthly':
+    // For first billing cycle from start date
+    switch (billingCycle) {
+      case 'monthly':
+        nextRenewal = DateTime(
+          startDate.year,
+          startDate.month + 1,
+          startDate.day,
+        );
+        break;
+      case 'quarterly':
+        nextRenewal = DateTime(
+          startDate.year,
+          startDate.month + 3,
+          startDate.day,
+        );
+        break;
+      case 'yearly':
+        nextRenewal = DateTime(
+          startDate.year + 1,
+          startDate.month,
+          startDate.day,
+        );
+        break;
+      case 'custom':
+        if (customDays != null) {
+          nextRenewal = startDate.add(Duration(days: customDays));
+        } else {
+          // Default to monthly if custom days is not provided
           nextRenewal = DateTime(
-            nextRenewal.year,
-            nextRenewal.month + 1,
-            nextRenewal.day,
+            startDate.year,
+            startDate.month + 1,
+            startDate.day,
           );
-          break;
-        case 'quarterly':
-          nextRenewal = DateTime(
-            nextRenewal.year,
-            nextRenewal.month + 3,
-            nextRenewal.day,
-          );
-          break;
-        case 'yearly':
-          nextRenewal = DateTime(
-            nextRenewal.year + 1,
-            nextRenewal.month,
-            nextRenewal.day,
-          );
-          break;
-        case 'custom':
-          if (customDays != null) {
-            nextRenewal = nextRenewal.add(Duration(days: customDays));
-          } else {
-            // Default to monthly if custom days is not provided
+        }
+        break;
+      default:
+        // Default to monthly
+        nextRenewal = DateTime(
+          startDate.year,
+          startDate.month + 1,
+          startDate.day,
+        );
+    }
+    
+    // If we need to skip past dates, keep adding billing cycles until we find a date in the future
+    if (skipPastDates) {
+      while (nextRenewal.isBefore(now)) {
+        switch (billingCycle) {
+          case 'monthly':
             nextRenewal = DateTime(
               nextRenewal.year,
               nextRenewal.month + 1,
               nextRenewal.day,
             );
-          }
-          break;
-        default:
-          // Default to monthly
-          nextRenewal = DateTime(
-            nextRenewal.year,
-            nextRenewal.month + 1,
-            nextRenewal.day,
-          );
+            break;
+          case 'quarterly':
+            nextRenewal = DateTime(
+              nextRenewal.year,
+              nextRenewal.month + 3,
+              nextRenewal.day,
+            );
+            break;
+          case 'yearly':
+            nextRenewal = DateTime(
+              nextRenewal.year + 1,
+              nextRenewal.month,
+              nextRenewal.day,
+            );
+            break;
+          case 'custom':
+            if (customDays != null) {
+              nextRenewal = nextRenewal.add(Duration(days: customDays));
+            } else {
+              // Default to monthly if custom days is not provided
+              nextRenewal = DateTime(
+                nextRenewal.year,
+                nextRenewal.month + 1,
+                nextRenewal.day,
+              );
+            }
+            break;
+          default:
+            // Default to monthly
+            nextRenewal = DateTime(
+              nextRenewal.year,
+              nextRenewal.month + 1,
+              nextRenewal.day,
+            );
+        }
       }
     }
     

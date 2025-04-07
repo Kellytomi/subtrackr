@@ -15,6 +15,8 @@ class SubscriptionCard extends StatelessWidget {
   final VoidCallback? onPause;
   final VoidCallback? onResume;
   final VoidCallback? onCancel;
+  final VoidCallback? onEdit;
+  final VoidCallback? onMarkAsPaid;
   final String? defaultCurrencySymbol;
 
   const SubscriptionCard({
@@ -25,6 +27,8 @@ class SubscriptionCard extends StatelessWidget {
     this.onPause,
     this.onResume,
     this.onCancel,
+    this.onEdit,
+    this.onMarkAsPaid,
     this.defaultCurrencySymbol,
   }) : super(key: key);
 
@@ -66,17 +70,38 @@ class SubscriptionCard extends StatelessWidget {
 
     // Get days until renewal text
     String renewalText;
+    Color renewalTextColor = theme.brightness == Brightness.dark 
+        ? Colors.white70 
+        : Colors.black87;
+        
     if (subscription.status == AppConstants.statusActive) {
       if (subscription.isOverdue) {
         renewalText = 'Overdue';
+        renewalTextColor = Colors.red;
       } else {
-        renewalText = 'Renews in ${AppDateUtils.getDaysRemainingText(subscription.renewalDate)}';
+        final daysText = AppDateUtils.getDaysRemainingText(subscription.renewalDate);
+        // Don't include "in" for "Today" or "Tomorrow"
+        renewalText = daysText == 'Today' || daysText == 'Tomorrow' 
+            ? 'Renews $daysText' 
+            : 'Renews in $daysText';
+            
+        // Make "Renews Today" red
+        if (daysText == 'Today') {
+          renewalTextColor = Colors.red;
+        }
       }
     } else if (subscription.status == AppConstants.statusPaused) {
       renewalText = 'Paused';
     } else {
       renewalText = 'Cancelled';
     }
+
+    // Check if subscription is due today or overdue
+    final bool isDueNowOrOverdue = subscription.status == AppConstants.statusActive && 
+        (AppDateUtils.isToday(subscription.renewalDate) || subscription.isOverdue);
+    
+    // Debug print to help troubleshoot
+    print('DEBUG: ${subscription.name} - Status: ${subscription.status}, RenewalDate: ${subscription.renewalDate}, isOverdue: ${subscription.isOverdue}, isDueToday: ${AppDateUtils.isToday(subscription.renewalDate)}, isDueNowOrOverdue: $isDueNowOrOverdue');
 
     return Slidable(
       key: ValueKey(subscription.id),
@@ -115,6 +140,30 @@ class SubscriptionCard extends StatelessWidget {
               padding: const EdgeInsets.all(0),
               autoClose: true,
               label: 'Cancel',
+            ),
+          if (onEdit != null)
+            SlidableAction(
+              onPressed: (_) => onEdit!(),
+              backgroundColor: theme.colorScheme.surfaceVariant,
+              foregroundColor: Colors.black,
+              icon: Icons.edit_rounded,
+              padding: const EdgeInsets.all(0),
+              autoClose: true,
+              label: 'Edit',
+            ),
+          // Mark as Paid action (only for active subscriptions that are due or overdue)
+          if (subscription.status == AppConstants.statusActive && 
+              isDueNowOrOverdue && 
+              onMarkAsPaid != null)
+            SlidableAction(
+              onPressed: (_) => onMarkAsPaid!(),
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              icon: Icons.check_circle_outline,
+              padding: const EdgeInsets.all(0),
+              autoClose: true,
+              label: 'Mark Paid',
+              borderRadius: BorderRadius.zero,
             ),
           if (onDelete != null)
             SlidableAction(
@@ -176,18 +225,24 @@ class SubscriptionCard extends StatelessWidget {
                         child: subscription.logoUrl != null
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  subscription.logoUrl!,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Icon(
-                                      logoService.getFallbackIcon(subscription.name),
-                                      color: theme.brightness == Brightness.dark 
-                                          ? Colors.white 
-                                          : Colors.black,
-                                      size: 28,
-                                    );
-                                  },
+                                child: Hero(
+                                  tag: 'no_hero_animation_card_${subscription.id}',
+                                  flightShuttleBuilder: (_, __, ___, ____, _____) => 
+                                    const SizedBox.shrink(),
+                                  child: Image.network(
+                                    subscription.logoUrl!,
+                                    key: ValueKey('card_${subscription.id}_logo'),
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Icon(
+                                        logoService.getFallbackIcon(subscription.name),
+                                        color: theme.brightness == Brightness.dark 
+                                            ? Colors.white 
+                                            : Colors.black,
+                                        size: 28,
+                                      );
+                                    },
+                                  ),
                                 ),
                               )
                             : Icon(
@@ -293,61 +348,61 @@ class SubscriptionCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (subscription.category != null) ...[
-                    const SizedBox(height: 12),
-                    // Category tag
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.category_rounded,
-                              size: 12,
-                              color: theme.colorScheme.primary.withOpacity(0.7),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              subscription.category!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.primary.withOpacity(0.7),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 12),
-                  // Renewal information
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: theme.brightness == Brightness.dark 
-                          ? Colors.white.withOpacity(0.1) 
-                          : Colors.black.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      renewalText,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: theme.brightness == Brightness.dark 
-                            ? Colors.white.withOpacity(0.7) 
-                            : Colors.black.withOpacity(0.7),
+                  // Renewal information and category in same row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Renewal information
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: theme.brightness == Brightness.dark 
+                              ? Colors.white.withOpacity(0.1) 
+                              : Colors.black.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          renewalText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: renewalTextColor,
+                          ),
+                        ),
                       ),
-                    ),
+                      
+                      // Category tag (if available)
+                      if (subscription.category != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.category_rounded,
+                                size: 12,
+                                color: theme.colorScheme.primary.withOpacity(0.7),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                subscription.category!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.primary.withOpacity(0.7),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
