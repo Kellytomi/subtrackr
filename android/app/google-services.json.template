@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "752788778229",
-    "project_id": "subtrackr-994ac",
-    "storage_bucket": "subtrackr-994ac.firebasestorage.app"
+    "project_number": "YOUR_PROJECT_NUMBER",
+    "project_id": "YOUR_PROJECT_ID",
+    "storage_bucket": "YOUR_PROJECT_ID.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:752788778229:android:46194b725d3681799ee9bc",
+        "mobilesdk_app_id": "YOUR_MOBILE_SDK_APP_ID",
         "android_client_info": {
           "package_name": "com.kelvin.subtrackr"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDw8nDs7HvINIowGOqUZkYIN4-K2Xgrc24"
+          "current_key": "YOUR_API_KEY_HERE"
         }
       ],
       "services": {
@@ -26,4 +26,4 @@
     }
   ],
   "configuration_version": "1"
-}
+} 
