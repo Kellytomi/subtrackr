@@ -228,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     _buildSectionHeader('About', Icons.info_outline_rounded, colorScheme),
                   _buildSettingCard(
                     title: 'Version',
-                    subtitle: AppConstants.appVersion,
+                    subtitle: AppConstants.APP_VERSION,
                       icon: Icons.android_rounded,
                     iconColor: colorScheme.tertiary,
                     onTap: null,

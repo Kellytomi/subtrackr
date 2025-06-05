@@ -105,7 +105,7 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
       provider.deleteSubscription(subscriptionId);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text(AppConstants.subscriptionDeletedSuccess),
+          content: const Text(AppConstants.SUBSCRIPTION_DELETED_SUCCESS),
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.only(
             bottom: kFloatingActionButtonMargin + 48,
@@ -148,11 +148,11 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
   
   String _getStatusActionText(String status) {
     switch (status) {
-      case AppConstants.statusActive:
+      case AppConstants.STATUS_ACTIVE:
         return 'activated';
-      case AppConstants.statusPaused:
+      case AppConstants.STATUS_PAUSED:
         return 'paused';
-      case AppConstants.statusCancelled:
+      case AppConstants.STATUS_CANCELLED:
         return 'cancelled';
       default:
         return 'updated';
@@ -237,17 +237,17 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
     String statusText;
     
     switch (sub.status) {
-      case AppConstants.statusActive:
+      case AppConstants.STATUS_ACTIVE:
         statusColor = colorScheme.primary;
         statusIcon = Icons.check_circle_rounded;
         statusText = 'Active';
         break;
-      case AppConstants.statusPaused:
+      case AppConstants.STATUS_PAUSED:
         statusColor = colorScheme.tertiary;
         statusIcon = Icons.pause_circle_rounded;
         statusText = 'Paused';
         break;
-      case AppConstants.statusCancelled:
+      case AppConstants.STATUS_CANCELLED:
         statusColor = Colors.grey;
         statusIcon = Icons.cancel_rounded;
         statusText = 'Cancelled';
@@ -445,14 +445,14 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   // Activate button
-                                  if (sub.status != AppConstants.statusActive)
+                                  if (sub.status != AppConstants.STATUS_ACTIVE)
                                     Container(
                                       margin: const EdgeInsets.symmetric(horizontal: 8),
                                       child: ElevatedButton.icon(
                                         onPressed: () {
                                           _updateSubscriptionStatus(
                                             sub.id, 
-                                            AppConstants.statusActive
+                                            AppConstants.STATUS_ACTIVE
                                           );
                                         },
                                         icon: const Icon(Icons.play_circle_outline, color: Colors.white),
@@ -469,14 +469,14 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                     ),
                                   
                                   // Pause button
-                                  if (sub.status != AppConstants.statusPaused)
+                                  if (sub.status != AppConstants.STATUS_PAUSED)
                                     Container(
                                       margin: const EdgeInsets.symmetric(horizontal: 8),
                                       child: ElevatedButton.icon(
                                         onPressed: () {
                                           _updateSubscriptionStatus(
                                             sub.id, 
-                                            AppConstants.statusPaused
+                                            AppConstants.STATUS_PAUSED
                                           );
                                         },
                                         icon: const Icon(Icons.pause_circle_outline, color: Colors.black87),
@@ -493,14 +493,14 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                     ),
                                   
                                   // Cancel button
-                                  if (sub.status != AppConstants.statusCancelled)
+                                  if (sub.status != AppConstants.STATUS_CANCELLED)
                                     Container(
                                       margin: const EdgeInsets.symmetric(horizontal: 8),
                                       child: ElevatedButton.icon(
                                         onPressed: () {
                                           _updateSubscriptionStatus(
                                             sub.id, 
-                                            AppConstants.statusCancelled
+                                            AppConstants.STATUS_CANCELLED
                                           );
                                         },
                                         icon: const Icon(Icons.cancel_outlined, color: Colors.white),
@@ -632,7 +632,7 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
-                                            if (sub.isOverdue && sub.status == AppConstants.statusActive)
+                                            if (sub.isOverdue && sub.status == AppConstants.STATUS_ACTIVE)
                                               Container(
                                                 margin: const EdgeInsets.only(left: 8),
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -649,7 +649,7 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                                   ),
                                                 ),
                                               ),
-                                            if (daysUntilRenewal != null && daysUntilRenewal < 3 && daysUntilRenewal >= 0 && sub.status == AppConstants.statusActive)
+                                            if (daysUntilRenewal != null && daysUntilRenewal < 3 && daysUntilRenewal >= 0 && sub.status == AppConstants.STATUS_ACTIVE)
                                               Container(
                                                 margin: const EdgeInsets.only(left: 8),
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -858,7 +858,7 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                             const SizedBox(height: 32),
                             
                             // Annual cost calculation
-                            if (sub.status == AppConstants.statusActive)
+                            if (sub.status == AppConstants.STATUS_ACTIVE)
                               Container(
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
@@ -897,7 +897,7 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                             const SizedBox(height: 24),
                             
                             // Add "Mark as Paid" button for active subscriptions when today or overdue
-                            if (sub.status == AppConstants.statusActive && 
+                            if (sub.status == AppConstants.STATUS_ACTIVE && 
                                 daysUntilRenewal != null && 
                                 daysUntilRenewal <= 0) ...[
                               const SizedBox(height: 24),
@@ -932,11 +932,11 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
   
   String _getBillingCycleText(String billingCycle) {
     switch (billingCycle) {
-      case AppConstants.billingCycleMonthly:
+      case AppConstants.BILLING_CYCLE_MONTHLY:
         return 'Monthly';
-      case AppConstants.billingCycleQuarterly:
+      case AppConstants.BILLING_CYCLE_QUARTERLY:
         return 'Quarterly';
-      case AppConstants.billingCycleYearly:
+      case AppConstants.BILLING_CYCLE_YEARLY:
         return 'Yearly';
       default:
         return billingCycle;
@@ -945,11 +945,11 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
   
   double _calculateAnnualCost(Subscription subscription) {
     switch (subscription.billingCycle) {
-      case AppConstants.billingCycleMonthly:
+      case AppConstants.BILLING_CYCLE_MONTHLY:
         return subscription.amount * 12;
-      case AppConstants.billingCycleQuarterly:
+      case AppConstants.BILLING_CYCLE_QUARTERLY:
         return subscription.amount * 4;
-      case AppConstants.billingCycleYearly:
+      case AppConstants.BILLING_CYCLE_YEARLY:
         return subscription.amount;
       default:
         return subscription.amount;

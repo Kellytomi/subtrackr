@@ -29,16 +29,16 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   
-  String _billingCycle = AppConstants.billingCycleMonthly;
+  String _billingCycle = AppConstants.BILLING_CYCLE_MONTHLY;
   DateTime _startDate = DateTime.now();
   DateTime _renewalDate = DateTime.now().add(const Duration(days: 30));
   String? _category;
   bool _notificationsEnabled = true;
-  int _notificationDays = AppConstants.defaultNotificationDaysBeforeRenewal;
-  String _currencyCode = AppConstants.defaultCurrencyCode;
+  int _notificationDays = AppConstants.DEFAULT_NOTIFICATION_DAYS_BEFORE_RENEWAL;
+  String _currencyCode = AppConstants.DEFAULT_CURRENCY_CODE;
   String? _currencySymbol;
   String? _logoUrl;
-  String _status = AppConstants.statusActive;
+  String _status = AppConstants.STATUS_ACTIVE;
   
   // Add a list to store logo suggestions
   List<LogoSuggestion> _logoSuggestions = [];
@@ -672,15 +672,15 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
                                 icon: Icons.calendar_today_rounded,
                                 items: [
                                   DropdownMenuItem(
-                                    value: AppConstants.billingCycleMonthly,
+                                    value: AppConstants.BILLING_CYCLE_MONTHLY,
                                     child: const Text('Monthly'),
                                   ),
                                   DropdownMenuItem(
-                                    value: AppConstants.billingCycleQuarterly,
+                                    value: AppConstants.BILLING_CYCLE_QUARTERLY,
                                     child: const Text('Quarterly'),
                                   ),
                                   DropdownMenuItem(
-                                    value: AppConstants.billingCycleYearly,
+                                    value: AppConstants.BILLING_CYCLE_YEARLY,
                                     child: const Text('Yearly'),
                                   ),
                                 ],
@@ -1093,7 +1093,7 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppConstants.subscriptionUpdatedSuccess)),
+        const SnackBar(content: Text(AppConstants.SUBSCRIPTION_UPDATED_SUCCESS)),
       );
       
       // Navigate back

@@ -26,14 +26,14 @@ class Subscription {
     required this.billingCycle,
     required this.startDate,
     required this.renewalDate,
-    this.status = AppConstants.statusActive,
+    this.status = AppConstants.STATUS_ACTIVE,
     this.description,
     this.website,
     this.logoUrl,
     this.customBillingDays,
     this.category,
     this.notificationsEnabled = true,
-    this.notificationDays = AppConstants.defaultNotificationDaysBeforeRenewal,
+    this.notificationDays = AppConstants.DEFAULT_NOTIFICATION_DAYS_BEFORE_RENEWAL,
     this.paymentHistory,
     this.currencyCode = 'USD', // Default to USD
   }) : id = id ?? const Uuid().v4();
@@ -104,17 +104,17 @@ class Subscription {
       id: map['id'] as String? ?? '',
       name: map['name'] as String? ?? '',
       amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
-      billingCycle: map['billingCycle'] as String? ?? AppConstants.billingCycleMonthly,
+      billingCycle: map['billingCycle'] as String? ?? AppConstants.BILLING_CYCLE_MONTHLY,
       startDate: DateTime.fromMillisecondsSinceEpoch(map['startDate'] as int? ?? 0),
       renewalDate: DateTime.fromMillisecondsSinceEpoch(map['renewalDate'] as int? ?? 0),
-      status: map['status'] as String? ?? AppConstants.statusActive,
+      status: map['status'] as String? ?? AppConstants.STATUS_ACTIVE,
       description: map['description'] as String?,
       website: map['website'] as String?,
       logoUrl: map['logoUrl'] as String?,
       customBillingDays: map['customBillingDays'] as int?,
       category: map['category'] as String?,
       notificationsEnabled: (map['notificationsEnabled'] as bool?) ?? true,
-      notificationDays: (map['notificationDays'] as int?) ?? AppConstants.defaultNotificationDaysBeforeRenewal,
+      notificationDays: (map['notificationDays'] as int?) ?? AppConstants.DEFAULT_NOTIFICATION_DAYS_BEFORE_RENEWAL,
       paymentHistory: map['paymentHistory'] != null
           ? (map['paymentHistory'] as List<dynamic>)
               .map((timestamp) => DateTime.fromMillisecondsSinceEpoch(timestamp as int))
@@ -127,13 +127,13 @@ class Subscription {
   // Calculate monthly cost
   double get monthlyCost {
     switch (billingCycle) {
-      case AppConstants.billingCycleMonthly:
+      case AppConstants.BILLING_CYCLE_MONTHLY:
         return amount;
-      case AppConstants.billingCycleQuarterly:
+      case AppConstants.BILLING_CYCLE_QUARTERLY:
         return amount / 3;
-      case AppConstants.billingCycleYearly:
+      case AppConstants.BILLING_CYCLE_YEARLY:
         return amount / 12;
-      case AppConstants.billingCycleCustom:
+      case AppConstants.BILLING_CYCLE_CUSTOM:
         if (customBillingDays != null && customBillingDays! > 0) {
           return amount * 30 / customBillingDays!;
         }
@@ -146,13 +146,13 @@ class Subscription {
   // Calculate yearly cost
   double get yearlyCost {
     switch (billingCycle) {
-      case AppConstants.billingCycleMonthly:
+      case AppConstants.BILLING_CYCLE_MONTHLY:
         return amount * 12;
-      case AppConstants.billingCycleQuarterly:
+      case AppConstants.BILLING_CYCLE_QUARTERLY:
         return amount * 4;
-      case AppConstants.billingCycleYearly:
+      case AppConstants.BILLING_CYCLE_YEARLY:
         return amount;
-      case AppConstants.billingCycleCustom:
+      case AppConstants.BILLING_CYCLE_CUSTOM:
         if (customBillingDays != null && customBillingDays! > 0) {
           return amount * 365 / customBillingDays!;
         }
@@ -165,13 +165,13 @@ class Subscription {
   // Get the billing cycle as a human-readable string
   String get billingCycleText {
     switch (billingCycle) {
-      case AppConstants.billingCycleMonthly:
+      case AppConstants.BILLING_CYCLE_MONTHLY:
         return 'Monthly';
-      case AppConstants.billingCycleQuarterly:
+      case AppConstants.BILLING_CYCLE_QUARTERLY:
         return 'Quarterly';
-      case AppConstants.billingCycleYearly:
+      case AppConstants.BILLING_CYCLE_YEARLY:
         return 'Yearly';
-      case AppConstants.billingCycleCustom:
+      case AppConstants.BILLING_CYCLE_CUSTOM:
         if (customBillingDays != null) {
           return 'Every $customBillingDays days';
         }
@@ -184,11 +184,11 @@ class Subscription {
   // Get the status as a human-readable string
   String get statusText {
     switch (status) {
-      case AppConstants.statusActive:
+      case AppConstants.STATUS_ACTIVE:
         return 'Active';
-      case AppConstants.statusPaused:
+      case AppConstants.STATUS_PAUSED:
         return 'Paused';
-      case AppConstants.statusCancelled:
+      case AppConstants.STATUS_CANCELLED:
         return 'Cancelled';
       default:
         return 'Unknown';
@@ -197,7 +197,7 @@ class Subscription {
   
   // Check if the subscription is due soon (within the next 3 days)
   bool get isDueSoon {
-    if (status != AppConstants.statusActive) return false;
+    if (status != AppConstants.STATUS_ACTIVE) return false;
     
     final now = DateTime.now();
     final difference = renewalDate.difference(now).inDays;
@@ -206,7 +206,7 @@ class Subscription {
   
   // Check if the subscription is overdue
   bool get isOverdue {
-    if (status != AppConstants.statusActive) return false;
+    if (status != AppConstants.STATUS_ACTIVE) return false;
     
     final now = DateTime.now();
     // Compare only the dates, not the times
@@ -232,17 +232,17 @@ class Subscription {
   
   // Pause the subscription
   Subscription pause() {
-    return copyWith(status: AppConstants.statusPaused);
+    return copyWith(status: AppConstants.STATUS_PAUSED);
   }
   
   // Resume the subscription
   Subscription resume() {
-    return copyWith(status: AppConstants.statusActive);
+    return copyWith(status: AppConstants.STATUS_ACTIVE);
   }
   
   // Cancel the subscription
   Subscription cancel() {
-    return copyWith(status: AppConstants.statusCancelled);
+    return copyWith(status: AppConstants.STATUS_CANCELLED);
   }
   
   // Mark subscription as paid and update renewal date
@@ -256,7 +256,7 @@ class Subscription {
     // We calculate from the current renewal date, not from the payment date
     DateTime nextRenewal;
     switch (billingCycle) {
-      case AppConstants.billingCycleMonthly:
+      case AppConstants.BILLING_CYCLE_MONTHLY:
         // Keep the same day of month for the next renewal
         final nextMonth = renewalDate.month + 1;
         final nextYear = renewalDate.year + (nextMonth > 12 ? 1 : 0);
@@ -281,7 +281,7 @@ class Subscription {
           nextRenewal = DateTime(oneMoreYear, finalMonth, finalDay);
         }
         break;
-      case AppConstants.billingCycleQuarterly:
+      case AppConstants.BILLING_CYCLE_QUARTERLY:
         // Keep the same day but add 3 months
         final nextMonth = renewalDate.month + 3;
         final nextYear = renewalDate.year + (nextMonth > 12 ? 1 : 0);
@@ -306,7 +306,7 @@ class Subscription {
           nextRenewal = DateTime(oneMoreYear, finalMonth, finalDay);
         }
         break;
-      case AppConstants.billingCycleYearly:
+      case AppConstants.BILLING_CYCLE_YEARLY:
         // Keep the same day and month, but add a year
         final nextYear = renewalDate.year + 1;
         
@@ -324,7 +324,7 @@ class Subscription {
           nextRenewal = DateTime(nextRenewal.year + 1, nextRenewal.month, nextRenewal.day);
         }
         break;
-      case AppConstants.billingCycleCustom:
+      case AppConstants.BILLING_CYCLE_CUSTOM:
         if (customBillingDays != null) {
           // For custom, we do add from the renewal date
           nextRenewal = renewalDate.add(Duration(days: customBillingDays!));
@@ -367,7 +367,7 @@ class Subscription {
     return copyWith(
       paymentHistory: updatedHistory,
       renewalDate: nextRenewal,
-      status: AppConstants.statusActive, // Ensure subscription is active
+      status: AppConstants.STATUS_ACTIVE, // Ensure subscription is active
     );
   }
 } 

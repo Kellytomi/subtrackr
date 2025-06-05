@@ -30,30 +30,30 @@ class SubscriptionProvider extends ChangeNotifier {
   
   // Get active subscriptions
   List<Subscription> get activeSubscriptions => _subscriptions
-      .where((subscription) => subscription.status == AppConstants.statusActive)
+      .where((subscription) => subscription.status == AppConstants.STATUS_ACTIVE)
       .toList();
   
   // Get paused subscriptions
   List<Subscription> get pausedSubscriptions => _subscriptions
-      .where((subscription) => subscription.status == AppConstants.statusPaused)
+      .where((subscription) => subscription.status == AppConstants.STATUS_PAUSED)
       .toList();
   
   // Get cancelled subscriptions
   List<Subscription> get cancelledSubscriptions => _subscriptions
-      .where((subscription) => subscription.status == AppConstants.statusCancelled)
+      .where((subscription) => subscription.status == AppConstants.STATUS_CANCELLED)
       .toList();
   
   // Get subscriptions due soon (within the next 3 days)
   List<Subscription> get subscriptionsDueSoon => _subscriptions
       .where((subscription) => 
-          subscription.status == AppConstants.statusActive &&
+          subscription.status == AppConstants.STATUS_ACTIVE &&
           subscription.isDueSoon)
       .toList();
   
   // Get overdue subscriptions
   List<Subscription> get overdueSubscriptions => _subscriptions
       .where((subscription) => 
-          subscription.status == AppConstants.statusActive &&
+          subscription.status == AppConstants.STATUS_ACTIVE &&
           subscription.isOverdue)
       .toList();
   
@@ -143,7 +143,7 @@ class SubscriptionProvider extends ChangeNotifier {
         if (subscription.currencyCode.isEmpty) {
           // If currency code is empty, use the default currency code
           final updatedSubscription = subscription.copyWith(
-            currencyCode: _settingsService.getCurrencyCode() ?? AppConstants.defaultCurrencyCode,
+            currencyCode: _settingsService.getCurrencyCode() ?? AppConstants.DEFAULT_CURRENCY_CODE,
           );
           loadedSubscriptions[i] = updatedSubscription;
           await _repository.updateSubscription(updatedSubscription);
@@ -156,7 +156,7 @@ class SubscriptionProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _isLoading = false;
-      _error = AppConstants.errorLoadingSubscriptions;
+      _error = AppConstants.ERROR_LOADING_SUBSCRIPTIONS;
       notifyListeners();
     }
   }
@@ -170,11 +170,11 @@ class SubscriptionProvider extends ChangeNotifier {
       notifyListeners();
       
       // Schedule notification if active
-      if (subscription.status == AppConstants.statusActive) {
+      if (subscription.status == AppConstants.STATUS_ACTIVE) {
         _scheduleNotification(subscription);
       }
     } catch (e) {
-      _error = AppConstants.errorAddingSubscription;
+      _error = AppConstants.ERROR_ADDING_SUBSCRIPTION;
       notifyListeners();
     }
   }
@@ -190,13 +190,13 @@ class SubscriptionProvider extends ChangeNotifier {
       notifyListeners();
       
       // Update notification if active
-      if (subscription.status == AppConstants.statusActive) {
+      if (subscription.status == AppConstants.STATUS_ACTIVE) {
         _scheduleNotification(subscription);
       } else {
         await _notificationService.cancelNotification(subscription.id.hashCode);
       }
     } catch (e) {
-      _error = AppConstants.errorUpdatingSubscription;
+      _error = AppConstants.ERROR_UPDATING_SUBSCRIPTION;
       notifyListeners();
     }
   }
@@ -209,7 +209,7 @@ class SubscriptionProvider extends ChangeNotifier {
       _subscriptions = _subscriptions.where((s) => s.id != id).toList();
       notifyListeners();
     } catch (e) {
-      _error = AppConstants.errorDeletingSubscription;
+      _error = AppConstants.ERROR_DELETING_SUBSCRIPTION;
       notifyListeners();
     }
   }
@@ -237,7 +237,7 @@ class SubscriptionProvider extends ChangeNotifier {
       // Reschedule notification
       _scheduleNotification(updatedSubscription);
     } catch (e) {
-      _error = AppConstants.errorUpdatingSubscription;
+      _error = AppConstants.ERROR_UPDATING_SUBSCRIPTION;
       notifyListeners();
     }
   }
@@ -250,14 +250,14 @@ class SubscriptionProvider extends ChangeNotifier {
         orElse: () => throw Exception('Subscription not found'),
       );
       final updatedSubscription = subscription.copyWith(
-        status: AppConstants.statusPaused,
+        status: AppConstants.STATUS_PAUSED,
       );
       
       await _repository.updateSubscription(updatedSubscription);
       await _notificationService.cancelNotification(id.hashCode);
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
-      _error = AppConstants.errorUpdatingSubscription;
+      _error = AppConstants.ERROR_UPDATING_SUBSCRIPTION;
       notifyListeners();
     }
   }
@@ -270,14 +270,14 @@ class SubscriptionProvider extends ChangeNotifier {
         orElse: () => throw Exception('Subscription not found'),
       );
       final updatedSubscription = subscription.copyWith(
-        status: AppConstants.statusActive,
+        status: AppConstants.STATUS_ACTIVE,
       );
       
       await _repository.updateSubscription(updatedSubscription);
       _scheduleNotification(updatedSubscription);
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
-      _error = AppConstants.errorUpdatingSubscription;
+      _error = AppConstants.ERROR_UPDATING_SUBSCRIPTION;
       notifyListeners();
     }
   }
@@ -290,14 +290,14 @@ class SubscriptionProvider extends ChangeNotifier {
         orElse: () => throw Exception('Subscription not found'),
       );
       final updatedSubscription = subscription.copyWith(
-        status: AppConstants.statusCancelled,
+        status: AppConstants.STATUS_CANCELLED,
       );
       
       await _repository.updateSubscription(updatedSubscription);
       await _notificationService.cancelNotification(id.hashCode);
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
-      _error = AppConstants.errorUpdatingSubscription;
+      _error = AppConstants.ERROR_UPDATING_SUBSCRIPTION;
       notifyListeners();
     }
   }
@@ -312,7 +312,7 @@ class SubscriptionProvider extends ChangeNotifier {
       final updatedSubscription = subscription.addPayment(paymentDate);
       await updateSubscription(updatedSubscription);
     } catch (e) {
-      _error = AppConstants.errorUpdatingSubscription;
+      _error = AppConstants.ERROR_UPDATING_SUBSCRIPTION;
       notifyListeners();
     }
   }

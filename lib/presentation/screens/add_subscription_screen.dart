@@ -45,15 +45,15 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   
-  String _currencyCode = AppConstants.defaultCurrencyCode;
-  String _currencySymbol = AppConstants.defaultCurrencySymbol;
-  String _billingCycle = AppConstants.billingCycleMonthly;
+  String _currencyCode = AppConstants.DEFAULT_CURRENCY_CODE;
+  String _currencySymbol = AppConstants.DEFAULT_CURRENCY_SYMBOL;
+  String _billingCycle = AppConstants.BILLING_CYCLE_MONTHLY;
   DateTime _startDate = DateTime.now();
   String? _category;
   bool _notificationsEnabled = true;
-  int _notificationDays = AppConstants.defaultNotificationDaysBeforeRenewal;
+  int _notificationDays = AppConstants.DEFAULT_NOTIFICATION_DAYS_BEFORE_RENEWAL;
   String? _logoUrl;
-  String _status = AppConstants.statusActive;
+  String _status = AppConstants.STATUS_ACTIVE;
   
   // Add a list to store logo suggestions
   List<LogoSuggestion> _logoSuggestions = [];
@@ -107,8 +107,8 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final settingsService = Provider.of<SettingsService>(context, listen: false);
       setState(() {
-        _currencyCode = settingsService.getCurrencyCode() ?? AppConstants.defaultCurrencyCode;
-        _currencySymbol = CurrencyUtils.getCurrencyByCode(_currencyCode)?.symbol ?? AppConstants.defaultCurrencySymbol;
+        _currencyCode = settingsService.getCurrencyCode() ?? AppConstants.DEFAULT_CURRENCY_CODE;
+        _currencySymbol = CurrencyUtils.getCurrencyByCode(_currencyCode)?.symbol ?? AppConstants.DEFAULT_CURRENCY_SYMBOL;
         _isLoading = false;
       });
       
@@ -673,15 +673,15 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
                       icon: Icons.calendar_today_rounded,
                       items: [
                         DropdownMenuItem(
-                          value: AppConstants.billingCycleMonthly,
+                          value: AppConstants.BILLING_CYCLE_MONTHLY,
                           child: const Text('Monthly'),
                         ),
                         DropdownMenuItem(
-                          value: AppConstants.billingCycleQuarterly,
+                          value: AppConstants.BILLING_CYCLE_QUARTERLY,
                           child: const Text('Quarterly'),
                         ),
                         DropdownMenuItem(
-                          value: AppConstants.billingCycleYearly,
+                          value: AppConstants.BILLING_CYCLE_YEARLY,
                           child: const Text('Yearly'),
                         ),
                       ],
@@ -982,7 +982,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
       final website = _websiteController.text.trim();
       
       int? customBillingDays;
-      if (_billingCycle == AppConstants.billingCycleCustom) {
+      if (_billingCycle == AppConstants.BILLING_CYCLE_CUSTOM) {
         customBillingDays = int.parse(_customDaysController.text);
       }
       
@@ -1020,7 +1020,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
         logoUrl: _logoUrl,
         notificationsEnabled: _notificationsEnabled,
         notificationDays: _notificationDays,
-        status: AppConstants.statusActive, // Always active when first created
+        status: AppConstants.STATUS_ACTIVE, // Always active when first created
       );
       
       // If we had a last payment date, add it to the payment history
@@ -1036,7 +1036,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
       
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppConstants.subscriptionAddedSuccess)),
+        const SnackBar(content: Text(AppConstants.SUBSCRIPTION_ADDED_SUCCESS)),
       );
       
       // Navigate back
@@ -1050,28 +1050,28 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
     
     DateTime calculatedDate;
     switch (_billingCycle) {
-      case AppConstants.billingCycleMonthly:
+      case AppConstants.BILLING_CYCLE_MONTHLY:
         calculatedDate = DateTime(
           _lastPaymentDate!.year,
           _lastPaymentDate!.month + 1,
           _lastPaymentDate!.day,
         );
         break;
-      case AppConstants.billingCycleQuarterly:
+      case AppConstants.BILLING_CYCLE_QUARTERLY:
         calculatedDate = DateTime(
           _lastPaymentDate!.year,
           _lastPaymentDate!.month + 3,
           _lastPaymentDate!.day,
         );
         break;
-      case AppConstants.billingCycleYearly:
+      case AppConstants.BILLING_CYCLE_YEARLY:
         calculatedDate = DateTime(
           _lastPaymentDate!.year + 1,
           _lastPaymentDate!.month,
           _lastPaymentDate!.day,
         );
         break;
-      case AppConstants.billingCycleCustom:
+      case AppConstants.BILLING_CYCLE_CUSTOM:
         final days = int.tryParse(_customDaysController.text);
         if (days != null) {
           calculatedDate = _lastPaymentDate!.add(Duration(days: days));
@@ -1087,28 +1087,28 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
     // until we get a future date
     while (calculatedDate.isBefore(DateTime.now())) {
       switch (_billingCycle) {
-        case AppConstants.billingCycleMonthly:
+        case AppConstants.BILLING_CYCLE_MONTHLY:
           calculatedDate = DateTime(
             calculatedDate.year,
             calculatedDate.month + 1,
             calculatedDate.day,
           );
           break;
-        case AppConstants.billingCycleQuarterly:
+        case AppConstants.BILLING_CYCLE_QUARTERLY:
           calculatedDate = DateTime(
             calculatedDate.year,
             calculatedDate.month + 3,
             calculatedDate.day,
           );
           break;
-        case AppConstants.billingCycleYearly:
+        case AppConstants.BILLING_CYCLE_YEARLY:
           calculatedDate = DateTime(
             calculatedDate.year + 1,
             calculatedDate.month,
             calculatedDate.day,
           );
           break;
-        case AppConstants.billingCycleCustom:
+        case AppConstants.BILLING_CYCLE_CUSTOM:
           final days = int.tryParse(_customDaysController.text);
           if (days != null) {
             calculatedDate = calculatedDate.add(Duration(days: days));
@@ -1134,16 +1134,16 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
     // Consider it historical if it's more than one billing cycle in the past
     bool isHistorical = false;
     switch (_billingCycle) {
-      case AppConstants.billingCycleMonthly:
+      case AppConstants.BILLING_CYCLE_MONTHLY:
         isHistorical = difference > 31; // More than a month ago
         break;
-      case AppConstants.billingCycleQuarterly:
+      case AppConstants.BILLING_CYCLE_QUARTERLY:
         isHistorical = difference > 92; // More than 3 months ago
         break;
-      case AppConstants.billingCycleYearly:
+      case AppConstants.BILLING_CYCLE_YEARLY:
         isHistorical = difference > 366; // More than a year ago
         break;
-      case AppConstants.billingCycleCustom:
+      case AppConstants.BILLING_CYCLE_CUSTOM:
         final customDays = int.tryParse(_customDaysController.text) ?? 30;
         isHistorical = difference > customDays; // More than one custom cycle ago
         break;
@@ -1184,28 +1184,28 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
     
     DateTime calculatedDate;
     switch (_billingCycle) {
-      case AppConstants.billingCycleMonthly:
+      case AppConstants.BILLING_CYCLE_MONTHLY:
         calculatedDate = DateTime(
           baseDate.year,
           baseDate.month + 1,
           baseDate.day,
         );
         break;
-      case AppConstants.billingCycleQuarterly:
+      case AppConstants.BILLING_CYCLE_QUARTERLY:
         calculatedDate = DateTime(
           baseDate.year,
           baseDate.month + 3,
           baseDate.day,
         );
         break;
-      case AppConstants.billingCycleYearly:
+      case AppConstants.BILLING_CYCLE_YEARLY:
         calculatedDate = DateTime(
           baseDate.year + 1,
           baseDate.month,
           baseDate.day,
         );
         break;
-      case AppConstants.billingCycleCustom:
+      case AppConstants.BILLING_CYCLE_CUSTOM:
         final days = int.tryParse(_customDaysController.text);
         if (days != null) {
           calculatedDate = baseDate.add(Duration(days: days));
@@ -1221,28 +1221,28 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
     // until we get a future date
     while (calculatedDate.isBefore(DateTime.now())) {
       switch (_billingCycle) {
-        case AppConstants.billingCycleMonthly:
+        case AppConstants.BILLING_CYCLE_MONTHLY:
           calculatedDate = DateTime(
             calculatedDate.year,
             calculatedDate.month + 1,
             calculatedDate.day,
           );
           break;
-        case AppConstants.billingCycleQuarterly:
+        case AppConstants.BILLING_CYCLE_QUARTERLY:
           calculatedDate = DateTime(
             calculatedDate.year,
             calculatedDate.month + 3,
             calculatedDate.day,
           );
           break;
-        case AppConstants.billingCycleYearly:
+        case AppConstants.BILLING_CYCLE_YEARLY:
           calculatedDate = DateTime(
             calculatedDate.year + 1,
             calculatedDate.month,
             calculatedDate.day,
           );
           break;
-        case AppConstants.billingCycleCustom:
+        case AppConstants.BILLING_CYCLE_CUSTOM:
           final days = int.tryParse(_customDaysController.text);
           if (days != null) {
             calculatedDate = calculatedDate.add(Duration(days: days));

@@ -68,7 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!mounted) return;
     
     // Navigate to currency selection screen
-    Navigator.pushReplacementNamed(context, AppConstants.currencySelectionRoute);
+    Navigator.pushReplacementNamed(context, AppConstants.CURRENCY_SELECTION_ROUTE);
   }
 
   @override

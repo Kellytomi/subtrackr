@@ -24,7 +24,7 @@ class SubscriptionRepository {
     }
     
     // Open the box
-    _subscriptionsBox = await Hive.openBox<SubscriptionModel>(AppConstants.subscriptionsBox);
+    _subscriptionsBox = await Hive.openBox<SubscriptionModel>(AppConstants.SUBSCRIPTIONS_BOX);
   }
   
   // Get all subscriptions
@@ -35,7 +35,7 @@ class SubscriptionRepository {
   // Get active subscriptions
   List<Subscription> getActiveSubscriptions() {
     return _subscriptionsBox.values
-        .where((model) => model.status == AppConstants.statusActive)
+        .where((model) => model.status == AppConstants.STATUS_ACTIVE)
         .map((model) => model.toEntity())
         .toList();
   }
@@ -43,7 +43,7 @@ class SubscriptionRepository {
   // Get paused subscriptions
   List<Subscription> getPausedSubscriptions() {
     return _subscriptionsBox.values
-        .where((model) => model.status == AppConstants.statusPaused)
+        .where((model) => model.status == AppConstants.STATUS_PAUSED)
         .map((model) => model.toEntity())
         .toList();
   }
@@ -51,7 +51,7 @@ class SubscriptionRepository {
   // Get cancelled subscriptions
   List<Subscription> getCancelledSubscriptions() {
     return _subscriptionsBox.values
-        .where((model) => model.status == AppConstants.statusCancelled)
+        .where((model) => model.status == AppConstants.STATUS_CANCELLED)
         .map((model) => model.toEntity())
         .toList();
   }
@@ -89,7 +89,7 @@ class SubscriptionRepository {
     
     return _subscriptionsBox.values
         .where((model) => 
-            model.status == AppConstants.statusActive &&
+            model.status == AppConstants.STATUS_ACTIVE &&
             model.renewalDate.isAfter(now) &&
             model.renewalDate.isBefore(threeDaysLater))
         .map((model) => model.toEntity())
@@ -102,7 +102,7 @@ class SubscriptionRepository {
     
     return _subscriptionsBox.values
         .where((model) => 
-            model.status == AppConstants.statusActive &&
+            model.status == AppConstants.STATUS_ACTIVE &&
             model.renewalDate.isBefore(now))
         .map((model) => model.toEntity())
         .toList();

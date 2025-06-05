@@ -54,10 +54,10 @@ void main() async {
   final onboardingComplete = settingsService.isOnboardingComplete();
   final currencyCode = settingsService.getCurrencyCode();
   final initialRoute = !onboardingComplete 
-      ? AppConstants.onboardingRoute 
+      ? AppConstants.ONBOARDING_ROUTE 
       : (currencyCode == null || currencyCode.isEmpty) 
-          ? AppConstants.currencySelectionRoute 
-          : AppConstants.homeRoute;
+          ? AppConstants.CURRENCY_SELECTION_ROUTE 
+          : AppConstants.HOME_ROUTE;
   
   runApp(MyApp(
     settingsService: settingsService,
@@ -110,21 +110,21 @@ class MyApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
           return MaterialApp(
-            title: AppConstants.appName,
+            title: AppConstants.APP_NAME,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
             debugShowCheckedModeBanner: false,
             initialRoute: initialRoute,
             routes: {
-              AppConstants.onboardingRoute: (_) => const OnboardingScreen(),
-              AppConstants.currencySelectionRoute: (_) => const CurrencySelectionScreen(),
-              AppConstants.homeRoute: (_) => const MainLayout(),
-              AppConstants.addSubscriptionRoute: (_) => const AddSubscriptionScreen(),
-              AppConstants.editSubscriptionRoute: (_) => const EditSubscriptionScreen(),
-              AppConstants.subscriptionDetailsRoute: (_) => const SubscriptionDetailsScreen(),
-              AppConstants.settingsRoute: (_) => const SettingsScreen(),
-              AppConstants.statisticsRoute: (_) => const StatisticsScreen(),
+              AppConstants.ONBOARDING_ROUTE: (_) => const OnboardingScreen(),
+              AppConstants.CURRENCY_SELECTION_ROUTE: (_) => const CurrencySelectionScreen(),
+              AppConstants.HOME_ROUTE: (_) => const MainLayout(),
+              AppConstants.ADD_SUBSCRIPTION_ROUTE: (_) => const AddSubscriptionScreen(),
+              AppConstants.EDIT_SUBSCRIPTION_ROUTE: (_) => const EditSubscriptionScreen(),
+              AppConstants.SUBSCRIPTION_DETAILS_ROUTE: (_) => const SubscriptionDetailsScreen(),
+              AppConstants.SETTINGS_ROUTE: (_) => const SettingsScreen(),
+              AppConstants.STATISTICS_ROUTE: (_) => const StatisticsScreen(),
             },
           );
         },

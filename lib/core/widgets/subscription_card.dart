@@ -44,13 +44,13 @@ class SubscriptionCard extends StatelessWidget {
     // Determine the status color with fallbacks
     Color statusColor;
     switch (subscription.status) {
-      case AppConstants.statusActive:
+      case AppConstants.STATUS_ACTIVE:
         statusColor = customColors?.activeSubscription ?? Colors.green;
         break;
-      case AppConstants.statusPaused:
+      case AppConstants.STATUS_PAUSED:
         statusColor = customColors?.pausedSubscription ?? Colors.orange;
         break;
-      case AppConstants.statusCancelled:
+      case AppConstants.STATUS_CANCELLED:
         statusColor = customColors?.cancelledSubscription ?? Colors.red;
         break;
       default:
@@ -60,7 +60,7 @@ class SubscriptionCard extends StatelessWidget {
     // Get currency information
     final currency = CurrencyUtils.getCurrencyByCode(subscription.currencyCode) ?? 
         CurrencyUtils.getAllCurrencies().firstWhere(
-          (c) => c.code == AppConstants.defaultCurrencyCode,
+          (c) => c.code == AppConstants.DEFAULT_CURRENCY_CODE,
           orElse: () => CurrencyUtils.getAllCurrencies().first,
         );
 
@@ -75,7 +75,7 @@ class SubscriptionCard extends StatelessWidget {
     String renewalText;
     Color renewalTextColor = theme.colorScheme.onSurface.withOpacity(0.8);
     
-    if (subscription.status == AppConstants.statusActive) {
+    if (subscription.status == AppConstants.STATUS_ACTIVE) {
       if (subscription.isOverdue) {
         renewalText = 'Overdue';
         renewalTextColor = theme.colorScheme.error;
@@ -91,14 +91,14 @@ class SubscriptionCard extends StatelessWidget {
           renewalTextColor = theme.colorScheme.error;
         }
       }
-    } else if (subscription.status == AppConstants.statusPaused) {
+    } else if (subscription.status == AppConstants.STATUS_PAUSED) {
       renewalText = 'Paused';
     } else {
       renewalText = 'Cancelled';
     }
 
     // Check if subscription is due today or overdue
-    final bool isDueNowOrOverdue = subscription.status == AppConstants.statusActive && 
+    final bool isDueNowOrOverdue = subscription.status == AppConstants.STATUS_ACTIVE && 
         (AppDateUtils.isToday(subscription.renewalDate) || subscription.isOverdue);
     
     return Material(
@@ -109,7 +109,7 @@ class SubscriptionCard extends StatelessWidget {
           motion: const DrawerMotion(),
           extentRatio: 0.6,
           children: [
-            if (subscription.status == AppConstants.statusActive && onPause != null)
+            if (subscription.status == AppConstants.STATUS_ACTIVE && onPause != null)
               SlidableAction(
                 onPressed: (_) => onPause!(),
                 backgroundColor: theme.colorScheme.surfaceContainerHighest,
@@ -120,7 +120,7 @@ class SubscriptionCard extends StatelessWidget {
                 autoClose: true,
                 label: 'Pause',
               ),
-            if (subscription.status == AppConstants.statusPaused && onResume != null)
+            if (subscription.status == AppConstants.STATUS_PAUSED && onResume != null)
               SlidableAction(
                 onPressed: (_) => onResume!(),
                 backgroundColor: theme.colorScheme.surfaceContainerHighest,
@@ -131,7 +131,7 @@ class SubscriptionCard extends StatelessWidget {
                 autoClose: true,
                 label: 'Resume',
               ),
-            if (subscription.status != AppConstants.statusCancelled && onCancel != null)
+            if (subscription.status != AppConstants.STATUS_CANCELLED && onCancel != null)
               SlidableAction(
                 onPressed: (_) => onCancel!(),
                 backgroundColor: theme.colorScheme.surfaceContainerHighest,
@@ -152,7 +152,7 @@ class SubscriptionCard extends StatelessWidget {
                 label: 'Edit',
               ),
             // Mark as Paid action (only for active subscriptions that are due or overdue)
-            if (subscription.status == AppConstants.statusActive && 
+            if (subscription.status == AppConstants.STATUS_ACTIVE && 
                 isDueNowOrOverdue && 
                 onMarkAsPaid != null)
               SlidableAction(
@@ -364,9 +364,9 @@ class SubscriptionCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                subscription.status == AppConstants.statusActive
+                                subscription.status == AppConstants.STATUS_ACTIVE
                                     ? 'Active'
-                                    : subscription.status == AppConstants.statusPaused
+                                    : subscription.status == AppConstants.STATUS_PAUSED
                                         ? 'Paused'
                                         : 'Cancelled',
                                 style: TextStyle(

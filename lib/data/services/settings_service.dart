@@ -17,35 +17,35 @@ class SettingsService {
   
   /// Initialize the settings service
   Future<void> init() async {
-    _settingsBox = await Hive.openBox(AppConstants.settingsBox);
+    _settingsBox = await Hive.openBox(AppConstants.SETTINGS_BOX);
     
     // Set default values if not already set
-    if (!_settingsBox.containsKey(AppConstants.themeModeSetting)) {
-      await _settingsBox.put(AppConstants.themeModeSetting, ThemeMode.system.index);
+    if (!_settingsBox.containsKey(AppConstants.THEME_MODE_SETTING)) {
+      await _settingsBox.put(AppConstants.THEME_MODE_SETTING, ThemeMode.system.index);
     }
     
-    if (!_settingsBox.containsKey(AppConstants.notificationsEnabledSetting)) {
-      await _settingsBox.put(AppConstants.notificationsEnabledSetting, true);
+    if (!_settingsBox.containsKey(AppConstants.NOTIFICATIONS_ENABLED_SETTING)) {
+      await _settingsBox.put(AppConstants.NOTIFICATIONS_ENABLED_SETTING, true);
     }
     
-    if (!_settingsBox.containsKey(AppConstants.notificationTimeSetting)) {
+    if (!_settingsBox.containsKey(AppConstants.NOTIFICATION_TIME_SETTING)) {
       // Default notification time: 9:00 AM
-      await _settingsBox.put(AppConstants.notificationTimeSetting, const TimeOfDay(hour: 9, minute: 0).toString());
+      await _settingsBox.put(AppConstants.NOTIFICATION_TIME_SETTING, const TimeOfDay(hour: 9, minute: 0).toString());
     }
     
-    if (!_settingsBox.containsKey(AppConstants.currencySymbolSetting)) {
-      await _settingsBox.put(AppConstants.currencySymbolSetting, AppConstants.defaultCurrencySymbol);
+    if (!_settingsBox.containsKey(AppConstants.CURRENCY_SYMBOL_SETTING)) {
+      await _settingsBox.put(AppConstants.CURRENCY_SYMBOL_SETTING, AppConstants.DEFAULT_CURRENCY_SYMBOL);
     }
     
-    if (!_settingsBox.containsKey(AppConstants.currencyCodeSetting)) {
-      await _settingsBox.put(AppConstants.currencyCodeSetting, AppConstants.defaultCurrencyCode);
+    if (!_settingsBox.containsKey(AppConstants.CURRENCY_CODE_SETTING)) {
+      await _settingsBox.put(AppConstants.CURRENCY_CODE_SETTING, AppConstants.DEFAULT_CURRENCY_CODE);
     }
   }
   
   /// Get the current theme mode
   ThemeMode getThemeMode() {
     try {
-      final value = _settingsBox.get(AppConstants.themeModeSetting);
+      final value = _settingsBox.get(AppConstants.THEME_MODE_SETTING);
       if (value is int && value >= 0 && value < ThemeMode.values.length) {
         return ThemeMode.values[value];
       }
@@ -58,25 +58,25 @@ class SettingsService {
   
   /// Set the theme mode
   Future<void> setThemeMode(ThemeMode themeMode) async {
-    await _settingsBox.put(AppConstants.themeModeSetting, themeMode.index);
+    await _settingsBox.put(AppConstants.THEME_MODE_SETTING, themeMode.index);
   }
   
   /// Check if notifications are enabled
   bool areNotificationsEnabled() {
-    final value = _settingsBox.get(AppConstants.notificationsEnabledSetting);
+    final value = _settingsBox.get(AppConstants.NOTIFICATIONS_ENABLED_SETTING);
     return value is bool ? value : true;
   }
   
   /// Enable or disable notifications
   Future<void> setNotificationsEnabled(bool enabled) async {
-    await _settingsBox.put(AppConstants.notificationsEnabledSetting, enabled);
+    await _settingsBox.put(AppConstants.NOTIFICATIONS_ENABLED_SETTING, enabled);
   }
   
   /// Get the notification time
   TimeOfDay getNotificationTime() {
     // Try to get from separate hour and minute fields first (new format)
-    final hourValue = _settingsBox.get('${AppConstants.notificationTimeSetting}_hour');
-    final minuteValue = _settingsBox.get('${AppConstants.notificationTimeSetting}_minute');
+    final hourValue = _settingsBox.get('${AppConstants.NOTIFICATION_TIME_SETTING}_hour');
+    final minuteValue = _settingsBox.get('${AppConstants.NOTIFICATION_TIME_SETTING}_minute');
     
     if (hourValue is int && minuteValue is int) {
       return TimeOfDay(hour: hourValue, minute: minuteValue);
@@ -84,7 +84,7 @@ class SettingsService {
     
     // Fall back to old format if separate fields don't exist
     final timeString = _settingsBox.get(
-      AppConstants.notificationTimeSetting,
+      AppConstants.NOTIFICATION_TIME_SETTING,
     );
     
     if (timeString is String) {
@@ -108,31 +108,31 @@ class SettingsService {
   
   /// Set the notification time
   Future<void> setNotificationTime(TimeOfDay time) async {
-    await _settingsBox.put('${AppConstants.notificationTimeSetting}_hour', time.hour);
-    await _settingsBox.put('${AppConstants.notificationTimeSetting}_minute', time.minute);
-    await _settingsBox.put(AppConstants.notificationTimeSetting, time.toString());
+    await _settingsBox.put('${AppConstants.NOTIFICATION_TIME_SETTING}_hour', time.hour);
+    await _settingsBox.put('${AppConstants.NOTIFICATION_TIME_SETTING}_minute', time.minute);
+    await _settingsBox.put(AppConstants.NOTIFICATION_TIME_SETTING, time.toString());
   }
   
   /// Get the currency symbol
   String getCurrencySymbol() {
-    final value = _settingsBox.get(AppConstants.currencySymbolSetting);
-    return value is String ? value : AppConstants.defaultCurrencySymbol;
+    final value = _settingsBox.get(AppConstants.CURRENCY_SYMBOL_SETTING);
+    return value is String ? value : AppConstants.DEFAULT_CURRENCY_SYMBOL;
   }
   
   /// Set the currency symbol
   Future<void> setCurrencySymbol(String symbol) async {
-    await _settingsBox.put(AppConstants.currencySymbolSetting, symbol);
+    await _settingsBox.put(AppConstants.CURRENCY_SYMBOL_SETTING, symbol);
   }
   
   /// Get the currency code
   String? getCurrencyCode() {
-    final value = _settingsBox.get(AppConstants.currencyCodeSetting);
-    return value is String ? value : AppConstants.defaultCurrencyCode;
+    final value = _settingsBox.get(AppConstants.CURRENCY_CODE_SETTING);
+    return value is String ? value : AppConstants.DEFAULT_CURRENCY_CODE;
   }
   
   /// Set the currency code
   Future<void> setCurrencyCode(String code) async {
-    await _settingsBox.put(AppConstants.currencyCodeSetting, code);
+    await _settingsBox.put(AppConstants.CURRENCY_CODE_SETTING, code);
     
     // Also update the symbol for backward compatibility
     final currency = CurrencyUtils.getCurrencyByCode(code);
@@ -143,13 +143,13 @@ class SettingsService {
   
   /// Check if onboarding is complete
   bool isOnboardingComplete() {
-    final value = _settingsBox.get(AppConstants.onboardingCompleteSetting);
+    final value = _settingsBox.get(AppConstants.ONBOARDING_COMPLETE_SETTING);
     return value is bool ? value : false;
   }
   
   /// Set onboarding complete
   Future<void> setOnboardingComplete(bool complete) async {
-    await _settingsBox.put(AppConstants.onboardingCompleteSetting, complete);
+    await _settingsBox.put(AppConstants.ONBOARDING_COMPLETE_SETTING, complete);
   }
   
   /// Close the box

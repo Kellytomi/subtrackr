@@ -91,7 +91,7 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Welcome to ${AppConstants.appName}',
+                    'Welcome to ${AppConstants.APP_NAME}',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: colorScheme.primary,
@@ -257,7 +257,7 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
                     await notificationService.requestPermissions();
                     
                     // Navigate to home screen
-                    Navigator.pushReplacementNamed(context, AppConstants.homeRoute);
+                    Navigator.pushReplacementNamed(context, AppConstants.HOME_ROUTE);
                   }
                 },
                 style: ElevatedButton.styleFrom(

@@ -128,7 +128,7 @@ class _MainLayoutState extends State<MainLayout> {
               ? FloatingActionButton(
                   key: _fabKey,
                   onPressed: () {
-                    Navigator.pushNamed(context, AppConstants.addSubscriptionRoute);
+                    Navigator.pushNamed(context, AppConstants.ADD_SUBSCRIPTION_ROUTE);
                   },
                   child: const Icon(Icons.add),
                 )

@@ -9,6 +9,9 @@ import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
 import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
 import 'package:subtrackr/presentation/blocs/theme_provider.dart';
+import 'package:subtrackr/presentation/widgets/home/app_header.dart';
+import 'package:subtrackr/presentation/widgets/home/category_tabs.dart';
+import 'package:subtrackr/presentation/widgets/home/summary_cards_section.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -87,380 +90,40 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
     final settingsService = Provider.of<SettingsService>(context, listen: false);
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final defaultCurrencyCode = settingsService.getCurrencyCode() ?? AppConstants.defaultCurrencyCode;
-    final isDarkMode = themeProvider.isDarkMode;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final defaultCurrencyCode = settingsService.getCurrencyCode() ?? AppConstants.DEFAULT_CURRENCY_CODE;
     
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
             // App Header (fixed)
-            _buildAppHeader(colorScheme),
+            const AppHeader(),
             
             // Summary Cards - horizontal scrollable but fixed position
-            _buildSummaryCards(subscriptionProvider, defaultCurrencyCode),
+            SummaryCardsSection(defaultCurrencyCode: defaultCurrencyCode),
             
             // Category Tabs (fixed)
-            _buildCategoryTabs(colorScheme),
+            CategoryTabs(
+              selectedIndex: _selectedIndex,
+              categories: _categories,
+              onCategorySelected: (index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+              },
+            ),
             
             // Subscription List (scrollable)
             Expanded(
               child: _buildSubscriptionList(
                 _getFilteredSubscriptions(subscriptionProvider),
                 defaultCurrencyCode,
-                theme,
               ),
             ),
           ],
         ),
       ),
-      // Configure snackbar behavior
       extendBody: true,
-    );
-  }
-
-  Widget _buildAppHeader(ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: colorScheme.outline.withOpacity(0.1),
-            width: 1,
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            AppConstants.appName,
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Track your subscriptions',
-            style: TextStyle(
-              fontSize: 16,
-              color: theme.brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryCards(SubscriptionProvider provider, String defaultCurrencyCode) {
-    final activeCount = provider.activeSubscriptions.length;
-    final dueSoonCount = provider.subscriptionsDueSoon.length;
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    // Count local and foreign subscriptions
-    int localSubscriptions = 0;
-    int foreignSubscriptions = 0;
-    
-    for (final subscription in provider.activeSubscriptions) {
-      if (subscription.currencyCode == defaultCurrencyCode) {
-        localSubscriptions++;
-      } else {
-        foreignSubscriptions++;
-      }
-    }
-    
-    // Create summary cards - Due Soon first
-    final summaryCards = <Widget>[
-      _buildSummaryCard(
-        title: 'Due Soon',
-        value: dueSoonCount.toString(),
-        icon: Icons.notifications_active_rounded,
-        color: colorScheme.tertiary,
-      ),
-      
-      _buildSummaryCard(
-        title: 'Active Subscriptions',
-        value: activeCount.toString(),
-        icon: Icons.check_circle_rounded,
-        color: colorScheme.primary,
-      ),
-    ];
-    
-    // Add local subscriptions card if there are any
-    if (localSubscriptions > 0) {
-      final currency = CurrencyUtils.getCurrencyByCode(defaultCurrencyCode) ?? 
-          CurrencyUtils.getAllCurrencies().first;
-      
-      summaryCards.add(
-        _buildSummaryCard(
-          title: 'Local Subscriptions',
-          value: localSubscriptions.toString(),
-          subtitle: currency.code,
-          icon: Icons.home_rounded,
-          color: colorScheme.secondary,
-          flag: currency.flag,
-        ),
-      );
-    }
-    
-    // Add foreign subscriptions card if there are any
-    if (foreignSubscriptions > 0) {
-      summaryCards.add(
-        _buildSummaryCard(
-          title: 'Foreign Subscriptions',
-          value: foreignSubscriptions.toString(),
-          icon: Icons.language_rounded,
-          color: Colors.indigo,
-        ),
-      );
-    }
-    
-    // Create a scroll controller for the horizontal list
-    final ScrollController horizontalScrollController = ScrollController();
-    
-    return StatefulBuilder(
-      builder: (context, setState) {
-        // Calculate total width and visible width for scroll indicator
-        final double cardWidth = 180.0 + 16.0; // card width + margin
-        final double totalContentWidth = cardWidth * summaryCards.length;
-        final double viewportWidth = MediaQuery.of(context).size.width - 40; // Accounting for padding
-        final theme = Theme.of(context);
-        
-        // Calculate number of pages and scroll positions
-        final int totalPages = (totalContentWidth / viewportWidth).ceil();
-        final maxScrollExtent = totalContentWidth - viewportWidth;
-        
-        // Listen to scroll events
-        horizontalScrollController.addListener(() {
-          setState(() {}); // Rebuild to update indicator position
-        });
-        
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: 190, // Increased height to accommodate all content
-              child: ListView.builder(
-                controller: horizontalScrollController,
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                scrollDirection: Axis.horizontal,
-                itemCount: summaryCards.length,
-                itemBuilder: (context, index) => summaryCards[index],
-              ),
-            ),
-            // Scroll indicators
-            if (totalContentWidth > viewportWidth) // Only show if content is scrollable
-              Container(
-                height: 8,
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(totalPages, (index) {
-                    // Calculate the active page based on scroll position
-                    final double scrollPercentage = horizontalScrollController.hasClients && maxScrollExtent > 0
-                        ? (horizontalScrollController.offset / maxScrollExtent).clamp(0.0, 1.0)
-                        : 0.0;
-                    final double activePosition = scrollPercentage * (totalPages - 1);
-                    final bool isActive = (index == activePosition.round());
-                    
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: isActive ? 24 : 8,
-                      height: 8,
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: isActive 
-                            ? colorScheme.primary 
-                            : colorScheme.primary.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    );
-                  }),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildSummaryCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-    String? subtitle,
-    String? flag,
-  }) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(right: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      elevation: 0,
-      color: theme.colorScheme.surface,
-      child: Container(
-        width: 180,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(
-            color: color.withOpacity(0.2),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Icon and flag row
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: color,
-                    size: 22, // Slightly smaller icon
-                  ),
-                ),
-                if (flag != null) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    flag,
-                    style: const TextStyle(
-                      fontSize: 20,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            
-            const SizedBox(height: 10), // Reduced spacing
-            
-            // Value (number)
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 26, // Slightly smaller font size
-                fontWeight: FontWeight.bold,
-                color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            
-            const SizedBox(height: 2), // Reduced spacing
-            
-            // Title
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: theme.brightness == Brightness.dark 
-                    ? Colors.white.withOpacity(0.7) 
-                    : Colors.black.withOpacity(0.7),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            
-            // Subtitle (optional)
-            if (subtitle != null) ...[
-              const SizedBox(height: 2), // Reduced spacing
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.brightness == Brightness.dark 
-                      ? Colors.white.withOpacity(0.5) 
-                      : Colors.black.withOpacity(0.5),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryTabs(ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
-    return Container(
-      height: 50,
-      margin: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(
-          color: colorScheme.outline.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: List.generate(_categories.length, (index) {
-          final isSelected = _selectedIndex == index;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedIndex = index;
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? colorScheme.primary.withOpacity(0.1)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                child: Center(
-                  child: Text(
-                    _categories[index],
-                    style: TextStyle(
-                      color: isSelected ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.7),
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
     );
   }
 
@@ -481,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
-  Widget _buildSubscriptionList(List<Subscription> subscriptions, String defaultCurrencyCode, ThemeData theme) {
+  Widget _buildSubscriptionList(List<Subscription> subscriptions, String defaultCurrencyCode) {
     if (subscriptions.isEmpty) {
       return const EmptyState(
         icon: Icons.subscriptions,
@@ -524,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void _navigateToSubscriptionDetails(Subscription subscription) {
     Navigator.pushNamed(
       context,
-      AppConstants.subscriptionDetailsRoute,
+      AppConstants.SUBSCRIPTION_DETAILS_ROUTE,
       arguments: {'id': subscription.id},
     );
   }
@@ -532,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void _navigateToEditSubscription(Subscription subscription) {
     Navigator.pushNamed(
       context,
-      AppConstants.editSubscriptionRoute,
+      AppConstants.EDIT_SUBSCRIPTION_ROUTE,
       arguments: {'id': subscription.id},
     );
   }
