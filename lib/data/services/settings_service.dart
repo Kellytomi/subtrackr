@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 
+/// Service class for managing application settings using Hive storage.
 class SettingsService {
   static final SettingsService _instance = SettingsService._internal();
   
@@ -14,7 +15,7 @@ class SettingsService {
   
   late Box<dynamic> _settingsBox;
   
-  // Initialize the settings service
+  /// Initialize the settings service
   Future<void> init() async {
     _settingsBox = await Hive.openBox(AppConstants.settingsBox);
     
@@ -41,85 +42,95 @@ class SettingsService {
     }
   }
   
-  // Get the current theme mode
+  /// Get the current theme mode
   ThemeMode getThemeMode() {
-    final themeModeIndex = _settingsBox.get(AppConstants.themeModeSetting, defaultValue: ThemeMode.system.index);
-    return ThemeMode.values[themeModeIndex];
+    try {
+      final value = _settingsBox.get(AppConstants.themeModeSetting);
+      if (value is int && value >= 0 && value < ThemeMode.values.length) {
+        return ThemeMode.values[value];
+      }
+    } catch (e) {
+      debugPrint('Error getting theme mode: $e');
+    }
+    // Default to system theme if anything goes wrong
+    return ThemeMode.system;
   }
   
-  // Set the theme mode
+  /// Set the theme mode
   Future<void> setThemeMode(ThemeMode themeMode) async {
     await _settingsBox.put(AppConstants.themeModeSetting, themeMode.index);
   }
   
-  // Check if notifications are enabled
+  /// Check if notifications are enabled
   bool areNotificationsEnabled() {
-    return _settingsBox.get(AppConstants.notificationsEnabledSetting, defaultValue: true);
+    final value = _settingsBox.get(AppConstants.notificationsEnabledSetting);
+    return value is bool ? value : true;
   }
   
-  // Enable or disable notifications
+  /// Enable or disable notifications
   Future<void> setNotificationsEnabled(bool enabled) async {
     await _settingsBox.put(AppConstants.notificationsEnabledSetting, enabled);
   }
   
-  // Get the notification time
+  /// Get the notification time
   TimeOfDay getNotificationTime() {
     // Try to get from separate hour and minute fields first (new format)
-    final hour = _settingsBox.get(AppConstants.notificationTimeSetting + '_hour');
-    final minute = _settingsBox.get(AppConstants.notificationTimeSetting + '_minute');
+    final hourValue = _settingsBox.get('${AppConstants.notificationTimeSetting}_hour');
+    final minuteValue = _settingsBox.get('${AppConstants.notificationTimeSetting}_minute');
     
-    if (hour != null && minute != null) {
-      return TimeOfDay(hour: hour, minute: minute);
+    if (hourValue is int && minuteValue is int) {
+      return TimeOfDay(hour: hourValue, minute: minuteValue);
     }
     
     // Fall back to old format if separate fields don't exist
     final timeString = _settingsBox.get(
       AppConstants.notificationTimeSetting,
-      defaultValue: const TimeOfDay(hour: 9, minute: 0).toString(),
     );
     
-    // Parse the time string (format: "TimeOfDay(hour: 9, minute: 0)")
-    final hourRegex = RegExp(r'hour: (\d+)');
-    final minuteRegex = RegExp(r'minute: (\d+)');
+    if (timeString is String) {
+      // Parse the time string (format: "TimeOfDay(hour: 9, minute: 0)")
+      final hourRegex = RegExp(r'hour: (\d+)');
+      final minuteRegex = RegExp(r'minute: (\d+)');
+      
+      final hourMatch = hourRegex.firstMatch(timeString);
+      final minuteMatch = minuteRegex.firstMatch(timeString);
+      
+      if (hourMatch != null && minuteMatch != null) {
+        final parsedHour = int.tryParse(hourMatch.group(1)!) ?? 9;
+        final parsedMinute = int.tryParse(minuteMatch.group(1)!) ?? 0;
+        return TimeOfDay(hour: parsedHour, minute: parsedMinute);
+      }
+    }
     
-    final hourMatch = hourRegex.firstMatch(timeString);
-    final minuteMatch = minuteRegex.firstMatch(timeString);
-    
-    final parsedHour = hourMatch != null ? int.parse(hourMatch.group(1)!) : 9;
-    final parsedMinute = minuteMatch != null ? int.parse(minuteMatch.group(1)!) : 0;
-    
-    return TimeOfDay(hour: parsedHour, minute: parsedMinute);
+    // Default fallback
+    return const TimeOfDay(hour: 9, minute: 0);
   }
   
-  // Set the notification time
+  /// Set the notification time
   Future<void> setNotificationTime(TimeOfDay time) async {
-    await _settingsBox.put(AppConstants.notificationTimeSetting + '_hour', time.hour);
-    await _settingsBox.put(AppConstants.notificationTimeSetting + '_minute', time.minute);
+    await _settingsBox.put('${AppConstants.notificationTimeSetting}_hour', time.hour);
+    await _settingsBox.put('${AppConstants.notificationTimeSetting}_minute', time.minute);
     await _settingsBox.put(AppConstants.notificationTimeSetting, time.toString());
   }
   
-  // Get the currency symbol
+  /// Get the currency symbol
   String getCurrencySymbol() {
-    return _settingsBox.get(
-      AppConstants.currencySymbolSetting,
-      defaultValue: AppConstants.defaultCurrencySymbol,
-    );
+    final value = _settingsBox.get(AppConstants.currencySymbolSetting);
+    return value is String ? value : AppConstants.defaultCurrencySymbol;
   }
   
-  // Set the currency symbol
+  /// Set the currency symbol
   Future<void> setCurrencySymbol(String symbol) async {
     await _settingsBox.put(AppConstants.currencySymbolSetting, symbol);
   }
   
-  // Get the currency code
+  /// Get the currency code
   String? getCurrencyCode() {
-    return _settingsBox.get(
-      AppConstants.currencyCodeSetting,
-      defaultValue: AppConstants.defaultCurrencyCode,
-    );
+    final value = _settingsBox.get(AppConstants.currencyCodeSetting);
+    return value is String ? value : AppConstants.defaultCurrencyCode;
   }
   
-  // Set the currency code
+  /// Set the currency code
   Future<void> setCurrencyCode(String code) async {
     await _settingsBox.put(AppConstants.currencyCodeSetting, code);
     
@@ -130,17 +141,18 @@ class SettingsService {
     }
   }
   
-  // Check if onboarding is complete
+  /// Check if onboarding is complete
   bool isOnboardingComplete() {
-    return _settingsBox.get(AppConstants.onboardingCompleteSetting, defaultValue: false);
+    final value = _settingsBox.get(AppConstants.onboardingCompleteSetting);
+    return value is bool ? value : false;
   }
   
-  // Set onboarding complete
+  /// Set onboarding complete
   Future<void> setOnboardingComplete(bool complete) async {
     await _settingsBox.put(AppConstants.onboardingCompleteSetting, complete);
   }
   
-  // Close the box
+  /// Close the box
   Future<void> close() async {
     await _settingsBox.close();
   }

@@ -13,7 +13,7 @@ class CustomBottomNavBar extends StatelessWidget {
   final double unselectedFontSize;
 
   const CustomBottomNavBar({
-    Key? key,
+    super.key,
     required this.currentIndex,
     required this.onTap,
     required this.items,
@@ -24,7 +24,7 @@ class CustomBottomNavBar extends StatelessWidget {
     this.iconSize = 24,
     this.selectedFontSize = 14,
     this.unselectedFontSize = 12,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +83,7 @@ class CustomFloatingNavBar extends StatelessWidget {
   final String? fabLabel;
 
   const CustomFloatingNavBar({
-    Key? key,
+    super.key,
     required this.currentIndex,
     required this.onTap,
     required this.items,
@@ -94,7 +94,7 @@ class CustomFloatingNavBar extends StatelessWidget {
     this.fabIcon = Icons.add,
     this.fabColor,
     this.fabLabel,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

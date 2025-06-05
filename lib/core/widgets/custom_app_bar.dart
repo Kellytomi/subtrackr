@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:subtrackr/core/constants/app_constants.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -13,7 +12,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final PreferredSizeWidget? bottom;
 
   const CustomAppBar({
-    Key? key,
+    super.key,
     required this.title,
     this.actions,
     this.showBackButton = true,
@@ -23,7 +22,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.backgroundColor,
     this.foregroundColor,
     this.bottom,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +79,7 @@ class CustomSliverAppBar extends StatelessWidget {
   final bool snap;
 
   const CustomSliverAppBar({
-    Key? key,
+    super.key,
     required this.title,
     this.actions,
     this.showBackButton = true,
@@ -93,7 +92,7 @@ class CustomSliverAppBar extends StatelessWidget {
     this.pinned = true,
     this.floating = false,
     this.snap = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +143,7 @@ class CustomSearchAppBar extends StatelessWidget implements PreferredSizeWidget 
   final Color? foregroundColor;
 
   const CustomSearchAppBar({
-    Key? key,
+    super.key,
     required this.title,
     this.hintText = 'Search...',
     required this.onChanged,
@@ -153,7 +152,7 @@ class CustomSearchAppBar extends StatelessWidget implements PreferredSizeWidget 
     this.onBackPressed,
     this.backgroundColor,
     this.foregroundColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

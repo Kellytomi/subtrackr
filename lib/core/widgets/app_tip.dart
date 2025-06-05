@@ -1,3 +1,5 @@
+import 'dart:ui';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:subtrackr/core/utils/tips_helper.dart';
 
@@ -28,7 +30,7 @@ class AppTip extends StatefulWidget {
   final bool autoPosition;
 
   const AppTip({
-    Key? key,
+    super.key,
     required this.tipKey,
     required this.title,
     required this.message,
@@ -37,7 +39,7 @@ class AppTip extends StatefulWidget {
     required this.child,
     this.onDismiss,
     this.autoPosition = true,
-  }) : super(key: key);
+  });
 
   @override
   State<AppTip> createState() => _AppTipState();
@@ -100,6 +102,8 @@ class _AppTipState extends State<AppTip> with SingleTickerProviderStateMixin {
   }
   
   Future<void> _checkIfTipShouldBeShown() async {
+    if (!mounted) return;
+    
     final hasBeenShown = await TipsHelper.isTipShown(widget.tipKey);
     
     if (!hasBeenShown) {
@@ -116,6 +120,8 @@ class _AppTipState extends State<AppTip> with SingleTickerProviderStateMixin {
   }
   
   void _dismissTip() {
+    if (!mounted) return;
+    
     _animationController.reverse().then((_) {
       if (mounted) {
         setState(() {
@@ -147,19 +153,25 @@ class _AppTipState extends State<AppTip> with SingleTickerProviderStateMixin {
               // Get the position of the child widget
               final RenderBox? renderBox = _childKey.currentContext?.findRenderObject() as RenderBox?;
               
-              if (renderBox == null) {
+              if (renderBox == null || !mounted) {
                 return const SizedBox();
               }
               
               final childSize = renderBox.size;
               final childPosition = renderBox.localToGlobal(Offset.zero);
               
+              // Get screen size safely
+              final screenSize = MediaQuery.of(context).size;
+              if (screenSize.width <= 0 || screenSize.height <= 0) {
+                return const SizedBox();
+              }
+              
               // Calculate the position for the tip
               Offset tipPosition = _calculateTipPosition(
                 childPosition, 
                 childSize,
                 constraints,
-                MediaQuery.of(context).size,
+                screenSize,
               );
               
               return Positioned(
@@ -172,7 +184,7 @@ class _AppTipState extends State<AppTip> with SingleTickerProviderStateMixin {
                     child: Material(
                       color: Colors.transparent,
                       child: Container(
-                        width: min(280, constraints.maxWidth * 0.8),
+                        width: math.min(280, constraints.maxWidth * 0.8),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.primary,
@@ -319,5 +331,5 @@ class _AppTipState extends State<AppTip> with SingleTickerProviderStateMixin {
   }
   
   // Helper to get the minimum value between two numbers
-  double min(double a, double b) => a < b ? a : b;
+  double min(double a, double b) => math.min(a, b);
 } 

@@ -55,11 +55,9 @@ class AppTheme {
       secondary: _secondaryColorLight,
       tertiary: _tertiaryColorLight,
       error: _errorColorLight,
-      background: _backgroundColorLight,
       surface: _surfaceColorLight,
       onPrimary: _onPrimaryLight,
       onSecondary: _onSecondaryLight,
-      onBackground: _onBackgroundLight,
       onSurface: _onSurfaceLight,
       outline: Colors.grey.shade300,
     ),
@@ -147,11 +145,9 @@ class AppTheme {
       secondary: _secondaryColorDark,
       tertiary: _tertiaryColorDark,
       error: _errorColorDark,
-      background: _backgroundColorDark,
       surface: _surfaceColorDark,
       onPrimary: _onPrimaryDark,
       onSecondary: _onSecondaryDark,
-      onBackground: _onBackgroundDark,
       onSurface: _onSurfaceDark,
       outline: Colors.grey.shade700,
     ),
@@ -231,14 +227,14 @@ class AppTheme {
   );
 }
 
-// Custom colors extension to access our custom colors from the theme
+@immutable
 class CustomColorsExtension extends ThemeExtension<CustomColorsExtension> {
   final Color subscriptionCard;
   final Color activeSubscription;
   final Color pausedSubscription;
   final Color cancelledSubscription;
 
-  CustomColorsExtension({
+  const CustomColorsExtension({
     required this.subscriptionCard,
     required this.activeSubscription,
     required this.pausedSubscription,
@@ -246,7 +242,7 @@ class CustomColorsExtension extends ThemeExtension<CustomColorsExtension> {
   });
 
   @override
-  ThemeExtension<CustomColorsExtension> copyWith({
+  CustomColorsExtension copyWith({
     Color? subscriptionCard,
     Color? activeSubscription,
     Color? pausedSubscription,
@@ -261,14 +257,10 @@ class CustomColorsExtension extends ThemeExtension<CustomColorsExtension> {
   }
 
   @override
-  ThemeExtension<CustomColorsExtension> lerp(
-    covariant ThemeExtension<CustomColorsExtension>? other,
-    double t,
-  ) {
+  CustomColorsExtension lerp(ThemeExtension<CustomColorsExtension>? other, double t) {
     if (other is! CustomColorsExtension) {
       return this;
     }
-
     return CustomColorsExtension(
       subscriptionCard: Color.lerp(subscriptionCard, other.subscriptionCard, t)!,
       activeSubscription: Color.lerp(activeSubscription, other.activeSubscription, t)!,
@@ -278,7 +270,7 @@ class CustomColorsExtension extends ThemeExtension<CustomColorsExtension> {
   }
 }
 
-// Extension method to easily access custom colors from the theme
-extension CustomColorsExtensionX on ThemeData {
+// Extension method to easily access custom colors
+extension CustomColorsThemeData on ThemeData {
   CustomColorsExtension get customColors => extension<CustomColorsExtension>()!;
 } 

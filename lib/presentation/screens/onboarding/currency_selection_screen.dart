@@ -6,7 +6,7 @@ import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
 
 class CurrencySelectionScreen extends StatefulWidget {
-  const CurrencySelectionScreen({Key? key}) : super(key: key);
+  const CurrencySelectionScreen({super.key});
 
   @override
   State<CurrencySelectionScreen> createState() => _CurrencySelectionScreenState();

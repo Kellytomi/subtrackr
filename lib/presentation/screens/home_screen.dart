@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
+import 'package:subtrackr/core/utils/color_extensions.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/core/widgets/empty_state.dart';
 import 'package:subtrackr/core/widgets/subscription_card.dart';
@@ -110,21 +111,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               child: _buildSubscriptionList(
                 _getFilteredSubscriptions(subscriptionProvider),
                 defaultCurrencyCode,
+                theme,
               ),
             ),
           ],
         ),
       ),
-      // Add a floating action button
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(context, AppConstants.addSubscriptionRoute);
-        },
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        elevation: 4,
-        child: const Icon(Icons.add),
-      ),
+      // Configure snackbar behavior
+      extendBody: true,
     );
   }
 
@@ -487,108 +481,133 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
-  Widget _buildSubscriptionList(List<Subscription> subscriptions, String defaultCurrencyCode) {
+  Widget _buildSubscriptionList(List<Subscription> subscriptions, String defaultCurrencyCode, ThemeData theme) {
     if (subscriptions.isEmpty) {
-      return EmptyState(
-        title: 'No subscriptions found',
-        message: _selectedIndex == 0
-            ? 'Add your first subscription to start tracking your expenses.'
-            : 'No subscriptions in this category.',
-        icon: _selectedIndex == 1
-            ? Icons.check_circle_rounded
-            : _selectedIndex == 2
-                ? Icons.notifications_active_rounded
-                : _selectedIndex == 3
-                    ? Icons.pause_circle_rounded
-                    : Icons.cancel_rounded,
-        onActionPressed: _selectedIndex == 0
-            ? () {
-                Navigator.pushNamed(context, AppConstants.addSubscriptionRoute);
-              }
-            : null,
-        actionLabel: _selectedIndex == 0 ? 'Add Subscription' : null,
+      return const EmptyState(
+        icon: Icons.subscriptions,
+        title: 'No Subscriptions',
+        message: 'Add your first subscription to get started',
       );
     }
 
-    // Use an animated list with staggered animations
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 100), // Increased bottom padding for FAB
-      itemCount: subscriptions.length,
-      itemBuilder: (context, index) {
-        final subscription = subscriptions[index];
-        
-        // Create a staggered animation effect
-        final itemAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: Interval(
-              0.4 + (index * 0.1).clamp(0.0, 0.6), // Stagger items, max delay 0.6
-              1.0,
-              curve: Curves.easeOut,
-            ),
-          ),
-        );
-        
-        return FadeTransition(
-          opacity: itemAnimation,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0.05, 0),
-              end: Offset.zero,
-            ).animate(itemAnimation),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-                ),
-              ),
-              child: SubscriptionCard(
-                subscription: subscription,
-                defaultCurrencySymbol: CurrencyUtils.getCurrencyByCode(defaultCurrencyCode)?.symbol ?? '\$',
-                onTap: () {
-                  Navigator.pushNamed(
-                    context,
-                    AppConstants.subscriptionDetailsRoute,
-                    arguments: {'id': subscription.id},
-                  );
-                },
-                onEdit: () {
-                  Navigator.pushNamed(
-                    context,
-                    AppConstants.editSubscriptionRoute,
-                    arguments: {'id': subscription.id},
-                  );
-                },
-                onMarkAsPaid: () {
-                  final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-                  
-                  // Mark the subscription as paid
-                  subscriptionProvider.markSubscriptionAsPaid(subscription.id).then((_) {
-                    // Show success message
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${subscription.name} marked as paid'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  });
-                },
-              ),
-            ),
-          ),
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        await Provider.of<SubscriptionProvider>(context, listen: false).loadSubscriptions();
       },
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        itemCount: subscriptions.length,
+        itemBuilder: (context, index) {
+          final subscription = subscriptions[index];
+          return Padding(
+            key: ValueKey('subscription_item_${subscription.id}'),
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: SubscriptionCard(
+              key: ValueKey('subscription_card_${subscription.id}'),
+              subscription: subscription,
+              defaultCurrencySymbol: CurrencyUtils.getCurrencyByCode(defaultCurrencyCode)?.symbol ?? '\$',
+              onTap: () => _navigateToSubscriptionDetails(subscription),
+              onEdit: () => _navigateToEditSubscription(subscription),
+              onDelete: () => _showDeleteConfirmation(subscription),
+              onPause: () => _pauseSubscription(subscription),
+              onResume: () => _resumeSubscription(subscription),
+              onCancel: () => _cancelSubscription(subscription),
+              onMarkAsPaid: () => _markSubscriptionAsPaid(subscription),
+            ),
+          );
+        },
+      ),
     );
+  }
+
+  void _navigateToSubscriptionDetails(Subscription subscription) {
+    Navigator.pushNamed(
+      context,
+      AppConstants.subscriptionDetailsRoute,
+      arguments: {'id': subscription.id},
+    );
+  }
+
+  void _navigateToEditSubscription(Subscription subscription) {
+    Navigator.pushNamed(
+      context,
+      AppConstants.editSubscriptionRoute,
+      arguments: {'id': subscription.id},
+    );
+  }
+
+  void _pauseSubscription(Subscription subscription) async {
+    final provider = Provider.of<SubscriptionProvider>(context, listen: false);
+    await provider.pauseSubscription(subscription.id);
+  }
+
+  void _resumeSubscription(Subscription subscription) async {
+    final provider = Provider.of<SubscriptionProvider>(context, listen: false);
+    await provider.resumeSubscription(subscription.id);
+  }
+
+  void _cancelSubscription(Subscription subscription) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Subscription'),
+        content: const Text('Are you sure you want to cancel this subscription?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true) {
+      final provider = Provider.of<SubscriptionProvider>(context, listen: false);
+      await provider.cancelSubscription(subscription.id);
+    }
+  }
+
+  void _markSubscriptionAsPaid(Subscription subscription) async {
+    final provider = Provider.of<SubscriptionProvider>(context, listen: false);
+    await provider.markSubscriptionAsPaid(subscription.id);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${subscription.name} marked as paid'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _showDeleteConfirmation(Subscription subscription) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Subscription'),
+        content: const Text('Are you sure you want to delete this subscription?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true) {
+      final provider = Provider.of<SubscriptionProvider>(context, listen: false);
+      await provider.deleteSubscription(subscription.id);
+    }
   }
 } 

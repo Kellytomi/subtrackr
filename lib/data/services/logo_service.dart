@@ -35,7 +35,7 @@ class LogoService {
     'crunchyroll': 'https://static.crunchyroll.com/cr-assets/icons/beta/apple-touch-icon-152x152.png',
     'tidal': 'https://tidal.com/img/tidal-share-image.png',
     'deezer': 'https://e-cdns-files.dzcdn.net/img/common/opengraph-logo.png',
-    'cursor': 'https://cursor.sh/apple-touch-icon.png',
+    'cursor': 'assets/logos/cursor-logo.png',
   };
   
   // Map of common subscription services to their logo URLs
@@ -72,7 +72,7 @@ class LogoService {
     'dashlane': 'https://cdn.icon-icons.com/icons2/2699/PNG/512/dashlane_logo_icon_169063.png',
     'lastpass': 'https://cdn.icon-icons.com/icons2/2699/PNG/512/lastpass_logo_icon_169326.png',
     '1password': 'https://cdn.icon-icons.com/icons2/2699/PNG/512/1password_logo_icon_169138.png',
-    'cursor': 'https://cursor.sh/apple-touch-icon.png',
+    'cursor': 'assets/logos/cursor-logo.png',
     // Additional popular services
     'github': 'https://cdn.icon-icons.com/icons2/2699/PNG/512/github_logo_icon_169115.png',
     'gitlab': 'https://cdn.icon-icons.com/icons2/2699/PNG/512/gitlab_logo_icon_169095.png',
@@ -222,6 +222,11 @@ class LogoService {
     
     // Normalize the input (lowercase, remove extra spaces)
     final normalized = _normalizeInput(websiteOrName);
+    
+    // Special case for Cursor
+    if (normalized == 'cursor') {
+      return 'assets/logos/cursor-logo.png';
+    }
     
     // STEP 1: Check direct logos for most popular services first
     for (final entry in _directLogos.entries) {
@@ -403,6 +408,12 @@ class LogoService {
         suggestions.add(LogoSuggestion(name: name, logoUrl: url));
         seenUrls.add(url);
       }
+    }
+    
+    // Special case for Cursor
+    if (normalized.contains('cursor')) {
+      addSuggestion('Cursor', 'assets/logos/cursor-logo.png');
+      return suggestions;
     }
     
     // Check direct logos

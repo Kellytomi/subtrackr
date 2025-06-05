@@ -127,27 +127,32 @@ class SubscriptionProvider extends ChangeNotifier {
   
   // Load all subscriptions
   Future<void> loadSubscriptions() async {
+    if (_isLoading) return; // Prevent concurrent loads
+    
     _isLoading = true;
     _error = null;
     notifyListeners();
     
     try {
-      _subscriptions = _repository.getAllSubscriptions();
+      final loadedSubscriptions = _repository.getAllSubscriptions();
+      loadedSubscriptions.sort((a, b) => a.name.compareTo(b.name)); // Sort alphabetically
       
       // Ensure each subscription has a valid currency code
-      for (int i = 0; i < _subscriptions.length; i++) {
-        final subscription = _subscriptions[i];
+      for (int i = 0; i < loadedSubscriptions.length; i++) {
+        final subscription = loadedSubscriptions[i];
         if (subscription.currencyCode.isEmpty) {
           // If currency code is empty, use the default currency code
           final updatedSubscription = subscription.copyWith(
             currencyCode: _settingsService.getCurrencyCode() ?? AppConstants.defaultCurrencyCode,
           );
-          _subscriptions[i] = updatedSubscription;
+          loadedSubscriptions[i] = updatedSubscription;
           await _repository.updateSubscription(updatedSubscription);
         }
       }
       
+      _subscriptions = loadedSubscriptions;
       _isLoading = false;
+      _error = null;
       notifyListeners();
     } catch (e) {
       _isLoading = false;
@@ -159,76 +164,39 @@ class SubscriptionProvider extends ChangeNotifier {
   // Add a new subscription
   Future<void> addSubscription(Subscription subscription) async {
     try {
-      // Ensure the subscription has a valid currency code
-      Subscription subscriptionToAdd = subscription;
-      if (subscription.currencyCode.isEmpty) {
-        subscriptionToAdd = subscription.copyWith(
-          currencyCode: _settingsService.getCurrencyCode() ?? AppConstants.defaultCurrencyCode,
-        );
-      }
-      
-      await _repository.addSubscription(subscriptionToAdd);
-      _subscriptions.add(subscriptionToAdd);
-      
-      // Schedule notification if enabled
-      if (subscriptionToAdd.notificationsEnabled && 
-          _settingsService.areNotificationsEnabled() &&
-          subscriptionToAdd.status == AppConstants.statusActive) {
-        _scheduleNotification(subscriptionToAdd);
-      }
-      
+      await _repository.addSubscription(subscription);
+      _subscriptions = [..._subscriptions, subscription];
+      _subscriptions.sort((a, b) => a.name.compareTo(b.name));
       notifyListeners();
+      
+      // Schedule notification if active
+      if (subscription.status == AppConstants.statusActive) {
+        _scheduleNotification(subscription);
+      }
     } catch (e) {
-      _error = AppConstants.errorSavingSubscription;
+      _error = AppConstants.errorAddingSubscription;
       notifyListeners();
     }
   }
   
-  // Update an existing subscription
-  Future<void> updateSubscription(Subscription updatedSubscription) async {
+  // Update a subscription
+  Future<void> updateSubscription(Subscription subscription) async {
     try {
-      // Ensure the subscription has a valid currency code
-      Subscription subscriptionToUpdate = updatedSubscription;
-      if (updatedSubscription.currencyCode.isEmpty) {
-        // Find the existing subscription to get its currency code
-        final existingSubscription = _subscriptions.firstWhere(
-          (s) => s.id == updatedSubscription.id,
-          orElse: () => updatedSubscription,
-        );
-        
-        // If the existing subscription has a currency code, use it
-        if (existingSubscription.currencyCode.isNotEmpty) {
-          subscriptionToUpdate = updatedSubscription.copyWith(
-            currencyCode: existingSubscription.currencyCode,
-          );
-        } else {
-          // Otherwise, use the default currency code
-          subscriptionToUpdate = updatedSubscription.copyWith(
-            currencyCode: _settingsService.getCurrencyCode() ?? AppConstants.defaultCurrencyCode,
-          );
-        }
-      }
-      
-      await _repository.updateSubscription(subscriptionToUpdate);
-      
-      final index = _subscriptions.indexWhere((s) => s.id == subscriptionToUpdate.id);
-      if (index != -1) {
-        _subscriptions[index] = subscriptionToUpdate;
-      }
-      
-      // Cancel existing notification
-      await _notificationService.cancelNotification(subscriptionToUpdate.id.hashCode);
-      
-      // Schedule new notification if enabled
-      if (subscriptionToUpdate.notificationsEnabled && 
-          _settingsService.areNotificationsEnabled() &&
-          subscriptionToUpdate.status == AppConstants.statusActive) {
-        _scheduleNotification(subscriptionToUpdate);
-      }
-      
+      await _repository.updateSubscription(subscription);
+      _subscriptions = _subscriptions.map((s) => 
+        s.id == subscription.id ? subscription : s
+      ).toList();
+      _subscriptions.sort((a, b) => a.name.compareTo(b.name));
       notifyListeners();
+      
+      // Update notification if active
+      if (subscription.status == AppConstants.statusActive) {
+        _scheduleNotification(subscription);
+      } else {
+        await _notificationService.cancelNotification(subscription.id.hashCode);
+      }
     } catch (e) {
-      _error = AppConstants.errorSavingSubscription;
+      _error = AppConstants.errorUpdatingSubscription;
       notifyListeners();
     }
   }
@@ -237,11 +205,8 @@ class SubscriptionProvider extends ChangeNotifier {
   Future<void> deleteSubscription(String id) async {
     try {
       await _repository.deleteSubscription(id);
-      _subscriptions.removeWhere((s) => s.id == id);
-      
-      // Cancel notification
       await _notificationService.cancelNotification(id.hashCode);
-      
+      _subscriptions = _subscriptions.where((s) => s.id != id).toList();
       notifyListeners();
     } catch (e) {
       _error = AppConstants.errorDeletingSubscription;
@@ -249,46 +214,114 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
   
-  // Pause a subscription
+  // Mark subscription as paid
+  Future<void> markSubscriptionAsPaid(String id) async {
+    try {
+      final subscription = _subscriptions.firstWhere(
+        (s) => s.id == id,
+        orElse: () => throw Exception('Subscription not found'),
+      );
+      final nextRenewalDate = AppDateUtils.calculateNextRenewalDate(
+        subscription.renewalDate,
+        subscription.billingCycle,
+        subscription.customBillingDays,
+      );
+      
+      final updatedSubscription = subscription.copyWith(
+        renewalDate: nextRenewalDate,
+      );
+      
+      await _repository.updateSubscription(updatedSubscription);
+      await loadSubscriptions(); // Reload to ensure proper state update
+      
+      // Reschedule notification
+      _scheduleNotification(updatedSubscription);
+    } catch (e) {
+      _error = AppConstants.errorUpdatingSubscription;
+      notifyListeners();
+    }
+  }
+  
+  // Pause subscription
   Future<void> pauseSubscription(String id) async {
-    final subscription = _subscriptions.firstWhere((s) => s.id == id);
-    final updatedSubscription = subscription.pause();
-    await updateSubscription(updatedSubscription);
+    try {
+      final subscription = _subscriptions.firstWhere(
+        (s) => s.id == id,
+        orElse: () => throw Exception('Subscription not found'),
+      );
+      final updatedSubscription = subscription.copyWith(
+        status: AppConstants.statusPaused,
+      );
+      
+      await _repository.updateSubscription(updatedSubscription);
+      await _notificationService.cancelNotification(id.hashCode);
+      await loadSubscriptions(); // Reload to ensure proper state update
+    } catch (e) {
+      _error = AppConstants.errorUpdatingSubscription;
+      notifyListeners();
+    }
   }
   
-  // Resume a subscription
+  // Resume subscription
   Future<void> resumeSubscription(String id) async {
-    final subscription = _subscriptions.firstWhere((s) => s.id == id);
-    final updatedSubscription = subscription.resume();
-    await updateSubscription(updatedSubscription);
+    try {
+      final subscription = _subscriptions.firstWhere(
+        (s) => s.id == id,
+        orElse: () => throw Exception('Subscription not found'),
+      );
+      final updatedSubscription = subscription.copyWith(
+        status: AppConstants.statusActive,
+      );
+      
+      await _repository.updateSubscription(updatedSubscription);
+      _scheduleNotification(updatedSubscription);
+      await loadSubscriptions(); // Reload to ensure proper state update
+    } catch (e) {
+      _error = AppConstants.errorUpdatingSubscription;
+      notifyListeners();
+    }
   }
   
-  // Cancel a subscription
+  // Cancel subscription
   Future<void> cancelSubscription(String id) async {
-    final subscription = _subscriptions.firstWhere((s) => s.id == id);
-    final updatedSubscription = subscription.cancel();
-    await updateSubscription(updatedSubscription);
+    try {
+      final subscription = _subscriptions.firstWhere(
+        (s) => s.id == id,
+        orElse: () => throw Exception('Subscription not found'),
+      );
+      final updatedSubscription = subscription.copyWith(
+        status: AppConstants.statusCancelled,
+      );
+      
+      await _repository.updateSubscription(updatedSubscription);
+      await _notificationService.cancelNotification(id.hashCode);
+      await loadSubscriptions(); // Reload to ensure proper state update
+    } catch (e) {
+      _error = AppConstants.errorUpdatingSubscription;
+      notifyListeners();
+    }
   }
   
   // Add a payment to a subscription
   Future<void> addPayment(String id, DateTime paymentDate) async {
-    final subscription = _subscriptions.firstWhere((s) => s.id == id);
-    final updatedSubscription = subscription.addPayment(paymentDate);
-    await updateSubscription(updatedSubscription);
-  }
-  
-  // Mark a subscription as paid
-  Future<void> markSubscriptionAsPaid(String id) async {
-    final subscription = _subscriptions.firstWhere((s) => s.id == id);
-    final updatedSubscription = subscription.markAsPaid();
-    await updateSubscription(updatedSubscription);
+    try {
+      final subscription = _subscriptions.firstWhere(
+        (s) => s.id == id,
+        orElse: () => throw Exception('Subscription not found'),
+      );
+      final updatedSubscription = subscription.addPayment(paymentDate);
+      await updateSubscription(updatedSubscription);
+    } catch (e) {
+      _error = AppConstants.errorUpdatingSubscription;
+      notifyListeners();
+    }
   }
   
   // Schedule a notification for a subscription
   void _scheduleNotification(Subscription subscription) {
     // Skip if renewal date is in the past
     if (subscription.renewalDate.isBefore(DateTime.now())) {
-      print('DEBUG: Skipping notification for ${subscription.name} because renewal date ${subscription.renewalDate} is in the past');
+              debugPrint('DEBUG: Skipping notification for ${subscription.name} because renewal date ${subscription.renewalDate} is in the past');
       return;
     }
     
@@ -307,12 +340,12 @@ class SubscriptionProvider extends ChangeNotifier {
     
     // Skip if notification date is in the past
     if (notificationDate.isBefore(DateTime.now())) {
-      print('DEBUG: Notification date ${notificationDate} for ${subscription.name} is in the past');
+              debugPrint('DEBUG: Notification date $notificationDate for ${subscription.name} is in the past');
       
       // If renewal is still in the future, schedule for now + 1 minute as fallback
       if (renewalDate.isAfter(DateTime.now())) {
         final fallbackDate = DateTime.now().add(const Duration(minutes: 1));
-        print('DEBUG: Using fallback date ${fallbackDate} for ${subscription.name}');
+        debugPrint('DEBUG: Using fallback date $fallbackDate for ${subscription.name}');
         
         _notificationService.scheduleNotification(
           id: subscription.id.hashCode,
@@ -324,7 +357,7 @@ class SubscriptionProvider extends ChangeNotifier {
       return;
     }
     
-    print('DEBUG: Scheduling notification for ${subscription.name} on ${notificationDate}');
+          debugPrint('DEBUG: Scheduling notification for ${subscription.name} on $notificationDate');
     
     // Schedule notification
     _notificationService.scheduleNotification(
@@ -383,19 +416,19 @@ class SubscriptionProvider extends ChangeNotifier {
   // Debug notifications - print all pending notifications to console
   Future<void> debugNotifications() async {
     final pendingNotifications = await _notificationService.getPendingNotifications();
-    print('DEBUG: ===== PENDING NOTIFICATIONS =====');
-    print('DEBUG: Total pending notifications: ${pendingNotifications.length}');
+    debugPrint('DEBUG: ===== PENDING NOTIFICATIONS =====');
+    debugPrint('DEBUG: Total pending notifications: ${pendingNotifications.length}');
     
     for (final notification in pendingNotifications) {
-      print('DEBUG: Notification ID: ${notification.id}');
-      print('DEBUG: Title: ${notification.title}');
-      print('DEBUG: Body: ${notification.body}');
-      print('DEBUG: Payload: ${notification.payload}');
-      print('DEBUG: ---------------------');
+      debugPrint('DEBUG: Notification ID: ${notification.id}');
+      debugPrint('DEBUG: Title: ${notification.title}');
+      debugPrint('DEBUG: Body: ${notification.body}');
+      debugPrint('DEBUG: Payload: ${notification.payload}');
+      debugPrint('DEBUG: ---------------------');
     }
     
     // Debug active subscriptions and their renewal dates
-    print('DEBUG: ===== ACTIVE SUBSCRIPTIONS =====');
+    debugPrint('DEBUG: ===== ACTIVE SUBSCRIPTIONS =====');
     final now = DateTime.now();
     for (final subscription in activeSubscriptions) {
       final notificationTime = _settingsService.getNotificationTime();
@@ -408,14 +441,14 @@ class SubscriptionProvider extends ChangeNotifier {
         notificationTime.minute,
       );
       
-      print('DEBUG: Subscription: ${subscription.name}');
-      print('DEBUG: Renewal date: ${subscription.renewalDate}');
-      print('DEBUG: Scheduled notification date: $notificationDate');
-      print('DEBUG: Days until renewal: ${subscription.daysUntilRenewal}');
-      print('DEBUG: Notification days before: ${subscription.notificationDays}');
-      print('DEBUG: Is notification date in past: ${notificationDate.isBefore(now)}');
-      print('DEBUG: Is renewal date in past: ${renewalDate.isBefore(now)}');
-      print('DEBUG: ---------------------');
+      debugPrint('DEBUG: Subscription: ${subscription.name}');
+      debugPrint('DEBUG: Renewal date: ${subscription.renewalDate}');
+      debugPrint('DEBUG: Scheduled notification date: $notificationDate');
+      debugPrint('DEBUG: Days until renewal: ${subscription.daysUntilRenewal}');
+      debugPrint('DEBUG: Notification days before: ${subscription.notificationDays}');
+      debugPrint('DEBUG: Is notification date in past: ${notificationDate.isBefore(now)}');
+      debugPrint('DEBUG: Is renewal date in past: ${renewalDate.isBefore(now)}');
+      debugPrint('DEBUG: ---------------------');
     }
   }
 } 

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
@@ -22,7 +23,7 @@ class SubscriptionCard extends StatelessWidget {
   final String? defaultCurrencySymbol;
 
   const SubscriptionCard({
-    Key? key,
+    super.key,
     required this.subscription,
     required this.onTap,
     this.onDelete,
@@ -32,25 +33,25 @@ class SubscriptionCard extends StatelessWidget {
     this.onEdit,
     this.onMarkAsPaid,
     this.defaultCurrencySymbol,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final customColors = theme.customColors;
+    final customColors = theme.extension<CustomColorsExtension>();
     final logoService = Provider.of<LogoService>(context, listen: false);
     
-    // Determine the status color
+    // Determine the status color with fallbacks
     Color statusColor;
     switch (subscription.status) {
       case AppConstants.statusActive:
-        statusColor = customColors.activeSubscription;
+        statusColor = customColors?.activeSubscription ?? Colors.green;
         break;
       case AppConstants.statusPaused:
-        statusColor = customColors.pausedSubscription;
+        statusColor = customColors?.pausedSubscription ?? Colors.orange;
         break;
       case AppConstants.statusCancelled:
-        statusColor = customColors.cancelledSubscription;
+        statusColor = customColors?.cancelledSubscription ?? Colors.red;
         break;
       default:
         statusColor = Colors.grey;
@@ -69,27 +70,25 @@ class SubscriptionCard extends StatelessWidget {
       currency.symbol,
       subscription.billingCycle,
     );
-
+    
     // Get days until renewal text
     String renewalText;
-    Color renewalTextColor = theme.brightness == Brightness.dark 
-        ? Colors.white70 
-        : Colors.black87;
-        
+    Color renewalTextColor = theme.colorScheme.onSurface.withOpacity(0.8);
+    
     if (subscription.status == AppConstants.statusActive) {
       if (subscription.isOverdue) {
         renewalText = 'Overdue';
-        renewalTextColor = Colors.red;
+        renewalTextColor = theme.colorScheme.error;
       } else {
         final daysText = AppDateUtils.getDaysRemainingText(subscription.renewalDate);
         // Don't include "in" for "Today" or "Tomorrow"
         renewalText = daysText == 'Today' || daysText == 'Tomorrow' 
             ? 'Renews $daysText' 
             : 'Renews in $daysText';
-            
+             
         // Make "Renews Today" red
         if (daysText == 'Today') {
-          renewalTextColor = Colors.red;
+          renewalTextColor = theme.colorScheme.error;
         }
       }
     } else if (subscription.status == AppConstants.statusPaused) {
@@ -102,108 +101,102 @@ class SubscriptionCard extends StatelessWidget {
     final bool isDueNowOrOverdue = subscription.status == AppConstants.statusActive && 
         (AppDateUtils.isToday(subscription.renewalDate) || subscription.isOverdue);
     
-    return Slidable(
-      key: ValueKey(subscription.id),
-      endActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        extentRatio: 0.6,
-        children: [
-          if (subscription.status == AppConstants.statusActive && onPause != null)
-            SlidableAction(
-              onPressed: (_) => onPause!(),
-              backgroundColor: theme.colorScheme.surfaceVariant,
-              foregroundColor: Colors.black,
-              icon: Icons.pause_rounded,
-              borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
-              padding: const EdgeInsets.all(0),
-              autoClose: true,
-              label: 'Pause',
-            ),
-          if (subscription.status == AppConstants.statusPaused && onResume != null)
-            SlidableAction(
-              onPressed: (_) => onResume!(),
-              backgroundColor: theme.colorScheme.surfaceVariant,
-              foregroundColor: Colors.black,
-              icon: Icons.play_arrow_rounded,
-              borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
-              padding: const EdgeInsets.all(0),
-              autoClose: true,
-              label: 'Resume',
-            ),
-          if (subscription.status != AppConstants.statusCancelled && onCancel != null)
-            SlidableAction(
-              onPressed: (_) => onCancel!(),
-              backgroundColor: theme.colorScheme.surfaceVariant,
-              foregroundColor: Colors.black,
-              icon: Icons.cancel_rounded,
-              padding: const EdgeInsets.all(0),
-              autoClose: true,
-              label: 'Cancel',
-            ),
-          if (onEdit != null)
-            SlidableAction(
-              onPressed: (_) => onEdit!(),
-              backgroundColor: theme.colorScheme.surfaceVariant,
-              foregroundColor: Colors.black,
-              icon: Icons.edit_rounded,
-              padding: const EdgeInsets.all(0),
-              autoClose: true,
-              label: 'Edit',
-            ),
-          // Mark as Paid action (only for active subscriptions that are due or overdue)
-          if (subscription.status == AppConstants.statusActive && 
-              isDueNowOrOverdue && 
-              onMarkAsPaid != null)
-            SlidableAction(
-              onPressed: (_) => onMarkAsPaid!(),
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              icon: Icons.check_circle_outline,
-              padding: const EdgeInsets.all(0),
-              autoClose: true,
-              label: 'Mark Paid',
-              borderRadius: BorderRadius.zero,
-            ),
-          if (onDelete != null)
-            SlidableAction(
-              onPressed: (_) => onDelete!(),
-              backgroundColor: theme.colorScheme.surfaceVariant,
-              foregroundColor: Colors.black,
-              icon: Icons.delete_rounded,
-              borderRadius: const BorderRadius.horizontal(right: Radius.circular(16)),
-              padding: const EdgeInsets.all(0),
-              autoClose: true,
-              label: 'Delete',
-            ),
-        ],
-      ),
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 16),
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+    return Material(
+      color: Colors.transparent,
+      child: Slidable(
+        key: ValueKey(subscription.id),
+        endActionPane: ActionPane(
+          motion: const DrawerMotion(),
+          extentRatio: 0.6,
+          children: [
+            if (subscription.status == AppConstants.statusActive && onPause != null)
+              SlidableAction(
+                onPressed: (_) => onPause!(),
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                foregroundColor: theme.colorScheme.onSurfaceVariant,
+                icon: Icons.pause_rounded,
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                padding: const EdgeInsets.all(0),
+                autoClose: true,
+                label: 'Pause',
+              ),
+            if (subscription.status == AppConstants.statusPaused && onResume != null)
+              SlidableAction(
+                onPressed: (_) => onResume!(),
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                foregroundColor: theme.colorScheme.onSurfaceVariant,
+                icon: Icons.play_arrow_rounded,
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                padding: const EdgeInsets.all(0),
+                autoClose: true,
+                label: 'Resume',
+              ),
+            if (subscription.status != AppConstants.statusCancelled && onCancel != null)
+              SlidableAction(
+                onPressed: (_) => onCancel!(),
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                foregroundColor: theme.colorScheme.onSurfaceVariant,
+                icon: Icons.cancel_rounded,
+                padding: const EdgeInsets.all(0),
+                autoClose: true,
+                label: 'Cancel',
+              ),
+            if (onEdit != null)
+              SlidableAction(
+                onPressed: (_) => onEdit!(),
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                foregroundColor: theme.colorScheme.onSurfaceVariant,
+                icon: Icons.edit_rounded,
+                padding: const EdgeInsets.all(0),
+                autoClose: true,
+                label: 'Edit',
+              ),
+            // Mark as Paid action (only for active subscriptions that are due or overdue)
+            if (subscription.status == AppConstants.statusActive && 
+                isDueNowOrOverdue && 
+                onMarkAsPaid != null)
+              SlidableAction(
+                onPressed: (_) => onMarkAsPaid!(),
+                backgroundColor: theme.colorScheme.primaryContainer,
+                foregroundColor: theme.colorScheme.onPrimaryContainer,
+                icon: Icons.check_circle_outline,
+                padding: const EdgeInsets.all(0),
+                autoClose: true,
+                label: 'Mark Paid',
+                borderRadius: BorderRadius.zero,
+              ),
+            if (onDelete != null)
+              SlidableAction(
+                onPressed: (_) => onDelete!(),
+                backgroundColor: theme.colorScheme.errorContainer,
+                foregroundColor: theme.colorScheme.onErrorContainer,
+                icon: Icons.delete_rounded,
+                borderRadius: const BorderRadius.horizontal(right: Radius.circular(16)),
+                padding: const EdgeInsets.all(0),
+                autoClose: true,
+                label: 'Delete',
+              ),
+          ],
         ),
-        child: AppTip(
-          tipKey: TipsHelper.homeScreenTipKey,
-          title: 'Subscription Cards',
-          message: 'Tap on a card to view details. Swipe left to see quick actions like pausing, editing, or marking as paid.',
-          icon: Icons.swipe_left,
-          position: TipPosition.right,
+        child: Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: theme.colorScheme.shadow.withOpacity(0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
               ],
               color: theme.colorScheme.surface,
               border: Border.all(
-                color: theme.brightness == Brightness.dark 
-                    ? Colors.white.withOpacity(0.1) 
-                    : Colors.black.withOpacity(0.05),
+                color: theme.colorScheme.outline.withOpacity(0.1),
                 width: 1,
               ),
             ),
@@ -222,39 +215,58 @@ class SubscriptionCard extends StatelessWidget {
                           width: 56,
                           height: 56,
                           decoration: BoxDecoration(
-                            color: theme.brightness == Brightness.dark 
-                                ? Colors.white.withOpacity(0.1) 
-                                : Colors.black.withOpacity(0.05),
+                            color: theme.colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: subscription.logoUrl != null
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
                                   child: Hero(
-                                    tag: 'no_hero_animation_card_${subscription.id}',
+                                    tag: 'card_logo_${subscription.id}_${key.hashCode}',
                                     flightShuttleBuilder: (_, __, ___, ____, _____) => 
                                       const SizedBox.shrink(),
-                                    child: Image.network(
-                                      subscription.logoUrl!,
-                                      key: ValueKey('card_${subscription.id}_logo'),
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Icon(
-                                          logoService.getFallbackIcon(subscription.name),
-                                          color: theme.brightness == Brightness.dark 
-                                              ? Colors.white 
-                                              : Colors.black,
-                                          size: 28,
-                                        );
-                                      },
-                                    ),
+                                    child: subscription.logoUrl!.startsWith('assets/')
+                                        ? Image.asset(
+                                            subscription.logoUrl!,
+                                            key: ValueKey('card_${subscription.id}_logo'),
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Icon(
+                                                logoService.getFallbackIcon(subscription.name),
+                                                color: theme.colorScheme.onSurfaceVariant,
+                                                size: 28,
+                                              );
+                                            },
+                                          )
+                                        : Image.network(
+                                            subscription.logoUrl!,
+                                            key: ValueKey('card_${subscription.id}_logo'),
+                                            fit: BoxFit.contain,
+                                            loadingBuilder: (context, child, loadingProgress) {
+                                              if (loadingProgress == null) return child;
+                                              return Center(
+                                                child: CircularProgressIndicator(
+                                                  value: loadingProgress.expectedTotalBytes != null
+                                                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                      : null,
+                                                  strokeWidth: 2,
+                                                  color: theme.colorScheme.onSurfaceVariant,
+                                                ),
+                                              );
+                                            },
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Icon(
+                                                logoService.getFallbackIcon(subscription.name),
+                                                color: theme.colorScheme.onSurfaceVariant,
+                                                size: 28,
+                                              );
+                                            },
+                                          ),
                                   ),
                                 )
                               : Icon(
                                   logoService.getFallbackIcon(subscription.name),
-                                  color: theme.brightness == Brightness.dark 
-                                      ? Colors.white 
-                                      : Colors.black,
+                                  color: theme.colorScheme.onSurfaceVariant,
                                   size: 28,
                                 ),
                         ),
@@ -269,9 +281,7 @@ class SubscriptionCard extends StatelessWidget {
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 18,
-                                  color: theme.brightness == Brightness.dark 
-                                      ? Colors.white 
-                                      : Colors.black,
+                                  color: theme.colorScheme.onSurface,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -283,29 +293,45 @@ class SubscriptionCard extends StatelessWidget {
                                     formattedAmount,
                                     style: theme.textTheme.titleSmall?.copyWith(
                                       fontWeight: FontWeight.w500,
-                                      color: theme.brightness == Brightness.dark 
-                                          ? Colors.white.withOpacity(0.8) 
-                                          : Colors.black.withOpacity(0.8),
+                                      color: theme.colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                   if (subscription.currencyCode != defaultCurrencySymbol) ...[
                                     const SizedBox(width: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: theme.brightness == Brightness.dark 
-                                            ? Colors.white.withOpacity(0.1) 
-                                            : Colors.black.withOpacity(0.05),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        currency.code,
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w500,
-                                          color: theme.brightness == Brightness.dark 
-                                              ? Colors.white.withOpacity(0.7) 
-                                              : Colors.black.withOpacity(0.7),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: BackdropFilter(
+                                        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.primary.withOpacity(0.08),
+                                            border: Border.all(
+                                              color: theme.colorScheme.primary.withOpacity(0.15),
+                                              width: 0.5,
+                                            ),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                currency.flag,
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                subscription.currencyCode,
+                                                style: TextStyle(
+                                                  color: theme.colorScheme.primary.withOpacity(0.8),
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -361,9 +387,7 @@ class SubscriptionCard extends StatelessWidget {
                         Icon(
                           Icons.calendar_today_rounded,
                           size: 14,
-                          color: theme.brightness == Brightness.dark 
-                              ? Colors.white.withOpacity(0.6) 
-                              : Colors.black.withOpacity(0.6),
+                          color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -380,18 +404,14 @@ class SubscriptionCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: theme.brightness == Brightness.dark 
-                                  ? Colors.white.withOpacity(0.08) 
-                                  : Colors.black.withOpacity(0.05),
+                              color: theme.colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               subscription.category!,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: theme.brightness == Brightness.dark 
-                                    ? Colors.white.withOpacity(0.7) 
-                                    : Colors.black.withOpacity(0.6),
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),

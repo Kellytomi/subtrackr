@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/widgets/feature_tutorial.dart';
-import 'package:subtrackr/core/utils/tips_helper.dart';
 import 'package:subtrackr/presentation/blocs/theme_provider.dart';
 import 'package:subtrackr/presentation/screens/home_screen.dart';
 import 'package:subtrackr/presentation/screens/settings_screen.dart';
 import 'package:subtrackr/presentation/screens/statistics_screen.dart';
 
 class MainLayout extends StatefulWidget {
-  const MainLayout({Key? key}) : super(key: key);
+  const MainLayout({super.key});
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
@@ -38,16 +37,15 @@ class _MainLayoutState extends State<MainLayout> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final colorScheme = Theme.of(context).colorScheme;
     
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
         // If we're not on the home tab, switch to it instead of exiting the app
-        if (_currentIndex != 0) {
+        if (!didPop && _currentIndex != 0) {
           setState(() {
             _currentIndex = 0;
           });
-          return false;
         }
-        return true;
       },
       child: FeatureTutorial(
         tutorialKey: 'main_app_tutorial',

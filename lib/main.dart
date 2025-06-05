@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/theme/app_theme.dart';
 import 'package:subtrackr/data/repositories/subscription_repository.dart';
@@ -11,7 +10,6 @@ import 'package:subtrackr/data/services/notification_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
 import 'package:subtrackr/presentation/blocs/theme_provider.dart';
-import 'package:subtrackr/presentation/screens/home_screen.dart';
 import 'package:subtrackr/presentation/screens/add_subscription_screen.dart';
 import 'package:subtrackr/presentation/screens/edit_subscription_screen.dart';
 import 'package:subtrackr/presentation/screens/main_layout.dart';
@@ -94,9 +92,12 @@ class MyApp extends StatelessWidget {
         Provider<NotificationService>.value(value: notificationService),
         Provider<LogoService>.value(value: logoService),
         ChangeNotifierProvider(
-          create: (_) => ThemeProvider(
-            settingsService: settingsService,
-          ),
+          create: (_) {
+            final provider = ThemeProvider(
+              settingsService: settingsService,
+            );
+            return provider;
+          },
         ),
         ChangeNotifierProvider(
           create: (_) => SubscriptionProvider(

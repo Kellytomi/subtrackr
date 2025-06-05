@@ -1,0 +1,104 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Description:  Ruleset for Flutter Mobile App Development
+
+🧠 General Principles
+Write the code as if the guy who ends up maintaining your code will be a violent psychopath who knows where you live
+
+Use Flutter 3+ and ensure compatibility with the latest Dart SDK.
+
+Follow Clean Architecture: separate your code into presentation, domain, and data layers.
+
+Prioritise performance and responsiveness — low jank, fast builds, and snappy navigation.
+
+Always use null safety and prefer final over var unless mutation is necessary.
+
+Keep widgets small, stateless, and reusable when possible.
+
+Avoid business logic in UI widgets — use state management to separate concerns.
+
+Use meaningful names for classes, methods, and variables; avoid abbreviations unless standard.
+
+Write comments to explain why, not what.
+
+🧱 Project Structure & Code Organisation
+Structure projects with folders like /core, /features, /shared, /services, /utils.
+
+Within features, follow feature_name/data, feature_name/domain, and feature_name/presentation for scalability.
+
+Extract constants into constants.dart, theme into theme.dart, and API configs separately.
+
+Keep navigation logic in one place using GoRouter or auto_route.
+
+📦 State Management
+Default to Riverpod or Bloc for scalable state logic.
+
+Avoid overusing setState() in large apps; prefer reactive patterns.
+
+Use StateNotifier or Cubit for simple state transitions.
+
+Isolate state logic from UI using providers, repositories, and services.
+
+🎨 UI/UX & Responsiveness
+Build apps with responsive design: use LayoutBuilder, MediaQuery, and packages like flutter_screenutil.
+
+Support both light and dark themes; allow theme switching if possible.
+
+Ensure accessibility with semantic labels, screen reader support, and tappable hit areas.
+
+Use animated transitions where appropriate to enhance experience without overdoing it.
+
+🔗 API & Data Layer
+Use dio or http with interceptors for network calls.
+
+Wrap network logic in a repository pattern for separation.
+
+Always handle timeouts, error responses, and retries.
+
+Model data using freezed + json_serializable for immutability and easy JSON mapping.
+
+💾 Storage & Caching
+Use hive or shared_preferences for local data.
+
+Secure sensitive data using flutter_secure_storage.
+
+Use caching where needed for performance and offline use.
+
+🚀 Performance & Optimisation
+Use the Flutter DevTools to monitor rebuilds and performance.
+
+Optimise images (e.g., use WebP or compress assets).
+
+Avoid rebuilding expensive widgets — use const, Keys, and Selector or Consumer patterns.
+
+Lazy-load heavy lists with ListView.builder or SliverList.
+
+🧪 Testing
+Write unit tests for business logic and widget tests for UI components.
+Mock network and storage layers using mockito or mocktail.
+
+Prefer integration_test over the deprecated flutter_driver.
+
+aim for high test coverage for production-level apps.
+
+🔐 Security & Best Practices
+Don’t hardcode API keys or secrets — use .env files via flutter_dotenv.
+
+Validate all user inputs on both client and server sides.
+
+Obfuscate code and enable ProGuard when building for release.
+
+Use SSL pinning and token refresh logic where appropriate.
+
+🧹 Tooling & DevOps
+Use very_good_analysis or custom lint rules for code quality.
+
+Format using dart format and analyse with flutter analyze.
+
+Automate CI/CD using GitHub Actions, Codemagic, or Bitrise.
+
+Use flavor setup (dev, staging, prod) for environment separation.
+

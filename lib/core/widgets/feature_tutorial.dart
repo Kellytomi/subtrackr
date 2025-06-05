@@ -20,13 +20,13 @@ class FeatureTutorial extends StatefulWidget {
   final VoidCallback? onComplete;
 
   const FeatureTutorial({
-    Key? key,
+    super.key,
     required this.child,
     required this.tutorialKey,
     required this.tips,
     this.autoStart = true,
     this.onComplete,
-  }) : super(key: key);
+  });
 
   @override
   State<FeatureTutorial> createState() => _FeatureTutorialState();
@@ -439,9 +439,9 @@ class AnimatedHighlightPainter extends StatefulWidget {
   final Rect highlightRect;
   
   const AnimatedHighlightPainter({
-    Key? key,
+    super.key,
     required this.highlightRect,
-  }) : super(key: key);
+  });
   
   @override
   State<AnimatedHighlightPainter> createState() => _AnimatedHighlightPainterState();

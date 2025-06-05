@@ -11,10 +11,15 @@ import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
 import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
 
+/// Helper class for logo suggestions
 class LogoSuggestion {
+  /// The name of the service
   final String name;
+  
+  /// The URL of the logo
   final String logoUrl;
   
+  /// Creates a logo suggestion
   LogoSuggestion({required this.name, required this.logoUrl});
 }
 
@@ -253,17 +258,17 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
       const SnackBar(content: Text('No logo found. Try a different name or website.')),
     );
   }
-
-  // Method to select a logo from suggestions
-  void _selectLogo(String logoUrl) {
-    setState(() {
-      _logoUrl = logoUrl;
-      _showLogoSuggestions = false;
-    });
-  }
   
+     /// Selects a logo from suggestions
+   void _selectLogo(String logoUrl) {
+     setState(() {
+       _logoUrl = logoUrl;
+       _showLogoSuggestions = false;
+     });
+   }
+ 
   // Method to select a new currency
-  void _selectCurrency() async {
+  Future<void> _selectCurrency() async {
     // Show currency selection dialog
     final selectedCurrency = await showModalBottomSheet<Currency?>(
       context: context,
@@ -996,8 +1001,8 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
       );
       }
       
-      // Debug info
-      print('DEBUG: Creating subscription: startDate: $_startDate, renewalDate: $calculatedRenewalDate, lastPaymentDate: $_lastPaymentDate');
+             // Debug info
+       debugPrint('DEBUG: Creating subscription: startDate: $_startDate, renewalDate: $calculatedRenewalDate, lastPaymentDate: $_lastPaymentDate');
       
       // Create new subscription (always set to active)
       final subscription = Subscription(
@@ -1124,7 +1129,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
     final now = DateTime.now();
     final difference = now.difference(_startDate).inDays;
     
-    print('DEBUG: Checking if historical: startDate: $_startDate, difference: $difference days');
+           debugPrint('DEBUG: Checking if historical: startDate: $_startDate, difference: $difference days');
     
     // Consider it historical if it's more than one billing cycle in the past
     bool isHistorical = false;
@@ -1146,7 +1151,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
         isHistorical = difference > 31; // Default to monthly
     }
     
-    print('DEBUG: Is historical: $isHistorical');
+           debugPrint('DEBUG: Is historical: $isHistorical');
     return isHistorical;
   }
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'dart:ui';
 import 'package:subtrackr/core/constants/app_constants.dart';
-import 'package:subtrackr/data/services/settings_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -13,38 +12,32 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  final int _numPages = 5;
+  final int _numPages = 4;
 
   final List<OnboardingPage> _pages = [
     OnboardingPage(
       title: 'Welcome to SubTrackr',
       description: 'The easiest way to manage all your subscriptions in one place.',
-      image: 'assets/images/onboarding_welcome.png',
+      image: 'assets/onboarding/1.png',
       color: const Color(0xFF6200EE),
     ),
     OnboardingPage(
       title: 'Track Your Expenses',
       description: 'Keep track of all your recurring expenses and never miss a payment.',
-      image: 'assets/images/onboarding_track.png',
+      image: 'assets/onboarding/2.png',
       color: const Color(0xFF03DAC6),
     ),
     OnboardingPage(
       title: 'Multi-Currency Support',
       description: 'Track subscriptions in different currencies with ease. Perfect for managing both local and international services.',
-      image: 'assets/images/onboarding_notify.png',
+      image: 'assets/onboarding/3.png',
       color: const Color(0xFF9C27B0),
     ),
     OnboardingPage(
       title: 'Get Notified',
       description: 'Receive timely reminders before your subscriptions renew.',
-      image: 'assets/images/onboarding_notify.png',
+      image: 'assets/onboarding/4.png',
       color: const Color(0xFF34C759),
-    ),
-    OnboardingPage(
-      title: 'Analyze Your Spending',
-      description: 'Visualize your subscription spending and find ways to save money.',
-      image: 'assets/images/onboarding_analyze.png',
-      color: const Color(0xFFFF9800),
     ),
   ];
 
@@ -171,24 +164,45 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             children: [
               Expanded(
                 flex: 3,
-                child: Image.asset(
-                  page.image,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: 250,
-                      height: 250,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: Image.asset(
+                          page.image,
+                          fit: BoxFit.contain,
+                          color: Colors.white.withOpacity(0.9),
+                          colorBlendMode: BlendMode.modulate,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 250,
+                              height: 250,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Icon(
+                                Icons.image,
+                                size: 100,
+                                color: Colors.white.withOpacity(0.6),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                      child: Icon(
-                        Icons.image,
-                        size: 100,
-                        color: Colors.white.withOpacity(0.6),
-                      ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 40),

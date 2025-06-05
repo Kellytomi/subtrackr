@@ -5,7 +5,7 @@ import 'package:subtrackr/data/services/settings_service.dart';
 
 class ThemeProvider extends ChangeNotifier {
   final SettingsService _settingsService;
-  late ThemeMode _themeMode;
+  ThemeMode _themeMode = ThemeMode.system;
   
   ThemeProvider({
     required SettingsService settingsService,
@@ -27,13 +27,19 @@ class ThemeProvider extends ChangeNotifier {
   
   // Initialize theme from saved settings
   Future<void> loadTheme() async {
-    final savedThemeMode = await _settingsService.getThemeMode();
-    _themeMode = savedThemeMode;
-    
-    // Set initial status bar style based on theme mode
-    _updateStatusBarStyle(_themeMode);
-    
-    notifyListeners();
+    try {
+      final savedThemeMode = _settingsService.getThemeMode();
+      _themeMode = savedThemeMode;
+      
+      // Set initial status bar style based on theme mode
+      _updateStatusBarStyle(_themeMode);
+      
+      notifyListeners();
+    } catch (e) {
+      // If there's any error, keep using the default theme mode
+      debugPrint('Error loading theme settings: $e');
+      _updateStatusBarStyle(_themeMode);
+    }
   }
   
   // Helper method to update status bar style

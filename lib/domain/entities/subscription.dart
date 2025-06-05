@@ -57,7 +57,7 @@ class Subscription {
     String? currencyCode,
   }) {
     return Subscription(
-      id: this.id,
+      id: id,
       name: name ?? this.name,
       amount: amount ?? this.amount,
       billingCycle: billingCycle ?? this.billingCycle,
@@ -101,26 +101,26 @@ class Subscription {
   // Create a subscription from a map
   factory Subscription.fromMap(Map<String, dynamic> map) {
     return Subscription(
-      id: map['id'],
-      name: map['name'],
-      amount: map['amount'],
-      billingCycle: map['billingCycle'],
-      startDate: DateTime.fromMillisecondsSinceEpoch(map['startDate']),
-      renewalDate: DateTime.fromMillisecondsSinceEpoch(map['renewalDate']),
-      status: map['status'],
-      description: map['description'],
-      website: map['website'],
-      logoUrl: map['logoUrl'],
-      customBillingDays: map['customBillingDays'],
-      category: map['category'],
-      notificationsEnabled: map['notificationsEnabled'] ?? true,
-      notificationDays: map['notificationDays'] ?? AppConstants.defaultNotificationDaysBeforeRenewal,
+      id: map['id'] as String? ?? '',
+      name: map['name'] as String? ?? '',
+      amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+      billingCycle: map['billingCycle'] as String? ?? AppConstants.billingCycleMonthly,
+      startDate: DateTime.fromMillisecondsSinceEpoch(map['startDate'] as int? ?? 0),
+      renewalDate: DateTime.fromMillisecondsSinceEpoch(map['renewalDate'] as int? ?? 0),
+      status: map['status'] as String? ?? AppConstants.statusActive,
+      description: map['description'] as String?,
+      website: map['website'] as String?,
+      logoUrl: map['logoUrl'] as String?,
+      customBillingDays: map['customBillingDays'] as int?,
+      category: map['category'] as String?,
+      notificationsEnabled: (map['notificationsEnabled'] as bool?) ?? true,
+      notificationDays: (map['notificationDays'] as int?) ?? AppConstants.defaultNotificationDaysBeforeRenewal,
       paymentHistory: map['paymentHistory'] != null
-          ? (map['paymentHistory'] as List)
-              .map((timestamp) => DateTime.fromMillisecondsSinceEpoch(timestamp))
+          ? (map['paymentHistory'] as List<dynamic>)
+              .map((timestamp) => DateTime.fromMillisecondsSinceEpoch(timestamp as int))
               .toList()
           : null,
-      currencyCode: map['currencyCode'] ?? 'USD',
+      currencyCode: map['currencyCode'] as String? ?? 'USD',
     );
   }
   
@@ -214,9 +214,7 @@ class Subscription {
     final renewalDateOnly = DateTime(renewalDate.year, renewalDate.month, renewalDate.day);
     
     // Only overdue if strictly before today (not today)
-    final isOverdueResult = renewalDateOnly.isBefore(today);
-    print('DEBUG isOverdue: ${this.name}, renewalDate: $renewalDate, now: $now, today: $today, isOverdue: $isOverdueResult, status: $status');
-    return isOverdueResult;
+    return renewalDateOnly.isBefore(today);
   }
   
   // Get days until renewal

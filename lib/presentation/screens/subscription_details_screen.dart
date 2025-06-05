@@ -24,6 +24,9 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
   bool _isLoading = true;
   String? _errorMessage;
   
+  // Create a unique hero tag for this screen
+  final String _heroTag = 'details_logo_${UniqueKey()}';
+  
   @override
   void initState() {
     super.initState();
@@ -101,7 +104,16 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
       final provider = Provider.of<SubscriptionProvider>(context, listen: false);
       provider.deleteSubscription(subscriptionId);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppConstants.subscriptionDeletedSuccess)),
+        SnackBar(
+          content: const Text(AppConstants.subscriptionDeletedSuccess),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.only(
+            bottom: kFloatingActionButtonMargin + 48,
+            left: 20,
+            right: 20,
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       );
       Navigator.pop(context);
     }
@@ -116,25 +128,23 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
       orElse: () => throw Exception('Subscription not found'),
     );
     
-    if (subscription != null) {
-      // Create updated subscription with new status
-      final updatedSubscription = subscription.copyWith(status: newStatus);
-      
-      // Update in provider
-      provider.updateSubscription(updatedSubscription);
-      
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Subscription ${_getStatusActionText(newStatus)}'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-      
-      // Refresh state
-      setState(() {});
+    // Create updated subscription with new status
+    final updatedSubscription = subscription.copyWith(status: newStatus);
+    
+    // Update in provider
+    provider.updateSubscription(updatedSubscription);
+    
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Subscription ${_getStatusActionText(newStatus)}'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    
+    // Refresh state
+    setState(() {});
     }
-  }
   
   String _getStatusActionText(String status) {
     switch (status) {
@@ -161,28 +171,63 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
     
     if (subscriptionId == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Subscription Details')),
-        body: const Center(child: Text('Subscription not found')),
+        appBar: AppBar(
+          title: const Text('Error'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: const Center(
+          child: Text('Subscription ID not found'),
+        ),
       );
     }
     
     // Get subscription from provider
     final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
-    final subscription = subscriptionProvider.subscriptions.firstWhere(
-      (s) => s.id == subscriptionId,
-      orElse: () => throw Exception('Subscription not found'),
-    );
     
-    if (subscription == null) {
+    // Show loading state if provider is loading
+    if (subscriptionProvider.isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Subscription Details')),
-        body: const Center(child: Text('Subscription not found')),
+        appBar: AppBar(
+          title: const Text('Loading...'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
     
+    // Find the subscription
+    Subscription? subscription;
+    try {
+      subscription = subscriptionProvider.subscriptions.firstWhere(
+        (s) => s.id == subscriptionId,
+      );
+    } catch (e) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Error'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: const Center(
+          child: Text('Subscription not found'),
+        ),
+      );
+    }
+    
+    // Since we've found the subscription, we can be sure it's not null
+    final sub = subscription;
+    
     // Format subscription details
     final currencyFormatter = NumberFormat.currency(
-      symbol: CurrencyUtils.getCurrencyByCode(subscription.currencyCode)?.symbol ?? '\$',
+      symbol: CurrencyUtils.getCurrencyByCode(sub.currencyCode)?.symbol ?? '\$',
       decimalDigits: 2,
     );
     
@@ -191,7 +236,7 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
     IconData statusIcon;
     String statusText;
     
-    switch (subscription.status) {
+    switch (sub.status) {
       case AppConstants.statusActive:
         statusColor = colorScheme.primary;
         statusIcon = Icons.check_circle_rounded;
@@ -214,197 +259,199 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
     }
     
     // Calculate days until renewal
-    final daysUntilRenewal = subscription.renewalDate != null
-      ? _calculateDaysUntil(subscription.renewalDate!)
+    final daysUntilRenewal = sub.renewalDate != null
+      ? _calculateDaysUntil(sub.renewalDate)
       : null;
       
     // Get currency data
-    final currency = CurrencyUtils.getCurrencyByCode(subscription.currencyCode);
+    final currency = CurrencyUtils.getCurrencyByCode(sub.currencyCode);
     
-    return Scaffold(
-      body: SafeArea(
-        child: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with back and edit buttons
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.arrow_back, 
-                          color: isDark ? Colors.white : Colors.black
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                        tooltip: 'Back',
-                        style: IconButton.styleFrom(
-                          backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        // Ensure animations are completed
+        if (_animationController.status == AnimationStatus.forward) {
+          _animationController.forward();
+        }
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header with back and edit buttons
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_back, 
+                            color: isDark ? Colors.white : Colors.black
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                          tooltip: 'Back',
+                          style: IconButton.styleFrom(
+                            backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
-                      ),
-                      
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.edit_outlined,
-                              color: isDark ? Colors.white : Colors.black,
-                            ),
-                            onPressed: () {
-                              Navigator.pushNamed(
-                                context, 
-                                '/edit-subscription',
-                                arguments: {'id': subscription.id},
-                              );
-                            },
-                            tooltip: 'Edit',
-                            style: IconButton.styleFrom(
-                              backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                        
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                Icons.edit_outlined,
+                                color: isDark ? Colors.white : Colors.black,
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: Icon(
-                              Icons.delete_outline,
-                              color: theme.colorScheme.error,
-                            ),
-                            onPressed: () => _deleteSubscription(context, subscription.id),
-                            tooltip: 'Delete',
-                            style: IconButton.styleFrom(
-                              backgroundColor: theme.colorScheme.error.withOpacity(0.1),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                
-                Expanded(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: ListView(
-                        padding: const EdgeInsets.all(20),
-                        children: [
-                          // Logo and name
-                          Center(
-                            child: Column(
-                              children: [
-                                if (subscription.logoUrl != null)
-                                  Container(
-                                    width: 100,
-                                    height: 100,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: colorScheme.primary.withOpacity(0.2),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(20),
-                                      child: Hero(
-                                        tag: 'no_hero_animation_details_${subscription.id}',
-                                        flightShuttleBuilder: (_, __, ___, ____, _____) => 
-                                          const SizedBox.shrink(),
-                                        child: Image.network(
-                                          subscription.logoUrl!,
-                                          key: ValueKey('details_${subscription.id}_logo'),
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            final logoService = Provider.of<LogoService>(context, listen: false);
-                                            return Container(
-                                              color: colorScheme.primary,
-                                              child: Icon(
-                                                logoService.getFallbackIcon(subscription.name),
-                                                color: Colors.white,
-                                                size: 40,
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  Container(
-                                    width: 100,
-                                    height: 100,
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.primary,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        subscription.name.substring(0, 1).toUpperCase(),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 40,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  subscription.name,
-                                  style: theme.textTheme.headlineMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
+                              onPressed: () {
+                                Navigator.pushNamed(
+                                  context, 
+                                  '/edit-subscription',
+                                  arguments: {'id': sub.id},
+                                );
+                              },
+                              tooltip: 'Edit',
+                              style: IconButton.styleFrom(
+                                backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                if (subscription.website != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Text(
-                                      subscription.website!,
-                                      style: theme.textTheme.bodyMedium?.copyWith(
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                color: theme.colorScheme.error,
+                              ),
+                              onPressed: () => _deleteSubscription(context, sub.id),
+                              tooltip: 'Delete',
+                              style: IconButton.styleFrom(
+                                backgroundColor: theme.colorScheme.error.withOpacity(0.1),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  Expanded(
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: SlideTransition(
+                        position: _slideAnimation,
+                        child: ListView(
+                          padding: const EdgeInsets.all(20),
+                          children: [
+                            // Logo and name
+                            Center(
+                              child: Column(
+                                children: [
+                                  if (sub.logoUrl != null)
+                                    Container(
+                                      width: 100,
+                                      height: 100,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(20),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: colorScheme.primary.withOpacity(0.2),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: Hero(
+                                          tag: _heroTag,
+                                          flightShuttleBuilder: (_, __, ___, ____, _____) => 
+                                            const SizedBox.shrink(),
+                                          child: Image.network(
+                                            sub.logoUrl!,
+                                            key: ValueKey('details_${sub.id}_logo'),
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              final logoService = Provider.of<LogoService>(context, listen: false);
+                                              return Container(
+                                                color: colorScheme.primary,
+                                                child: Icon(
+                                                  logoService.getFallbackIcon(sub.name),
+                                                  color: Colors.white,
+                                                  size: 40,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      width: 100,
+                                      height: 100,
+                                      decoration: BoxDecoration(
                                         color: colorScheme.primary,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          sub.name.substring(0, 1).toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 40,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
                                     ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    sub.name,
+                                    style: theme.textTheme.headlineMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
                                   ),
-                              ],
+                                  if (sub.website != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        sub.website!,
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: colorScheme.primary,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
-                          ),
-                          
-                          const SizedBox(height: 24),
-                          
-                          // Quick action buttons instead of status badge
-                          Center(
-                            child: AppTip(
-                              tipKey: TipsHelper.quickActionsKey,
-                              title: 'Quick Actions',
-                              message: 'Easily change your subscription status with these buttons. Pause temporarily or cancel a subscription you no longer need.',
-                              icon: Icons.touch_app,
-                              position: TipPosition.bottom,
+                            
+                            const SizedBox(height: 24),
+                            
+                            // Quick action buttons instead of status badge
+                            Center(
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   // Activate button
-                                  if (subscription.status != AppConstants.statusActive)
+                                  if (sub.status != AppConstants.statusActive)
                                     Container(
                                       margin: const EdgeInsets.symmetric(horizontal: 8),
                                       child: ElevatedButton.icon(
                                         onPressed: () {
                                           _updateSubscriptionStatus(
-                                            subscription.id, 
+                                            sub.id, 
                                             AppConstants.statusActive
                                           );
                                         },
@@ -422,13 +469,13 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                     ),
                                   
                                   // Pause button
-                                  if (subscription.status != AppConstants.statusPaused)
+                                  if (sub.status != AppConstants.statusPaused)
                                     Container(
                                       margin: const EdgeInsets.symmetric(horizontal: 8),
                                       child: ElevatedButton.icon(
                                         onPressed: () {
                                           _updateSubscriptionStatus(
-                                            subscription.id, 
+                                            sub.id, 
                                             AppConstants.statusPaused
                                           );
                                         },
@@ -446,13 +493,13 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                     ),
                                   
                                   // Cancel button
-                                  if (subscription.status != AppConstants.statusCancelled)
+                                  if (sub.status != AppConstants.statusCancelled)
                                     Container(
                                       margin: const EdgeInsets.symmetric(horizontal: 8),
                                       child: ElevatedButton.icon(
                                         onPressed: () {
                                           _updateSubscriptionStatus(
-                                            subscription.id, 
+                                            sub.id, 
                                             AppConstants.statusCancelled
                                           );
                                         },
@@ -471,100 +518,99 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                 ],
                               ),
                             ),
-                          ),
-                          
-                          const SizedBox(height: 32),
-                          
-                          // Price and billing info
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: theme.colorScheme.outline.withOpacity(0.2),
+                            
+                            const SizedBox(height: 32),
+                            
+                            // Price and billing info
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surface,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: theme.colorScheme.outline.withOpacity(0.2),
+                                ),
                               ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Payment Details',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Payment Details',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 16),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Amount',
-                                      style: theme.textTheme.bodyLarge,
-                                    ),
-                                    Row(
-                                      children: [
-                                        if (currency != null)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            margin: const EdgeInsets.only(right: 8),
-                                            decoration: BoxDecoration(
-                                              color: colorScheme.primary.withOpacity(0.1),
-                                              borderRadius: BorderRadius.circular(4),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Amount',
+                                        style: theme.textTheme.bodyLarge,
+                                      ),
+                                      Row(
+                                        children: [
+                                          if (currency != null)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              margin: const EdgeInsets.only(right: 8),
+                                              decoration: BoxDecoration(
+                                                color: colorScheme.primary.withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                currency.flag,
+                                                style: const TextStyle(fontSize: 14),
+                                              ),
                                             ),
-                                            child: Text(
-                                              currency.flag,
-                                              style: const TextStyle(fontSize: 14),
+                                          Text(
+                                            currencyFormatter.format(sub.amount),
+                                            style: theme.textTheme.titleMedium?.copyWith(
+                                              fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                        Text(
-                                          currencyFormatter.format(subscription.amount),
-                                          style: theme.textTheme.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  
+                                  const Divider(height: 32),
+                                  
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Billing Cycle',
+                                        style: theme.textTheme.bodyLarge,
+                                      ),
+                                      Text(
+                                        _getBillingCycleText(sub.billingCycle),
+                                        style: theme.textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w500,
                                         ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                
-                                const Divider(height: 32),
-                                
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Billing Cycle',
-                                      style: theme.textTheme.bodyLarge,
-                                    ),
-                                    Text(
-                                      _getBillingCycleText(subscription.billingCycle),
-                                      style: theme.textTheme.bodyLarge?.copyWith(
-                                        fontWeight: FontWeight.w500,
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                
-                                const SizedBox(height: 12),
-                                
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Start Date',
-                                      style: theme.textTheme.bodyLarge,
-                                    ),
-                                    Text(
-                                      AppDateUtils.formatDate(subscription.startDate),
-                                      style: theme.textTheme.bodyLarge?.copyWith(
-                                        fontWeight: FontWeight.w500,
+                                    ],
+                                  ),
+                                  
+                                  const SizedBox(height: 12),
+                                  
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Start Date',
+                                        style: theme.textTheme.bodyLarge,
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                
-                                if (subscription.renewalDate != null) ...[
+                                      Text(
+                                        AppDateUtils.formatDate(sub.startDate),
+                                        style: theme.textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  
+                                  ...[
                                   const SizedBox(height: 12),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -579,14 +625,14 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                           children: [
                                             Flexible(
                                               child: Text(
-                                                AppDateUtils.formatDate(subscription.renewalDate!),
+                                                AppDateUtils.formatDate(sub.renewalDate!),
                                                 style: theme.textTheme.bodyLarge?.copyWith(
                                                   fontWeight: FontWeight.w500,
                                                 ),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
-                                            if (subscription.isOverdue && subscription.status == AppConstants.statusActive)
+                                            if (sub.isOverdue && sub.status == AppConstants.statusActive)
                                               Container(
                                                 margin: const EdgeInsets.only(left: 8),
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -603,7 +649,7 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                                   ),
                                                 ),
                                               ),
-                                            if (daysUntilRenewal != null && daysUntilRenewal < 3 && daysUntilRenewal >= 0 && subscription.status == AppConstants.statusActive)
+                                            if (daysUntilRenewal != null && daysUntilRenewal < 3 && daysUntilRenewal >= 0 && sub.status == AppConstants.statusActive)
                                               Container(
                                                 margin: const EdgeInsets.only(left: 8),
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -634,14 +680,92 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                     ],
                                   ),
                                 ],
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          
-                          const SizedBox(height: 24),
-                          
-                          // Additional details
-                          if (subscription.category != null || subscription.description != null)
+                            
+                            const SizedBox(height: 24),
+                            
+                            // Additional details
+                            if (sub.category != null || sub.description != null)
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: theme.colorScheme.outline.withOpacity(0.2),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Additional Details',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    
+                                    if (sub.category != null) ...[
+                                      const SizedBox(height: 16),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.category_rounded,
+                                            color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Category:',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            sub.category!,
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                    
+                                    if (sub.description != null) ...[
+                                      const SizedBox(height: 16),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(
+                                            Icons.description_rounded,
+                                            color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Notes:',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        sub.description!,
+                                        style: theme.textTheme.bodyMedium,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            
+                            const SizedBox(height: 24),
+                            
+                            // Notification settings
                             Container(
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
@@ -654,225 +778,134 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    'Additional Details',
-                                    style: theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  
-                                  if (subscription.category != null) ...[
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.category_rounded,
-                                          color: theme.colorScheme.onSurface.withOpacity(0.7),
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Category:',
-                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                            color: theme.colorScheme.onSurface.withOpacity(0.7),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          subscription.category!,
-                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                  
-                                  if (subscription.description != null) ...[
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Icon(
-                                          Icons.description_rounded,
-                                          color: theme.colorScheme.onSurface.withOpacity(0.7),
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Notes:',
-                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                            color: theme.colorScheme.onSurface.withOpacity(0.7),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      subscription.description!,
-                                      style: theme.textTheme.bodyMedium,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          
-                          const SizedBox(height: 24),
-                          
-                          // Notification settings
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: theme.colorScheme.outline.withOpacity(0.2),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.notifications_active_rounded,
-                                      color: colorScheme.primary,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      'Notification Settings',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Renewal Notifications',
-                                      style: theme.textTheme.bodyLarge,
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: subscription.notificationsEnabled
-                                            ? colorScheme.primary.withOpacity(0.1)
-                                            : Colors.grey.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        subscription.notificationsEnabled ? 'Enabled' : 'Disabled',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: subscription.notificationsEnabled
-                                              ? colorScheme.primary
-                                              : Colors.grey,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                
-                                if (subscription.notificationsEnabled) ...[
-                                  const SizedBox(height: 12),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Flexible(
-                                        flex: 2,
-                                        child: Text(
-                                          'Notification Schedule',
-                                          style: theme.textTheme.bodyLarge,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                      Icon(
+                                        Icons.notifications_active_rounded,
+                                        color: colorScheme.primary,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        flex: 3,
-                                        child: Text(
-                                          '${subscription.notificationDays} days before renewal',
-                                          style: theme.textTheme.bodyLarge?.copyWith(
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          textAlign: TextAlign.end,
-                                          overflow: TextOverflow.ellipsis,
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Notification Settings',
+                                        style: theme.textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ],
                                   ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Renewal Notifications',
+                                        style: theme.textTheme.bodyLarge,
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: sub.notificationsEnabled
+                                              ? colorScheme.primary.withOpacity(0.1)
+                                              : Colors.grey.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          sub.notificationsEnabled ? 'Enabled' : 'Disabled',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: sub.notificationsEnabled
+                                                ? colorScheme.primary
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  
+                                  if (sub.notificationsEnabled) ...[
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Flexible(
+                                          flex: 2,
+                                          child: Text(
+                                            'Notification Schedule',
+                                            style: theme.textTheme.bodyLarge,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          flex: 3,
+                                          child: Text(
+                                            '${sub.notificationDays} days before renewal',
+                                            style: theme.textTheme.bodyLarge?.copyWith(
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            textAlign: TextAlign.end,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
-                          ),
-                          
-                          const SizedBox(height: 32),
-                          
-                          // Annual cost calculation
-                          if (subscription.status == AppConstants.statusActive)
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: colorScheme.primary.withOpacity(0.2),
+                            
+                            const SizedBox(height: 32),
+                            
+                            // Annual cost calculation
+                            if (sub.status == AppConstants.statusActive)
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: colorScheme.primary.withOpacity(0.2),
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      'Total Annual Cost',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      currencyFormatter.format(_calculateAnnualCost(sub)),
+                                      style: theme.textTheme.headlineSmall?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.primary,
+                                      ),
+                                    ),
+                                    Text(
+                                      'per year',
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: colorScheme.primary.withOpacity(0.7),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    'Total Annual Cost',
-                                    style: theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    currencyFormatter.format(_calculateAnnualCost(subscription)),
-                                    style: theme.textTheme.headlineSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.primary,
-                                    ),
-                                  ),
-                                  Text(
-                                    'per year',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: colorScheme.primary.withOpacity(0.7),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          
-                          const SizedBox(height: 24),
-                          
-                          // Add "Mark as Paid" button for active subscriptions when today or overdue
-                          if (subscription.status == AppConstants.statusActive && 
-                              daysUntilRenewal != null && daysUntilRenewal <= 0) ...[
-                            // Debug print before the widget
-                            SizedBox(
-                              height: 1,
-                              child: Builder(builder: (context) {
-                                print('DEBUG DETAILS: Status: ${subscription.status}, daysUntilRenewal: $daysUntilRenewal, RenewalDate: ${subscription.renewalDate}, isOverdue: ${subscription.isOverdue}');
-                                return Container();
-                              }),
-                            ),
+                            
                             const SizedBox(height: 24),
-                            AppTip(
-                              tipKey: TipsHelper.historyTipKey,
-                              title: 'Mark Payments',
-                              message: 'When a subscription is due or overdue, you can mark it as paid here. This will update the renewal date and add to payment history.',
-                              icon: Icons.history,
-                              position: TipPosition.top,
-                              child: SizedBox(
+                            
+                            // Add "Mark as Paid" button for active subscriptions when today or overdue
+                            if (sub.status == AppConstants.statusActive && 
+                                daysUntilRenewal != null && 
+                                daysUntilRenewal <= 0) ...[
+                              const SizedBox(height: 24),
+                              SizedBox(
                                 width: double.infinity,
                                 height: 50,
                                 child: ElevatedButton.icon(
-                                  onPressed: () => _markAsPaid(subscription),
+                                  onPressed: () => _markAsPaid(sub),
                                   icon: const Icon(Icons.check_circle_outline_rounded),
                                   label: const Text('Mark as Paid'),
                                   style: ElevatedButton.styleFrom(
@@ -884,15 +917,15 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+        ),
       ),
     );
   }

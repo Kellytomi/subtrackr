@@ -4,7 +4,7 @@ import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
 import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
-import 'package:subtrackr/presentation/screens/onboarding_screen.dart';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
@@ -215,9 +215,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final colorScheme = theme.colorScheme;
     
     // Ensure currency is initialized
-    if (_selectedCurrency == null) {
-      _selectedCurrency = CurrencyUtils.getCurrencyByCode('USD');
-    }
+    _selectedCurrency ??= CurrencyUtils.getCurrencyByCode('USD');
     
     // Get subscription data from provider
     final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
@@ -459,7 +457,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                         width: 80,
                                         height: 80,
                                         decoration: BoxDecoration(
-                                          color: colorScheme.surfaceVariant,
+                                          color: colorScheme.surfaceContainerHighest,
                                           shape: BoxShape.circle,
                                         ),
                                         child: Icon(
@@ -625,7 +623,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                       fontSize: 16,
                                     ),
                                     filled: true,
-                                    fillColor: theme.colorScheme.surfaceVariant,
+                                    fillColor: theme.colorScheme.surfaceContainerHighest,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide.none,

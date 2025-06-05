@@ -11,7 +11,7 @@ class EmptyState extends StatelessWidget {
   final EdgeInsetsGeometry padding;
 
   const EmptyState({
-    Key? key,
+    super.key,
     required this.title,
     required this.message,
     this.icon = Icons.inbox,
@@ -20,7 +20,7 @@ class EmptyState extends StatelessWidget {
     this.iconSize = 80,
     this.iconColor,
     this.padding = const EdgeInsets.all(32),
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +84,7 @@ class EmptyStateWithAnimation extends StatelessWidget {
   final EdgeInsetsGeometry padding;
 
   const EmptyStateWithAnimation({
-    Key? key,
+    super.key,
     required this.title,
     required this.message,
     required this.animationAsset,
@@ -92,7 +92,7 @@ class EmptyStateWithAnimation extends StatelessWidget {
     this.actionLabel,
     this.animationSize = 200,
     this.padding = const EdgeInsets.all(32),
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

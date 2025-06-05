@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
-import 'package:subtrackr/data/services/notification_service.dart';
+
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
 import 'package:subtrackr/presentation/blocs/theme_provider.dart';
@@ -983,9 +983,9 @@ class CurrencySelectorScreen extends StatefulWidget {
   final String initialCurrencyCode;
   
   const CurrencySelectorScreen({
-    Key? key,
+    super.key,
     required this.initialCurrencyCode,
-  }) : super(key: key);
+  });
 
   @override
   State<CurrencySelectorScreen> createState() => _CurrencySelectorScreenState();
