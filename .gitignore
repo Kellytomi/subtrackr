@@ -59,3 +59,4 @@ ios/Runner/GoogleService-Info.plist
 **/GoogleService-Info.plist
 **/*api_key*
 **/*secret*
+subtrackr-privacy
