@@ -18,25 +18,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     OnboardingPage(
       title: 'Welcome to SubTrackr',
       description: 'The easiest way to manage all your subscriptions in one place.',
-      image: 'assets/onboarding/1.png',
+      image: 'assets/onboarding/1.jpg',
       color: const Color(0xFF6200EE),
     ),
     OnboardingPage(
       title: 'Track Your Expenses',
       description: 'Keep track of all your recurring expenses and never miss a payment.',
-      image: 'assets/onboarding/2.png',
+      image: 'assets/onboarding/2.jpg',
       color: const Color(0xFF03DAC6),
     ),
     OnboardingPage(
       title: 'Multi-Currency Support',
       description: 'Track subscriptions in different currencies with ease. Perfect for managing both local and international services.',
-      image: 'assets/onboarding/3.png',
+      image: 'assets/onboarding/3.jpg',
       color: const Color(0xFF9C27B0),
     ),
     OnboardingPage(
       title: 'Get Notified',
       description: 'Receive timely reminders before your subscriptions renew.',
-      image: 'assets/onboarding/4.png',
+      image: 'assets/onboarding/4.jpg',
       color: const Color(0xFF34C759),
     ),
   ];

@@ -3,9 +3,7 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    // Add Firebase App Distribution plugin
-    id("com.google.firebase.appdistribution")
-    id("com.google.gms.google-services")
+    // Firebase plugins removed - not currently used
 }
 
 import java.util.Properties
@@ -63,28 +61,37 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 21
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.0.3"
+        versionCode = 6
+        versionName = "1.0.4"
     }
 
     buildTypes {
         release {
-            // Enables code shrinking, obfuscation, and optimization for only
-            // your project's release build type.
+            // Enable code shrinking, obfuscation, and optimization
             isMinifyEnabled = true
-            // Enables resource shrinking, which is performed by the
-            // Android Gradle plugin.
+            // Enable resource shrinking
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
             isDebuggable = false
+            
+            // Optimize NDK for size
             ndk {
-                debugSymbolLevel = "FULL"
+                debugSymbolLevel = "SYMBOL_TABLE" // Smaller than FULL
+                abiFilters += listOf("arm64-v8a") // Only support 64-bit ARM (most common)
             }
             
-            // Add Firebase App Distribution configuration
-            firebaseAppDistribution {
-                releaseNotes = "Initial beta release of SubTrackr\n- Track subscriptions\n- Multi-currency support\n- Smart notifications"
+            // Additional packaging options for size optimization
+            packagingOptions {
+                resources {
+                    excludes += listOf(
+                        "/META-INF/{AL2.0,LGPL2.1}",
+                        "/META-INF/versions/**",
+                        "**/kotlin/**",
+                        "**/*.kotlin_metadata",
+                        "**/DebugProbesKt.bin"
+                    )
+                }
             }
         }
         debug {
@@ -102,15 +109,11 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.22")
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.annotation:annotation:1.7.1")
-    // Import the Firebase BoM
-    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    // Firebase dependencies removed - not currently used in the app
     
-    // Add the dependencies for Firebase products you want to use
-    implementation("com.google.firebase:firebase-analytics-ktx")
-    
-    // Add Play Core dependencies
-    implementation("com.google.android.play:core:1.10.3")
-    implementation("com.google.android.play:core-ktx:1.8.1")
+    // Add Play Core dependencies (compatible with Android 14)
+    implementation("com.google.android.play:feature-delivery:2.1.0")
+    implementation("com.google.android.play:feature-delivery-ktx:2.1.0")
 }
 
 flutter {

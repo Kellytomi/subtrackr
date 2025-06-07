@@ -165,4 +165,13 @@
 -keepclassmembers class * extends android.view.View {
     *** get*();
     void set*(***);
-} 
+}
+
+# Keep Play Core classes for Flutter compatibility
+-keep class com.google.android.play.core.tasks.** { *; }
+-keep class com.google.android.play.core.splitcompat.** { *; }
+-keep class com.google.android.play.core.splitinstall.** { *; }
+-dontwarn com.google.android.play.core.**
+
+# Keep Flutter deferred components
+-keep class io.flutter.embedding.engine.deferredcomponents.** { *; } 
