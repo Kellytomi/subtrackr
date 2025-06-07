@@ -10,6 +10,7 @@ plugins {
 
 import java.util.Properties
 import java.io.FileInputStream
+import org.gradle.jvm.toolchain.JavaLanguageVersion
 
 // Load keystore properties
 val keystorePropertiesFile = rootProject.file("key.properties")
@@ -30,6 +31,13 @@ android {
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString()
+    }
+
+    // JVM Toolchain configuration
+    java {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(17))
+        }
     }
 
     signingConfigs {
@@ -95,7 +103,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.annotation:annotation:1.7.1")
     // Import the Firebase BoM
-    implementation(platform("com.google.firebase:firebase-bom:32.7.2"))
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     
     // Add the dependencies for Firebase products you want to use
     implementation("com.google.firebase:firebase-analytics-ktx")

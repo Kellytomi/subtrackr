@@ -8,16 +8,16 @@ import 'package:subtrackr/data/repositories/subscription_repository.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
-import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
-import 'package:subtrackr/presentation/blocs/theme_provider.dart';
-import 'package:subtrackr/presentation/screens/add_subscription_screen.dart';
-import 'package:subtrackr/presentation/screens/edit_subscription_screen.dart';
-import 'package:subtrackr/presentation/screens/main_layout.dart';
-import 'package:subtrackr/presentation/screens/onboarding_screen.dart';
-import 'package:subtrackr/presentation/screens/subscription_details_screen.dart';
-import 'package:subtrackr/presentation/screens/settings_screen.dart';
-import 'package:subtrackr/presentation/screens/statistics_screen.dart';
-import 'package:subtrackr/presentation/screens/onboarding/currency_selection_screen.dart';
+import 'package:subtrackr/presentation/providers/subscription_provider.dart';
+import 'package:subtrackr/presentation/providers/theme_provider.dart';
+import 'package:subtrackr/presentation/pages/add_subscription_screen.dart';
+import 'package:subtrackr/presentation/pages/edit_subscription_screen.dart';
+import 'package:subtrackr/presentation/pages/main_layout.dart';
+import 'package:subtrackr/presentation/pages/onboarding_screen.dart';
+import 'package:subtrackr/presentation/pages/subscription_details_screen.dart';
+import 'package:subtrackr/presentation/pages/settings_screen.dart';
+import 'package:subtrackr/presentation/pages/statistics_screen.dart';
+import 'package:subtrackr/presentation/pages/onboarding/currency_selection_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

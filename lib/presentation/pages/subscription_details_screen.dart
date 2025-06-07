@@ -6,7 +6,7 @@ import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/core/utils/date_utils.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
-import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
+import 'package:subtrackr/presentation/providers/subscription_provider.dart';
 import 'package:subtrackr/core/widgets/app_tip.dart';
 import 'package:subtrackr/core/utils/tips_helper.dart';
 

@@ -25,7 +25,7 @@ void main() {
     });
 
     test('widget build methods should be reasonably sized', () async {
-      final homeScreenFile = File('lib/presentation/screens/home_screen.dart');
+      final homeScreenFile = File('lib/presentation/pages/home_screen.dart');
       final content = await homeScreenFile.readAsString();
       
       // Find build method

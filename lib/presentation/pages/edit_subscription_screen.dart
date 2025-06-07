@@ -9,7 +9,7 @@ import 'package:subtrackr/core/utils/text_formatters.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
-import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
+import 'package:subtrackr/presentation/providers/subscription_provider.dart';
 
 class EditSubscriptionScreen extends StatefulWidget {
   const EditSubscriptionScreen({super.key});

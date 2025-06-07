@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
-
+import 'package:subtrackr/data/services/notification_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
-import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
-import 'package:subtrackr/presentation/blocs/theme_provider.dart';
+import 'package:subtrackr/presentation/providers/subscription_provider.dart';
+import 'package:subtrackr/presentation/providers/theme_provider.dart';
 import 'package:subtrackr/core/utils/tips_helper.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -153,6 +154,36 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   ),
                   
                   const SizedBox(height: 24),
+                  
+                  // Debug section (only in debug mode)
+                  if (kDebugMode) ...[
+                    _buildSectionHeader('Debug Tools', Icons.bug_report_outlined, colorScheme),
+                    _buildSettingCard(
+                      title: 'Test Notification (5s)',
+                      subtitle: 'Send a test notification in 5 seconds',
+                      icon: Icons.notifications_active,
+                      iconColor: Colors.orange,
+                      onTap: () => _sendTestNotification(5),
+                      colorScheme: colorScheme,
+                    ),
+                    _buildSettingCard(
+                      title: 'Test Notification (30s)',
+                      subtitle: 'Send a test notification in 30 seconds',
+                      icon: Icons.schedule,
+                      iconColor: Colors.blue,
+                      onTap: () => _sendTestNotification(30),
+                      colorScheme: colorScheme,
+                    ),
+                    _buildSettingCard(
+                      title: 'Test Immediate Notification',
+                      subtitle: 'Send a test notification immediately',
+                      icon: Icons.flash_on,
+                      iconColor: Colors.green,
+                      onTap: () => _sendTestNotification(0),
+                      colorScheme: colorScheme,
+                    ),
+                    const SizedBox(height: 24),
+                  ],
                   
                   // Data management section
                     _buildSectionHeader('Data Management', Icons.storage_rounded, colorScheme),
@@ -841,6 +872,44 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         ),
       ),
     );
+  }
+
+  Future<void> _sendTestNotification(int delaySeconds) async {
+    final notificationService = Provider.of<NotificationService>(context, listen: false);
+    
+    if (delaySeconds == 0) {
+      // Send immediate notification
+      await notificationService.showTestNotification();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Test notification sent immediately!'),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } else {
+      // Schedule notification
+      final scheduledDate = DateTime.now().add(Duration(seconds: delaySeconds));
+      await notificationService.scheduleNotification(
+        id: 9999,
+        title: 'Test Notification',
+        body: 'This test notification was scheduled for ${delaySeconds}s ago!',
+        scheduledDate: scheduledDate,
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Test notification scheduled for ${delaySeconds}s from now!'),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _resetAppTips() async {

@@ -7,8 +7,8 @@ import 'package:subtrackr/core/widgets/empty_state.dart';
 import 'package:subtrackr/core/widgets/subscription_card.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
-import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
-import 'package:subtrackr/presentation/blocs/theme_provider.dart';
+import 'package:subtrackr/presentation/providers/subscription_provider.dart';
+import 'package:subtrackr/presentation/providers/theme_provider.dart';
 import 'package:subtrackr/presentation/widgets/home/app_header.dart';
 import 'package:subtrackr/presentation/widgets/home/category_tabs.dart';
 import 'package:subtrackr/presentation/widgets/home/summary_cards_section.dart';
@@ -158,6 +158,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         await Provider.of<SubscriptionProvider>(context, listen: false).loadSubscriptions();
       },
       child: ListView.builder(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         itemCount: subscriptions.length,

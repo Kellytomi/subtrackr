@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
-import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
+import 'package:subtrackr/presentation/providers/subscription_provider.dart';
 import 'package:subtrackr/presentation/widgets/home/summary_card.dart';
 
 /// Summary cards section widget for displaying subscription statistics
@@ -21,9 +21,22 @@ class _SummaryCardsSectionState extends State<SummaryCardsSection> {
   final ScrollController _scrollController = ScrollController();
 
   @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    setState(() {
+      // Trigger rebuild to update scroll indicators
+    });
   }
 
   @override

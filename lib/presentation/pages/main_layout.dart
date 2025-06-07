@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/widgets/feature_tutorial.dart';
-import 'package:subtrackr/presentation/blocs/theme_provider.dart';
-import 'package:subtrackr/presentation/screens/home_screen.dart';
-import 'package:subtrackr/presentation/screens/settings_screen.dart';
-import 'package:subtrackr/presentation/screens/statistics_screen.dart';
+import 'package:subtrackr/presentation/providers/theme_provider.dart';
+import 'package:subtrackr/presentation/pages/home_screen.dart';
+import 'package:subtrackr/presentation/pages/settings_screen.dart';
+import 'package:subtrackr/presentation/pages/statistics_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -127,6 +127,7 @@ class _MainLayoutState extends State<MainLayout> {
           floatingActionButton: _currentIndex == 0
               ? FloatingActionButton(
                   key: _fabKey,
+                  heroTag: "add_subscription_fab",
                   onPressed: () {
                     Navigator.pushNamed(context, AppConstants.ADD_SUBSCRIPTION_ROUTE);
                   },

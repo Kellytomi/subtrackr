@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
-import 'package:subtrackr/presentation/blocs/subscription_provider.dart';
+import 'package:subtrackr/presentation/providers/subscription_provider.dart';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
