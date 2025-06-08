@@ -166,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           final subscription = subscriptions[index];
           return Padding(
             key: ValueKey('subscription_item_${subscription.id}'),
-            padding: const EdgeInsets.only(bottom: 8.0),
+            padding: const EdgeInsets.only(bottom: 1.0),
             child: SubscriptionCard(
               key: ValueKey('subscription_card_${subscription.id}'),
               subscription: subscription,

@@ -245,7 +245,7 @@ class SubscriptionCard extends StatelessWidget {
             ],
           ),
           child: Card(
-            margin: const EdgeInsets.only(bottom: 16),
+            margin: EdgeInsets.zero,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -255,14 +255,21 @@ class SubscriptionCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: theme.colorScheme.shadow.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: theme.colorScheme.shadow.withOpacity(0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 2),
+                    spreadRadius: 0,
+                  ),
+                  BoxShadow(
+                    color: theme.colorScheme.shadow.withOpacity(0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                    spreadRadius: 0,
                   ),
                 ],
                 color: theme.colorScheme.surface,
                 border: Border.all(
-                  color: theme.colorScheme.outline.withOpacity(0.1),
+                  color: theme.colorScheme.outline.withOpacity(0.08),
                   width: 1,
                 ),
               ),
@@ -270,23 +277,34 @@ class SubscriptionCard extends StatelessWidget {
                 onTap: onTap,
                 borderRadius: BorderRadius.circular(16),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          // Logo or icon with gradient background
+                          // Logo or icon with enhanced background
                           Container(
-                            width: 56,
-                            height: 56,
+                            width: 60,
+                            height: 60,
                             decoration: BoxDecoration(
                               color: theme.colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: theme.colorScheme.outline.withOpacity(0.06),
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: theme.colorScheme.shadow.withOpacity(0.06),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
                             ),
                             child: subscription.logoUrl != null
                                 ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(14),
                                     child: subscription.logoUrl!.startsWith('assets/')
                                         ? Image.asset(
                                             subscription.logoUrl!,
@@ -330,8 +348,8 @@ class SubscriptionCard extends StatelessWidget {
                                     color: theme.colorScheme.onSurfaceVariant,
                                     size: 28,
                                   ),
-                          ),
-                          const SizedBox(width: 16),
+                                                            ),
+                          const SizedBox(width: 18),
                           // Subscription details
                           Expanded(
                             child: Column(
@@ -340,14 +358,15 @@ class SubscriptionCard extends StatelessWidget {
                                 Text(
                                   subscription.name,
                                   style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 17,
                                     color: theme.colorScheme.onSurface,
+                                    letterSpacing: -0.2,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 6),
                                 Row(
                                   children: [
                                     Text(
@@ -402,28 +421,36 @@ class SubscriptionCard extends StatelessWidget {
                               ],
                             ),
                           ),
-                          // Status indicator
+                          // Enhanced status indicator
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(16),
+                              color: statusColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: statusColor.withOpacity(0.7),
+                                color: statusColor.withOpacity(0.25),
                                 width: 1,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: statusColor.withOpacity(0.08),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
                             ),
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Container(
-                                  width: 8,
-                                  height: 8,
+                                  width: 6,
+                                  height: 6,
                                   decoration: BoxDecoration(
                                     color: statusColor,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 6),
                                 Text(
                                   subscription.status == AppConstants.STATUS_ACTIVE
                                       ? 'Active'
@@ -432,8 +459,9 @@ class SubscriptionCard extends StatelessWidget {
                                           : 'Cancelled',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: FontWeight.w600,
                                     color: statusColor,
+                                    letterSpacing: 0.2,
                                   ),
                                 ),
                               ],
@@ -442,37 +470,44 @@ class SubscriptionCard extends StatelessWidget {
                         ],
                       ),
                       // Renewal info
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       Row(
                         children: [
                           Icon(
                             Icons.calendar_today_rounded,
-                            size: 14,
-                            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                            size: 16,
+                            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 6),
                           Text(
                             renewalText,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               color: renewalTextColor,
                               fontWeight: FontWeight.w500,
+                              letterSpacing: 0.1,
                             ),
                           ),
                           // Add category tag if available
                           if (subscription.category != null) ...[
                             const Spacer(),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: theme.colorScheme.outline.withOpacity(0.1),
+                                  width: 1,
+                                ),
                               ),
                               child: Text(
                                 subscription.category!,
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: theme.colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.3,
                                 ),
                               ),
                             ),
