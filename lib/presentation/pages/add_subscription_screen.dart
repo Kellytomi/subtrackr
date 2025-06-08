@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/core/utils/date_utils.dart';
@@ -10,18 +11,6 @@ import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
 import 'package:subtrackr/presentation/providers/subscription_provider.dart';
-
-/// Helper class for logo suggestions
-class LogoSuggestion {
-  /// The name of the service
-  final String name;
-  
-  /// The URL of the logo
-  final String logoUrl;
-  
-  /// Creates a logo suggestion
-  LogoSuggestion({required this.name, required this.logoUrl});
-}
 
 class AddSubscriptionScreen extends StatefulWidget {
   const AddSubscriptionScreen({super.key});
@@ -59,6 +48,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
   List<LogoSuggestion> _logoSuggestions = [];
   bool _showLogoSuggestions = false;
   bool _isLoading = true;
+  Timer? _debounceTimer;
 
   final List<String> _categories = [
     'Entertainment',
@@ -128,6 +118,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _websiteController.removeListener(_updateLogoFromWebsite);
     _nameController.removeListener(_updateLogoFromName);
     _nameController.dispose();
@@ -151,6 +142,18 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
   }
   
   void _updateLogoFromName() {
+    // Cancel previous debounce timer
+    _debounceTimer?.cancel();
+    
+    // Always hide suggestions if name is empty
+    if (_nameController.text.isEmpty) {
+      setState(() {
+        _logoSuggestions = [];
+        _showLogoSuggestions = false;
+      });
+      return;
+    }
+    
     // If a logo has already been selected, don't show suggestions
     if (_logoUrl != null) {
       setState(() {
@@ -159,38 +162,51 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
       return;
     }
     
-    if (_nameController.text.isNotEmpty) {
-      final logoService = Provider.of<LogoService>(context, listen: false);
-      
-      // Get logo suggestions
-      final suggestions = logoService.getLogoSuggestions(_nameController.text);
-      List<LogoSuggestion> newSuggestions = [];
-      
-      // Convert each suggestion to our LogoSuggestion class
-      for (var suggestion in suggestions) {
-        newSuggestions.add(LogoSuggestion(
-          name: suggestion.name,
-          logoUrl: suggestion.logoUrl,
-        ));
-      }
-      
-      _logoSuggestions = newSuggestions;
-      
-      // If we have suggestions, show them
-      if (_logoSuggestions.isNotEmpty) {
+    // Debounce the API call to avoid too many requests
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _fetchLogoSuggestions(_nameController.text);
+    });
+  }
+  
+  void _fetchLogoSuggestions(String query) {
+    if (!mounted || query.isEmpty) return;
+    
+    final logoService = Provider.of<LogoService>(context, listen: false);
+    
+    // Get logo suggestions asynchronously with retry logic
+    _getLogoSuggestionsWithRetry(logoService, query, 3).then((suggestions) {
+      if (mounted && _nameController.text == query) { // Check if query is still current
         setState(() {
-          _showLogoSuggestions = true;
+          _logoSuggestions = suggestions;
+          _showLogoSuggestions = suggestions.isNotEmpty;
         });
       }
-      
-      // REMOVED: No longer automatically set logo when typing
-      // Only show suggestions, user must click to select one
-    } else {
-      setState(() {
-        _logoSuggestions = [];
-        _showLogoSuggestions = false;
-      });
+    });
+  }
+  
+  Future<List<LogoSuggestion>> _getLogoSuggestionsWithRetry(
+    LogoService logoService, 
+    String query, 
+    int retries,
+  ) async {
+    for (int i = 0; i < retries; i++) {
+      try {
+        final suggestions = await logoService.getLogoSuggestions(query);
+        if (suggestions.isNotEmpty) {
+          return suggestions;
+        }
+      } catch (error) {
+        debugPrint('Logo suggestions attempt ${i + 1} failed: $error');
+        if (i == retries - 1) {
+          // Last attempt failed, return empty list
+          debugPrint('All logo suggestion attempts failed for query: $query');
+        } else {
+          // Wait before retrying
+          await Future.delayed(Duration(milliseconds: 500 * (i + 1)));
+        }
+      }
     }
+    return [];
   }
 
   void _searchForLogo() {
@@ -524,22 +540,51 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
                               // Show logo suggestions immediately after name field if available
                               if (_showLogoSuggestions && _logoSuggestions.isNotEmpty) ...[
                                 const SizedBox(height: 12),
-                                Text(
-                                  'Suggested Logos',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Suggested Logos',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    if (_logoSuggestions.length > 4)
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.swipe_left,
+                                            size: 16,
+                                            color: colorScheme.primary,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Swipe to see more',
+                                            style: theme.textTheme.bodySmall?.copyWith(
+                                              color: colorScheme.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                  ],
                                 ),
                                 const SizedBox(height: 8),
                                 SizedBox(
                                   height: 100,
                                   child: ListView.builder(
                                     scrollDirection: Axis.horizontal,
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
                                     itemCount: _logoSuggestions.length,
                                     itemBuilder: (context, index) {
                                       final suggestion = _logoSuggestions[index];
+                                      final isFirst = index == 0;
+                                      final isLast = index == _logoSuggestions.length - 1;
+                                      
                                       return Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                        padding: EdgeInsets.only(
+                                          left: isFirst ? 0 : 6,
+                                          right: isLast ? 0 : 6,
+                                        ),
                                         child: Column(
                                           children: [
                                             GestureDetector(
@@ -552,21 +597,47 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
                                                   border: Border.all(
                                                     color: colorScheme.outline.withOpacity(0.3),
                                                   ),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: colorScheme.shadow.withOpacity(0.1),
+                                                      blurRadius: 4,
+                                                      offset: const Offset(0, 2),
+                                                    ),
+                                                  ],
                                                 ),
                                                 child: ClipRRect(
                                                   borderRadius: BorderRadius.circular(12),
                                                   child: Hero(
-                                                    tag: 'no_hero_animation_suggestion_${suggestion.name}',
+                                                    tag: 'no_hero_animation_suggestion_${suggestion.name}_$index',
                                                     child: Image.network(
                                                       suggestion.logoUrl,
-                                                      key: ValueKey('logo_suggestion_${suggestion.name}'),
+                                                      key: ValueKey('logo_suggestion_${suggestion.name}_$index'),
                                                       fit: BoxFit.contain,
+                                                      loadingBuilder: (context, child, loadingProgress) {
+                                                        if (loadingProgress == null) return child;
+                                                        return Container(
+                                                          color: colorScheme.surface,
+                                                          child: Center(
+                                                            child: SizedBox(
+                                                              width: 20,
+                                                              height: 20,
+                                                              child: CircularProgressIndicator(
+                                                                strokeWidth: 2,
+                                                                value: loadingProgress.expectedTotalBytes != null
+                                                                    ? loadingProgress.cumulativeBytesLoaded /
+                                                                        loadingProgress.expectedTotalBytes!
+                                                                    : null,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
                                                       errorBuilder: (context, error, stackTrace) {
                                                         return Container(
-                                                          color: colorScheme.primary,
-                                                          child: const Icon(
+                                                          color: colorScheme.surface,
+                                                          child: Icon(
                                                             Icons.image_not_supported,
-                                                            color: Colors.white,
+                                                            color: colorScheme.outline,
                                                             size: 24,
                                                           ),
                                                         );
@@ -577,10 +648,14 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
                                               ),
                                             ),
                                             const SizedBox(height: 4),
-                                            Text(
-                                              suggestion.name,
-                                              style: theme.textTheme.bodySmall,
-                                              overflow: TextOverflow.ellipsis,
+                                            SizedBox(
+                                              width: 60,
+                                              child: Text(
+                                                suggestion.name,
+                                                style: theme.textTheme.bodySmall,
+                                                overflow: TextOverflow.ellipsis,
+                                                textAlign: TextAlign.center,
+                                              ),
                                             ),
                                           ],
                                         ),

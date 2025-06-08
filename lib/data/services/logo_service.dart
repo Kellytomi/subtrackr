@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:subtrackr/core/config/brandfetch_config.dart';
 
 class LogoService {
   static final LogoService _instance = LogoService._internal();
@@ -9,60 +12,35 @@ class LogoService {
   
   LogoService._internal();
   
-  // Minimal hardcoded mappings for services where domain construction is tricky
-  final Map<String, String> _specialCases = {
-    'cursor': 'assets/logos/cursor-logo.png',
-    // Services with non-obvious domains
-    'disney+': 'disneyplus.com',
-    'disney plus': 'disneyplus.com',
-    'disneyplus': 'disneyplus.com',
-    'disney': 'disney.com',
-    'hbo max': 'hbomax.com',
-    'hbomax': 'hbomax.com',
-    'apple tv+': 'tv.apple.com',
-    'apple tv plus': 'tv.apple.com',
-    'paramount+': 'paramountplus.com',
-    'paramount plus': 'paramountplus.com',
-    'youtube premium': 'youtube.com',
-    'youtube music': 'music.youtube.com',
-    'apple music': 'music.apple.com',
-    'amazon prime': 'primevideo.com',
-    'prime video': 'primevideo.com',
-    'amazon music': 'music.amazon.com',
-    // Apple Services - use direct logo URLs since Clearbit returns generic Apple logo
-    'apple music': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Apple_Music_icon.svg/512px-Apple_Music_icon.svg.png',
-    'apple tv+': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Apple_TV_Plus_logo.svg/512px-Apple_TV_Plus_logo.svg.png',
-    'apple tv plus': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Apple_TV_Plus_logo.svg/512px-Apple_TV_Plus_logo.svg.png',
-    'apple arcade': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Apple_Arcade_logo.svg/512px-Apple_Arcade_logo.svg.png',
-    'apple news+': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Apple_News_icon.svg/512px-Apple_News_icon.svg.png',
-    'apple news plus': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Apple_News_icon.svg/512px-Apple_News_icon.svg.png',
-    'apple fitness+': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Apple_Fitness%2B_logo.svg/512px-Apple_Fitness%2B_logo.svg.png',
-    'apple fitness plus': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Apple_Fitness%2B_logo.svg/512px-Apple_Fitness%2B_logo.svg.png',
-    'icloud': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/ICloud_logo.svg/512px-ICloud_logo.svg.png',
-    'icloud+': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/ICloud_logo.svg/512px-ICloud_logo.svg.png',
-    'apple one': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/512px-Apple_logo_black.svg.png',
-    // AI Services
-    'chatgpt': 'openai.com',
-    'chat gpt': 'openai.com',
-    'openai': 'openai.com',
-    'claude': 'anthropic.com',
+
+  
+  // No local assets - everything uses Brandfetch now
+  final Map<String, String> _localAssets = {};
+  
+  // Special domain mappings for services that don't use .com
+  final Map<String, String> _domainMappings = {
+    'claude': 'claude.ai',
     'anthropic': 'anthropic.com',
+    'chatgpt': 'openai.com',
+    'openai': 'openai.com',
+    'notion': 'notion.so',
+    'figma': 'figma.com',
+    'canva': 'canva.com',
+    'discord': 'discord.com',
+    'reddit': 'reddit.com',
+    'twitter': 'twitter.com',
+    'x': 'x.com',
+    'instagram': 'instagram.com',
+    'facebook': 'facebook.com',
+    'linkedin': 'linkedin.com',
+    'tiktok': 'tiktok.com',
+    'snapchat': 'snapchat.com',
+    'whatsapp': 'whatsapp.com',
+    'telegram': 'telegram.org',
+    'cursor': 'cursor.sh',
   };
   
-  // Related services mapping for better suggestions
-  final Map<String, List<String>> _relatedServices = {
-    'disney': ['disney+', 'disney plus', 'disney'],
-    'apple': ['apple music', 'apple tv+', 'apple arcade', 'apple news+', 'apple fitness+', 'icloud', 'apple one'],
-    'youtube': ['youtube premium', 'youtube music', 'youtube tv'],
-    'amazon': ['amazon prime', 'amazon music', 'prime video'],
-    'google': ['youtube', 'google drive', 'google one'],
-    'microsoft': ['microsoft 365', 'xbox game pass', 'outlook'],
-    'hbo': ['hbo max', 'hbo'],
-    'paramount': ['paramount+', 'paramount plus'],
-    'openai': ['openai', 'chatgpt', 'chat gpt'],
-    'anthropic': ['anthropic', 'claude'],
-    'ai': ['openai', 'anthropic', 'chatgpt', 'claude'],
-  };
+
   
   // Get logo URL from website URL or name
   String? getLogoUrl(String? websiteOrName) {
@@ -73,37 +51,28 @@ class LogoService {
     // Normalize the input (lowercase, remove extra spaces)
     final normalized = _normalizeInput(websiteOrName);
     
-    // Special case for local assets
-    if (normalized == 'cursor') {
-      return 'assets/logos/cursor-logo.png';
+    // Check for local assets first
+    if (_localAssets.containsKey(normalized)) {
+      return _localAssets[normalized];
     }
     
-    // Check if we have a special case mapping FIRST (highest priority)
-    for (final entry in _specialCases.entries) {
-      if (_isServiceMatch(normalized, entry.key)) {
-        final logoUrl = entry.value;
-        if (logoUrl.startsWith('assets/')) {
-          return logoUrl;
-        }
-        if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
-          return logoUrl;
-        }
-        return 'https://logo.clearbit.com/$logoUrl';
-      }
+    // Check for special domain mappings
+    if (_domainMappings.containsKey(normalized)) {
+      return _getBrandfetchUrl(_domainMappings[normalized]!);
     }
     
     // Try to extract domain from website URL
     String? domain = _extractDomain(websiteOrName);
     
-    // If we have a domain, use Clearbit API
+    // If we have a domain, use Brandfetch API
     if (domain != null) {
-      return 'https://logo.clearbit.com/$domain';
+      return _getBrandfetchUrl(domain);
     }
     
     // Try to construct a domain from the name
     final possibleDomain = _constructDomainFromName(normalized);
     if (possibleDomain != null) {
-      return 'https://logo.clearbit.com/$possibleDomain';
+      return _getBrandfetchUrl(possibleDomain);
     }
     
     // Final fallback - try Google's favicon service
@@ -115,36 +84,19 @@ class LogoService {
     return input.toLowerCase().trim();
   }
   
-  // Check if two service names match (handles typos and partial matches)
+  // Simple service name matching
   bool _isServiceMatch(String input, String serviceName) {
-    // Direct match - highest priority
-    if (input == serviceName) return true;
-    
-    // Handle common typos and variations
-    final cleanInput = input.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final cleanService = serviceName.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    
-    if (cleanInput == cleanService) return true;
-    
-    // Handle specific typos and variations
-    if ((input.contains('cluade') || input.contains('claud')) && serviceName.contains('claude')) return true;
-    if ((input.contains('chatgpt') || input.contains('chat gpt') || input.contains('gpt')) && 
-        (serviceName.contains('chatgpt') || serviceName.contains('openai'))) return true;
-    if (input.contains('anthropic') && serviceName.contains('claude')) return true;
-    if (input.contains('claude') && serviceName.contains('anthropic')) return true;
-    
-    // Exact service name matches for Apple services (to prevent "apple" matching all apple services)
-    if (serviceName.startsWith('apple ')) {
-      return input == serviceName || cleanInput == cleanService;
+    return input == serviceName;
+  }
+  
+  // Get Brandfetch URL with proper client ID parameter
+  String _getBrandfetchUrl(String domain) {
+    if (!BrandfetchConfig.isConfigured) {
+      // Fallback to simple format for testing (may not work optimally)
+      debugPrint('⚠️ Please get your free Brandfetch client ID from: ${BrandfetchConfig.registrationUrl}');
+      return 'https://cdn.brandfetch.io/$domain';
     }
-    
-    // Check if one contains the other (but only for shorter strings to avoid false matches)
-    if (input.length <= 5 || serviceName.length <= 5) {
-      return input.contains(serviceName) || serviceName.contains(input);
-    }
-    
-    // More precise matching for longer strings
-    return cleanInput.contains(cleanService) || cleanService.contains(cleanInput);
+    return 'https://cdn.brandfetch.io/$domain?c=${BrandfetchConfig.clientId}';
   }
   
   // Extract domain from a URL or text
@@ -212,10 +164,64 @@ class LogoService {
     return '$domainName.com';
   }
   
-  // Get logo suggestions with support for multiple related services
-  List<LogoSuggestion> getLogoSuggestions(String input) {
+  // Get logo suggestions using Brandfetch Brand Search API
+  Future<List<LogoSuggestion>> getLogoSuggestions(String input) async {
     if (input.isEmpty) return [];
     
+    // Try Brandfetch Brand Search API first
+    final apiSuggestions = await _searchBrandsApi(input);
+    if (apiSuggestions.isNotEmpty) {
+      return apiSuggestions;
+    }
+    
+    // Fallback to original logic if API fails
+    return _getLogoSuggestionsLocal(input);
+  }
+  
+  // Search brands using Brandfetch Brand Search API
+  Future<List<LogoSuggestion>> _searchBrandsApi(String query) async {
+    if (!BrandfetchConfig.isConfigured) {
+      debugPrint('⚠️ Brandfetch client ID not configured, using fallback suggestions');
+      return [];
+    }
+    
+    try {
+      final encodedQuery = Uri.encodeComponent(query);
+      final url = 'https://api.brandfetch.io/v2/search/$encodedQuery?c=${BrandfetchConfig.clientId}';
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 3));
+      
+      if (response.statusCode == 200) {
+        final dynamic jsonData = json.decode(response.body);
+        final suggestions = <LogoSuggestion>[];
+        
+        if (jsonData is List) {
+          for (final result in jsonData.take(8)) {
+            final name = result['name']?.toString();
+            final iconUrl = result['icon']?.toString();
+            
+            if (name != null && iconUrl != null) {
+              suggestions.add(LogoSuggestion(name: name, logoUrl: iconUrl));
+            }
+          }
+        }
+        
+        return suggestions;
+      } else {
+        debugPrint('Brandfetch API error: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error calling Brandfetch API: $e');
+    }
+    
+    return [];
+  }
+  
+  // Fallback logo suggestions with local logic
+  List<LogoSuggestion> _getLogoSuggestionsLocal(String input) {
     final suggestions = <LogoSuggestion>[];
     final normalized = _normalizeInput(input);
     final seenUrls = <String>{};
@@ -228,103 +234,108 @@ class LogoService {
       }
     }
     
-    // Special case for Cursor - return local asset
-    if (normalized.contains('cursor')) {
-      addSuggestion('Cursor', 'assets/logos/cursor-logo.png');
-      return suggestions;
-    }
+    // Generate multiple suggestions based on input
+    final commonServices = _getCommonServiceVariations(normalized);
     
-    // Check for exact matches first
+    // Add exact match first
     final exactLogoUrl = getLogoUrl(normalized);
     if (exactLogoUrl != null) {
       addSuggestion(_capitalizeServiceName(normalized), exactLogoUrl);
     }
     
-    // Check for partial matches in special cases (do this before related services)
-    for (final entry in _specialCases.entries) {
-      final serviceName = entry.key;
-      // Check if input matches the service name (handle typos and partial matches)
-      if (_isServiceMatch(normalized, serviceName)) {
-        final logoUrl = getLogoUrl(serviceName);
-        if (logoUrl != null) {
-          addSuggestion(_capitalizeServiceName(serviceName), logoUrl);
-        }
+    // Add common service variations
+    for (final serviceName in commonServices) {
+      final logoUrl = getLogoUrl(serviceName);
+      if (logoUrl != null) {
+        addSuggestion(_capitalizeServiceName(serviceName), logoUrl);
       }
     }
     
-    // Check for related services when typing partial matches
-    for (final entry in _relatedServices.entries) {
-      final serviceFamily = entry.key;
-      final relatedServices = entry.value;
-      
-      // If the input matches or is contained in the service family name
-      if (_isServiceMatch(normalized, serviceFamily)) {
-        for (final relatedService in relatedServices) {
-          final logoUrl = getLogoUrl(relatedService);
-          if (logoUrl != null) {
-            addSuggestion(_capitalizeServiceName(relatedService), logoUrl);
-          }
-        }
-      }
+    // Add domain-based suggestions
+    final possibleDomains = _generateDomainVariations(normalized);
+    for (final domain in possibleDomains) {
+      final logoUrl = _getBrandfetchUrl(domain);
+      final displayName = domain.replaceAll(RegExp(r'\.(com|ai|so|sh|org)$'), '');
+      addSuggestion(_capitalizeServiceName(displayName), logoUrl);
     }
     
-    // If no suggestions found, try the original input
-    if (suggestions.isEmpty) {
-      final fallbackUrl = getLogoUrl(input);
-      if (fallbackUrl != null) {
-        addSuggestion(_capitalizeServiceName(input), fallbackUrl);
-      }
-    }
-    
-    // Limit to 5 suggestions to avoid overwhelming the UI
-    return suggestions.take(5).toList();
+    // Limit to 8 suggestions for better variety
+    return suggestions.take(8).toList();
   }
   
   // Helper method to capitalize service names for display
   String _capitalizeServiceName(String name) {
     if (name.isEmpty) return name;
     
-    // Handle special cases
-    switch (name.toLowerCase()) {
-      case 'disney+':
-      case 'disney plus':
-        return 'Disney+';
-      case 'hbo max':
-        return 'HBO Max';
-      case 'apple tv+':
-      case 'apple tv plus':
-        return 'Apple TV+';
-      case 'paramount+':
-      case 'paramount plus':
-        return 'Paramount+';
-      case 'youtube premium':
-        return 'YouTube Premium';
-      case 'youtube music':
-        return 'YouTube Music';
-      case 'apple music':
-        return 'Apple Music';
-      case 'amazon prime':
-        return 'Amazon Prime';
-      case 'prime video':
-        return 'Prime Video';
-      case 'amazon music':
-        return 'Amazon Music';
-      case 'chatgpt':
-      case 'chat gpt':
-        return 'ChatGPT';
-      case 'openai':
-        return 'OpenAI';
-      case 'claude':
-        return 'Claude';
-      case 'anthropic':
-        return 'Anthropic';
-      default:
-        // Capitalize first letter of each word
-        return name.split(' ').map((word) {
-          if (word.isEmpty) return word;
-          return word[0].toUpperCase() + word.substring(1);
-        }).join(' ');
+    // Capitalize first letter of each word
+    return name.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1);
+    }).join(' ');
+  }
+  
+  // Generate common service variations for better suggestions
+  List<String> _getCommonServiceVariations(String input) {
+    final variations = <String>[];
+    
+    // Common service patterns
+    final patterns = {
+      'spot': ['spotify'],
+      'net': ['netflix'],
+      'dis': ['disney+', 'disney plus'],
+      'app': ['apple music', 'apple tv+', 'apple arcade'],
+      'you': ['youtube', 'youtube premium', 'youtube music'],
+      'ama': ['amazon prime', 'amazon music'],
+      'hbo': ['hbo max'],
+      'par': ['paramount+'],
+      'chat': ['chatgpt'],
+      'gpt': ['chatgpt'],
+      'open': ['openai'],
+      'clau': ['claude'],
+      'ant': ['anthropic'],
+      'twi': ['twitch'],
+      'tik': ['tiktok'],
+      'ins': ['instagram'],
+      'face': ['facebook'],
+      'lin': ['linkedin'],
+      'mic': ['microsoft 365'],
+      'goo': ['google drive', 'google one'],
+      'dro': ['dropbox'],
+      'not': ['notion'],
+      'sla': ['slack'],
+      'zoo': ['zoom'],
+      'can': ['canva'],
+      'fig': ['figma'],
+    };
+    
+    // Find matching patterns
+    for (final entry in patterns.entries) {
+      if (input.contains(entry.key)) {
+        variations.addAll(entry.value);
+      }
     }
+    
+    return variations;
+  }
+  
+  // Generate domain variations for suggestions
+  List<String> _generateDomainVariations(String input) {
+    final domains = <String>[];
+    
+    // Common domain patterns
+    domains.add('$input.com');
+    domains.add('$input.io');
+    domains.add('$input.app');
+    
+    // Handle special cases
+    if (input.contains('plus') || input.contains('+')) {
+      final baseName = input.replaceAll('plus', '').replaceAll('+', '').trim();
+      domains.add('${baseName}plus.com');
+      domains.add('$baseName.com');
+    }
+    
+    // Remove duplicates
+    return domains.toSet().toList();
   }
   
   // Get a fallback icon based on the first letter of the name
