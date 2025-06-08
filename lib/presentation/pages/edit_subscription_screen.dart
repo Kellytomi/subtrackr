@@ -145,8 +145,8 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       return;
     }
     
-    // Debounce the API call to avoid too many requests
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+    // Light debounce to feel real-time while avoiding excessive requests
+    _debounceTimer = Timer(const Duration(milliseconds: 150), () {
       _fetchLogoSuggestions(_nameController.text);
     });
   }
@@ -184,8 +184,8 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
           // Last attempt failed, return empty list
           debugPrint('All logo suggestion attempts failed for query: $query');
         } else {
-          // Wait before retrying
-          await Future.delayed(Duration(milliseconds: 500 * (i + 1)));
+          // Shorter wait before retrying for faster recovery
+          await Future.delayed(Duration(milliseconds: 200 * (i + 1)));
         }
       }
     }
