@@ -19,6 +19,7 @@ import 'package:subtrackr/presentation/pages/subscription_details_screen.dart';
 import 'package:subtrackr/presentation/pages/settings_screen.dart';
 import 'package:subtrackr/presentation/pages/statistics_screen.dart';
 import 'package:subtrackr/presentation/pages/onboarding/currency_selection_screen.dart';
+import 'package:subtrackr/presentation/pages/email_detection_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -133,6 +134,7 @@ class MyApp extends StatelessWidget {
               AppConstants.SUBSCRIPTION_DETAILS_ROUTE: (_) => const SubscriptionDetailsScreen(),
               AppConstants.SETTINGS_ROUTE: (_) => const SettingsScreen(),
               AppConstants.STATISTICS_ROUTE: (_) => const StatisticsScreen(),
+              AppConstants.EMAIL_DETECTION_ROUTE: (_) => const EmailDetectionPage(),
             },
           );
         },

@@ -331,6 +331,31 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       color: Colors.cyan,
                       children: [
                         _buildModernTile(
+                          title: 'Smart Email Detection',
+                          subtitle: 'Auto-detect subscriptions from Gmail',
+                          icon: Icons.auto_awesome,
+                          iconColor: Colors.orange,
+                          onTap: () {
+                            Navigator.pushNamed(context, '/email-detection');
+                          },
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                            ),
+                            child: Text(
+                              'NEW',
+                              style: TextStyle(
+                                color: Colors.orange.shade700,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ),
+                        _buildModernTile(
                           title: 'Export Data',
                           subtitle: 'Download your subscriptions as JSON',
                           icon: Icons.download_rounded,

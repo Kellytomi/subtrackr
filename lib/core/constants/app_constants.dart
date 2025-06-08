@@ -24,6 +24,9 @@ class AppConstants {
   
   /// Route for the settings screen
   static const String SETTINGS_ROUTE = '/settings';
+  
+  /// Route for email subscription detection
+  static const String EMAIL_DETECTION_ROUTE = '/email-detection';
 
   // Hive box names
   /// Hive box name for storing subscriptions
