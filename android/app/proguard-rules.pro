@@ -174,4 +174,65 @@
 -dontwarn com.google.android.play.core.**
 
 # Keep Flutter deferred components
--keep class io.flutter.embedding.engine.deferredcomponents.** { *; } 
+-keep class io.flutter.embedding.engine.deferredcomponents.** { *; }
+
+# Google Services and Firebase
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.android.gms.**
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+-keep class com.google.auth.** { *; }
+-dontwarn com.google.auth.**
+-keep class com.google.api.client.** { *; }
+-dontwarn com.google.api.client.**
+-keep class com.google.gson.** { *; }
+-dontwarn com.google.gson.**
+
+# Google Sign-In
+-keep class com.google.android.gms.auth.api.signin.** { *; }
+-keep class com.google.android.gms.common.** { *; }
+-keep class com.google.android.gms.tasks.** { *; }
+
+# Guava reflection classes (fixes the AnnotatedType error)
+-keep class com.google.common.reflect.** { *; }
+-dontwarn com.google.common.reflect.**
+-keep class java.lang.reflect.AnnotatedType { *; }
+-dontwarn java.lang.reflect.AnnotatedType
+
+# Google APIs
+-keep class com.google.api.services.** { *; }
+-dontwarn com.google.api.services.**
+-keep class com.google.api.client.googleapis.** { *; }
+-dontwarn com.google.api.client.googleapis.**
+
+# Firebase Auth
+-keep class com.google.firebase.auth.** { *; }
+-dontwarn com.google.firebase.auth.**
+
+# Firebase Firestore
+-keep class com.google.firebase.firestore.** { *; }
+-dontwarn com.google.firebase.firestore.**
+-keep class com.google.firestore.** { *; }
+-dontwarn com.google.firestore.**
+
+# Hive (local storage)
+-keep class hive.** { *; }
+-keep class **.hive.** { *; }
+-dontwarn hive.**
+
+# HTTP and network libraries
+-keep class okhttp3.** { *; }
+-dontwarn okhttp3.**
+-keep class retrofit2.** { *; }
+-dontwarn retrofit2.**
+
+# Keep all reflection-related classes
+-keepattributes Signature
+-keepattributes *Annotation*
+-keepattributes EnclosingMethod
+-keepattributes InnerClasses
+-keep class java.lang.reflect.** { *; }
+
+# Additional Google Play Services
+-keep class com.google.android.gms.internal.** { *; }
+-dontwarn com.google.android.gms.internal.** 

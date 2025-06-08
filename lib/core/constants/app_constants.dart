@@ -28,8 +28,7 @@ class AppConstants {
   /// Route for email subscription detection
   static const String EMAIL_DETECTION_ROUTE = '/email-detection';
   
-  /// Route for the login/authentication page
-  static const String LOGIN_ROUTE = '/login';
+
 
   // Hive box names
   /// Hive box name for storing subscriptions

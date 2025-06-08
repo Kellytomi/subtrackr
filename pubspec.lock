@@ -852,6 +852,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.0"
+  restart_app:
+    dependency: "direct main"
+    description:
+      name: restart_app
+      sha256: "00d5ec3e9de871cedbe552fc41e615b042b5ec654385e090e0983f6d02f655ed"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.2"
   shared_preferences:
     dependency: "direct main"
     description:
@@ -924,6 +932,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
+  shorebird_code_push:
+    dependency: "direct main"
+    description:
+      name: shorebird_code_push
+      sha256: cc78bbf651d320414e6ce66d6f3e825f91050050bf94bbe27f7eb3eebfdfde1c
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.4"
   sky_engine:
     dependency: transitive
     description: flutter

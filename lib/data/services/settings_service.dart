@@ -182,6 +182,8 @@ class SettingsService {
     await _settingsBox.put(AppConstants.AUTO_SYNC_SETTING, enabled);
   }
   
+
+  
   /// Close the box
   Future<void> close() async {
     await _settingsBox.close();

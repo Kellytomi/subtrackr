@@ -71,7 +71,7 @@ class AppTheme {
       backgroundColor: _primaryColorLight,
       foregroundColor: _onPrimaryLight,
     ),
-    cardTheme: const CardTheme(
+    cardTheme: const CardThemeData(
       color: _surfaceColorLight,
       elevation: 0,
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -161,7 +161,7 @@ class AppTheme {
       backgroundColor: _primaryColorDark,
       foregroundColor: _onPrimaryDark,
     ),
-    cardTheme: const CardTheme(
+    cardTheme: const CardThemeData(
       color: _surfaceColorDark,
       elevation: 0,
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),

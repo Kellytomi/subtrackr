@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
@@ -17,7 +18,7 @@ class EmailDetectionPage extends StatefulWidget {
   State<EmailDetectionPage> createState() => _EmailDetectionPageState();
 }
 
-class _EmailDetectionPageState extends State<EmailDetectionPage> {
+class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   final EmailScannerService _emailService = EmailScannerService();
   
@@ -32,63 +33,204 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
   // Progress tracking
   double _scanProgress = 0.0;
   String _scanStatus = '';
+  
+  // Timer for periodic auth refresh
+  Timer? _authRefreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeAuth();
+    
+    // Set up periodic auth refresh (every 10 seconds when page is active)
+    _authRefreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (mounted) {
+        print('⏰ Periodic auth check...');
+        _checkAuthStateQuietly();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Refresh auth state when coming back from settings
+    print('📍 didChangeDependencies called, refreshing auth...');
     _initializeAuth();
   }
 
-  Future<void> _initializeAuth() async {
-    setState(() => _isLoading = true);
+  @override
+  void didUpdateWidget(EmailDetectionPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refresh auth state when widget updates
+    print('🔄 didUpdateWidget called, refreshing auth...');
+    _initializeAuth();
+  }
+
+  // This method will be called when the app resumes or when returning from other screens
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh auth state when app resumes
+      print('📱 App resumed, refreshing auth state...');
+      _initializeAuth();
+    }
+  }
+
+  // Method to handle when user returns from settings or other screens
+  void _handleReturnFromNavigation() {
+    print('🔄 Returned to Email Detection page, refreshing auth state...');
+    _initializeAuth();
+  }
+
+  // Quiet auth check that doesn't show loading states
+  Future<void> _checkAuthStateQuietly() async {
+    if (!mounted || _isLoading || _isScanning) return;
     
     try {
-      await _authService.initialize();
-      
-      // Check both AuthService and CloudSyncService for authentication
       final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
       final isGoogleSignedIn = _authService.isSignedIn;
       final isFirebaseSignedIn = cloudSyncService.isUserSignedIn;
       
-      setState(() {
-        _currentUser = _authService.currentUser;
-      });
+      // Only update if there's a discrepancy
+      final shouldBeSignedIn = isFirebaseSignedIn && isGoogleSignedIn;
+      final currentlyShowingSignedIn = _currentUser != null;
       
-      // If AuthService doesn't have current user but Firebase is signed in, try to get it
-      if (_currentUser == null && isFirebaseSignedIn) {
+      if (shouldBeSignedIn != currentlyShowingSignedIn) {
+        print('🔄 Auth state mismatch detected, refreshing...');
+        _initializeAuth();
+      }
+    } catch (e) {
+      print('⚠️ Quiet auth check failed: $e');
+    }
+  }
+
+  Future<void> _initializeAuth() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null; // Clear previous errors
+    });
+    
+    try {
+      print('🔄 Starting comprehensive auth refresh...');
+      
+      // Step 1: Check CloudSyncService first (this is our source of truth)
+      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+      final isFirebaseSignedIn = cloudSyncService.isUserSignedIn;
+      final firebaseUser = cloudSyncService.currentFirebaseUser;
+      
+      print('🔍 CloudSync state: signed in: $isFirebaseSignedIn, user: ${firebaseUser?.email}');
+      
+      // Step 2: Force reinitialize AuthService to get latest state
+      await _authService.initialize();
+      
+      // Step 3: Get current Google auth state
+      GoogleSignInAccount? currentUser = _authService.currentUser;
+      final isGoogleSignedIn = _authService.isSignedIn;
+      
+      print('🔍 Initial Google state: signed in: $isGoogleSignedIn, user: ${currentUser?.email}');
+      
+      // Step 4: If Firebase is signed in but Google is not, try multiple approaches
+      if (isFirebaseSignedIn && firebaseUser != null && currentUser == null) {
+        print('🔄 Firebase signed in but Google not detected. Trying recovery methods...');
+        
+        // Method 1: Try silent sign-in again
         try {
-          // Try to refresh AuthService authentication
-          final refreshed = await _authService.refreshAuthentication();
-          if (refreshed) {
-            setState(() {
-              _currentUser = _authService.currentUser;
-            });
+          final googleSignIn = GoogleSignIn(scopes: [
+            'email',
+            'profile',
+            'https://www.googleapis.com/auth/gmail.readonly',
+          ]);
+          
+          final silentUser = await googleSignIn.signInSilently();
+          if (silentUser != null) {
+            print('✅ Silent sign-in recovered user: ${silentUser.email}');
+            currentUser = silentUser;
+            
+            // Update AuthService with recovered user
+            await _authService.initialize();
           }
         } catch (e) {
-          print('⚠️ Could not refresh Google authentication: $e');
+          print('⚠️ Silent sign-in failed: $e');
+        }
+        
+        // Method 2: If still no user, try refreshing AuthService authentication
+        if (currentUser == null) {
+          print('🔄 Attempting AuthService refresh...');
+          try {
+            final refreshed = await _authService.refreshAuthentication();
+            if (refreshed) {
+              currentUser = _authService.currentUser;
+              print('✅ AuthService refresh successful: ${currentUser?.email}');
+            } else {
+              print('❌ AuthService refresh failed');
+            }
+          } catch (e) {
+            print('⚠️ AuthService refresh error: $e');
+          }
+        }
+        
+        // Method 3: If still no user and we have Firebase email, show helpful message
+        if (currentUser == null) {
+          print('⚠️ Could not recover Google auth for ${firebaseUser.email}');
+          setState(() {
+            _errorMessage = 'Google authentication needs to be refreshed. Please sign out and sign in again from Settings.';
+          });
         }
       }
       
-      // Debug: Print authentication state
-      print('🔍 EmailDetectionPage Auth Debug:');
-      print('   AuthService.isSignedIn: $isGoogleSignedIn');
+      // Step 5: If we have a Firebase user but no matching Google user, check if they match
+      if (isFirebaseSignedIn && currentUser != null && firebaseUser != null) {
+        if (currentUser.email != firebaseUser.email) {
+          print('⚠️ Email mismatch: Google(${currentUser.email}) vs Firebase(${firebaseUser.email})');
+          setState(() {
+            _errorMessage = 'Account mismatch detected. Please sign out and sign in again.';
+          });
+          return;
+        }
+      }
+      
+      // Step 6: Clear previous detected subscriptions if user changed
+      if (_currentUser?.email != currentUser?.email) {
+        print('🔄 User changed from ${_currentUser?.email} to ${currentUser?.email}');
+        _detectedSubscriptions.clear();
+        _selectedSubscriptions.clear();
+      }
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _currentUser = currentUser;
+      });
+      
+      // Debug: Print final authentication state
+      print('🔍 Final EmailDetectionPage Auth State:');
+      print('   CloudSync.isUserSignedIn: $isFirebaseSignedIn');
+      print('   CloudSync.currentUser: ${firebaseUser?.email}');
+      print('   AuthService.isSignedIn: ${_authService.isSignedIn}');
       print('   AuthService.currentUser: ${_authService.currentUser?.email}');
       print('   AuthService.gmailApi: ${_authService.gmailApi != null ? "initialized" : "null"}');
-      print('   CloudSyncService.isUserSignedIn: $isFirebaseSignedIn');
       print('   Final _currentUser: ${_currentUser?.email}');
+      print('   UI will show: ${_currentUser != null ? "scan section" : "sign-in prompt"}');
       
     } catch (error) {
+      print('❌ Error initializing authentication: $error');
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Failed to initialize authentication: $error';
       });
     } finally {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -682,26 +824,51 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
               ),
             ),
             const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Go back
-                  // Open bottom navigation to settings tab (index 3)
-                  // The user will need to navigate to settings manually
-                },
-                icon: const Icon(Icons.settings_outlined),
-                label: const Text('Go to Settings'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Go back
+                        // Open bottom navigation to settings tab (index 3)
+                        // The user will need to navigate to settings manually
+                      },
+                      icon: const Icon(Icons.settings_outlined),
+                      label: const Text('Go to Settings'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _initializeAuth,
+                    icon: _isLoading 
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    label: const Text('Refresh'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colorScheme.secondary,
+                      foregroundColor: colorScheme.onSecondary,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             Text(
-              'You can sign in from the Settings page',
+              'You can sign in from the Settings page or tap Refresh after signing in',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
                 color: colorScheme.onSurface.withOpacity(0.5),

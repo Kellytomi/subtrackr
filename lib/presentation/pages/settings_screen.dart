@@ -11,6 +11,7 @@ import 'package:subtrackr/core/utils/tips_helper.dart';
 import 'package:subtrackr/data/services/auth_service.dart';
 import 'package:subtrackr/data/services/cloud_sync_service.dart';
 
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -147,7 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                           trailing: Text(
                             currency.symbol,
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: colorScheme.tertiary,
                             ),
@@ -488,44 +489,13 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     const SizedBox(height: 32),
                     
                     // App Info
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceVariant.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: colorScheme.outline.withOpacity(0.2),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            'SubTrackr',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Version 1.0.0',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: colorScheme.onSurface.withOpacity(0.7),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Track your subscriptions with ease',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: colorScheme.onSurface.withOpacity(0.8),
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
+                    _buildModernSection(
+                      title: 'App Information',
+                      icon: Icons.info_outline_rounded,
+                      color: colorScheme.primary,
+                      children: [
+                        _buildAppInfoTile(colorScheme),
+                      ],
                     ),
                     
                     const SizedBox(height: 40),
@@ -1055,7 +1025,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 ),
                 child: Icon(
                   icon,
-                  size: 20,
+                  size: 22,
                   color: color,
                 ),
               ),
@@ -1063,7 +1033,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.onSurface,
                 ),
@@ -1114,7 +1084,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 ),
                 child: Icon(
                   icon,
-                  size: 24,
+                  size: 18,
                   color: iconColor,
                 ),
               ),
@@ -1126,7 +1096,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     Text(
                       title,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
                       ),
@@ -1802,6 +1772,143 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         );
       }
     }
+  }
+
+
+
+  // Get app version information
+  Future<Map<String, dynamic>> _getVersionInfo() async {
+    return {
+      'appVersion': '1.0.4+6', // This should match your actual app version
+      'patchNumber': null, // With automatic updates, we don't need to track this manually
+      'updateStatus': 'Auto-updating',
+      'hasPatch': false,
+    };
+  }
+
+  Widget _buildAppInfoTile(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outline.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [colorScheme.primary, colorScheme.secondary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.subscriptions_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SubTrackr',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    FutureBuilder<Map<String, dynamic>>(
+                      future: _getVersionInfo(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return Text(
+                            'Loading version...',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                          );
+                        }
+                        
+                        final versionData = snapshot.data ?? {};
+                        final appVersion = versionData['appVersion'] ?? '1.0.4+6';
+                        final patchNumber = versionData['patchNumber'] as int?;
+                        final updateStatus = versionData['updateStatus'] ?? 'Unknown';
+                        
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Version $appVersion',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colorScheme.onSurface.withOpacity(0.7),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: Colors.green.withOpacity(0.3),
+                                      width: 0.5,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Auto-updating enabled',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.green.shade700,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.auto_fix_high,
+                                  size: 12,
+                                  color: Colors.green.shade600,
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Track your subscriptions with ease',
+            style: TextStyle(
+              fontSize: 14,
+              color: colorScheme.onSurface.withOpacity(0.8),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 
 

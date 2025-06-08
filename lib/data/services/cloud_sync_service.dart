@@ -62,6 +62,65 @@ class CloudSyncService {
   /// Get the current Firebase user
   User? get currentFirebaseUser => _auth.currentUser;
 
+  /// Sign in with email and password
+  Future<UserCredential?> signInWithEmailAndPassword(String email, String password) async {
+    try {
+      print('🔄 Starting email/password sign-in for: $email');
+      
+      final userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      
+      print('✅ Email/password sign-in successful: ${userCredential.user?.uid}');
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      print('❌ Email/password sign-in failed: ${e.code} - ${e.message}');
+      throw e;
+    } catch (e) {
+      print('❌ Unexpected error during email/password sign-in: $e');
+      throw e;
+    }
+  }
+
+  /// Create account with email and password
+  Future<UserCredential?> createAccountWithEmailAndPassword(String email, String password) async {
+    try {
+      print('🔄 Creating account for: $email');
+      
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      
+      print('✅ Account creation successful: ${userCredential.user?.uid}');
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      print('❌ Account creation failed: ${e.code} - ${e.message}');
+      throw e;
+    } catch (e) {
+      print('❌ Unexpected error during account creation: $e');
+      throw e;
+    }
+  }
+
+  /// Send password reset email
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      print('🔄 Sending password reset email to: $email');
+      
+      await _auth.sendPasswordResetEmail(email: email);
+      
+      print('✅ Password reset email sent successfully');
+    } on FirebaseAuthException catch (e) {
+      print('❌ Failed to send password reset email: ${e.code} - ${e.message}');
+      throw e;
+    } catch (e) {
+      print('❌ Unexpected error sending password reset email: $e');
+      throw e;
+    }
+  }
+
   /// Sign in to Firebase using Google Sign-In
   Future<bool> signInWithGoogle() async {
     try {

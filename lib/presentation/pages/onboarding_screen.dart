@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:subtrackr/core/constants/app_constants.dart';
 
@@ -73,6 +74,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentPage = _pages[_currentPage];
+    
+    // Set system UI overlay style to match the current onboarding page
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: currentPage.color,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+    );
+    
     return Scaffold(
       body: Stack(
         children: [

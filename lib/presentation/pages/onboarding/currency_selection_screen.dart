@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
@@ -79,6 +80,16 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    
+    // Set system UI overlay style to match the page theme
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarBrightness: theme.brightness == Brightness.dark ? Brightness.dark : Brightness.light,
+      statusBarIconBrightness: theme.brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor: colorScheme.surface,
+      systemNavigationBarIconBrightness: theme.brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+      systemNavigationBarDividerColor: Colors.transparent,
+    ));
     
     return Scaffold(
       body: SafeArea(

@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/theme/app_theme.dart';
+
+import 'package:subtrackr/presentation/widgets/app_wrapper.dart';
 import 'package:subtrackr/data/repositories/subscription_repository.dart';
 import 'package:subtrackr/data/repositories/price_change_repository.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
@@ -22,7 +24,7 @@ import 'package:subtrackr/presentation/pages/settings_screen.dart';
 import 'package:subtrackr/presentation/pages/statistics_screen.dart';
 import 'package:subtrackr/presentation/pages/onboarding/currency_selection_screen.dart';
 import 'package:subtrackr/presentation/pages/email_detection_page.dart';
-import 'package:subtrackr/presentation/pages/auth/login_page.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -142,25 +144,27 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
-          return MaterialApp(
-            title: AppConstants.APP_NAME,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeProvider.themeMode,
-            debugShowCheckedModeBanner: false,
-            initialRoute: initialRoute,
-            routes: {
-              AppConstants.ONBOARDING_ROUTE: (_) => const OnboardingScreen(),
-              AppConstants.CURRENCY_SELECTION_ROUTE: (_) => const CurrencySelectionScreen(),
-              AppConstants.HOME_ROUTE: (_) => const MainLayout(),
-              AppConstants.ADD_SUBSCRIPTION_ROUTE: (_) => const AddSubscriptionScreen(),
-              AppConstants.EDIT_SUBSCRIPTION_ROUTE: (_) => const EditSubscriptionScreen(),
-              AppConstants.SUBSCRIPTION_DETAILS_ROUTE: (_) => const SubscriptionDetailsScreen(),
-              AppConstants.SETTINGS_ROUTE: (_) => const SettingsScreen(),
-              AppConstants.STATISTICS_ROUTE: (_) => const StatisticsScreen(),
-              AppConstants.EMAIL_DETECTION_ROUTE: (_) => const EmailDetectionPage(),
-              AppConstants.LOGIN_ROUTE: (_) => const LoginPage(),
-            },
+          return AppWrapper(
+            child: MaterialApp(
+              title: AppConstants.APP_NAME,
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: themeProvider.themeMode,
+              debugShowCheckedModeBanner: false,
+              initialRoute: initialRoute,
+              routes: {
+                AppConstants.ONBOARDING_ROUTE: (_) => const OnboardingScreen(),
+                AppConstants.CURRENCY_SELECTION_ROUTE: (_) => const CurrencySelectionScreen(),
+                AppConstants.HOME_ROUTE: (_) => const MainLayout(),
+                AppConstants.ADD_SUBSCRIPTION_ROUTE: (_) => const AddSubscriptionScreen(),
+                AppConstants.EDIT_SUBSCRIPTION_ROUTE: (_) => const EditSubscriptionScreen(),
+                AppConstants.SUBSCRIPTION_DETAILS_ROUTE: (_) => const SubscriptionDetailsScreen(),
+                AppConstants.SETTINGS_ROUTE: (_) => const SettingsScreen(),
+                AppConstants.STATISTICS_ROUTE: (_) => const StatisticsScreen(),
+                AppConstants.EMAIL_DETECTION_ROUTE: (_) => const EmailDetectionPage(),
+
+              },
+            ),
           );
         },
       ),
