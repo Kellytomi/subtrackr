@@ -27,6 +27,9 @@ class AppConstants {
   
   /// Route for email subscription detection
   static const String EMAIL_DETECTION_ROUTE = '/email-detection';
+  
+  /// Route for the login/authentication page
+  static const String LOGIN_ROUTE = '/login';
 
   // Hive box names
   /// Hive box name for storing subscriptions
@@ -82,6 +85,9 @@ class AppConstants {
   
   /// Setting key for subscription sorting preference
   static const String SUBSCRIPTION_SORT_SETTING = 'subscriptionSort';
+  
+  /// Setting key for auto sync preference
+  static const String AUTO_SYNC_SETTING = 'autoSync';
 
   // Default values
   /// Default currency symbol (US Dollar)

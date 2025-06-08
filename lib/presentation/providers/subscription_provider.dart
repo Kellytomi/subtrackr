@@ -6,6 +6,7 @@ import 'package:subtrackr/data/repositories/price_change_repository.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/data/services/price_history_service.dart';
+import 'package:subtrackr/data/services/cloud_sync_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
 import 'package:subtrackr/domain/entities/price_change.dart';
 
@@ -15,6 +16,7 @@ class SubscriptionProvider extends ChangeNotifier {
   final NotificationService _notificationService;
   final SettingsService _settingsService;
   final PriceHistoryService _priceHistoryService;
+  final CloudSyncService _cloudSyncService;
   
   List<Subscription> _subscriptions = [];
   bool _isLoading = false;
@@ -25,11 +27,13 @@ class SubscriptionProvider extends ChangeNotifier {
     required PriceChangeRepository priceChangeRepository,
     required NotificationService notificationService,
     required SettingsService settingsService,
+    required CloudSyncService cloudSyncService,
   })  : _repository = repository,
         _priceChangeRepository = priceChangeRepository,
         _notificationService = notificationService,
         _settingsService = settingsService,
-        _priceHistoryService = PriceHistoryService();
+        _priceHistoryService = PriceHistoryService(),
+        _cloudSyncService = cloudSyncService;
   
   // Getters
   List<Subscription> get subscriptions => _subscriptions;
@@ -142,7 +146,26 @@ class SubscriptionProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      final loadedSubscriptions = _repository.getAllSubscriptions();
+      var loadedSubscriptions = _repository.getAllSubscriptions();
+      
+      // Try to sync with cloud if user is signed in
+      if (_cloudSyncService.isUserSignedIn) {
+        try {
+          loadedSubscriptions = await _cloudSyncService.syncSubscriptions(loadedSubscriptions);
+          
+          // Update local repository with synced data
+          await _repository.clearAllSubscriptions();
+          for (final subscription in loadedSubscriptions) {
+            await _repository.addSubscription(subscription);
+          }
+          
+          print('✅ Cloud sync completed successfully');
+        } catch (e) {
+          print('⚠️ Cloud sync failed, using local data: $e');
+          // Continue with local data if cloud sync fails
+        }
+      }
+      
       _sortSubscriptions(loadedSubscriptions);
       
       // Ensure each subscription has a valid currency code
@@ -177,6 +200,9 @@ class SubscriptionProvider extends ChangeNotifier {
       _sortSubscriptions(_subscriptions);
       notifyListeners();
       
+      // Auto sync to cloud if enabled and signed in
+      await _cloudSyncService.autoSyncSubscription(subscription);
+      
       // Schedule notification if active
       if (subscription.status == AppConstants.STATUS_ACTIVE) {
         _scheduleNotification(subscription);
@@ -197,6 +223,9 @@ class SubscriptionProvider extends ChangeNotifier {
       _sortSubscriptions(_subscriptions);
       notifyListeners();
       
+      // Auto sync to cloud if enabled and signed in
+      await _cloudSyncService.autoSyncSubscription(subscription);
+      
       // Update notification if active
       if (subscription.status == AppConstants.STATUS_ACTIVE) {
         _scheduleNotification(subscription);
@@ -214,6 +243,10 @@ class SubscriptionProvider extends ChangeNotifier {
     try {
       await _repository.deleteSubscription(id);
       await _notificationService.cancelNotification(id.hashCode);
+      
+      // Auto sync deletion to cloud if enabled and signed in
+      await _cloudSyncService.autoSyncDeleteSubscription(id);
+      
       _subscriptions = _subscriptions.where((s) => s.id != id).toList();
       notifyListeners();
     } catch (e) {
@@ -240,6 +273,10 @@ class SubscriptionProvider extends ChangeNotifier {
       );
       
       await _repository.updateSubscription(updatedSubscription);
+      
+      // Auto sync to cloud if enabled and signed in
+      await _cloudSyncService.autoSyncSubscription(updatedSubscription);
+      
       await loadSubscriptions(); // Reload to ensure proper state update
       
       // Reschedule notification
@@ -263,6 +300,10 @@ class SubscriptionProvider extends ChangeNotifier {
       
       await _repository.updateSubscription(updatedSubscription);
       await _notificationService.cancelNotification(id.hashCode);
+      
+      // Auto sync to cloud if enabled and signed in
+      await _cloudSyncService.autoSyncSubscription(updatedSubscription);
+      
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
       _error = AppConstants.ERROR_UPDATING_SUBSCRIPTION;
@@ -283,6 +324,10 @@ class SubscriptionProvider extends ChangeNotifier {
       
       await _repository.updateSubscription(updatedSubscription);
       _scheduleNotification(updatedSubscription);
+      
+      // Auto sync to cloud if enabled and signed in
+      await _cloudSyncService.autoSyncSubscription(updatedSubscription);
+      
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
       _error = AppConstants.ERROR_UPDATING_SUBSCRIPTION;
@@ -303,6 +348,10 @@ class SubscriptionProvider extends ChangeNotifier {
       
       await _repository.updateSubscription(updatedSubscription);
       await _notificationService.cancelNotification(id.hashCode);
+      
+      // Auto sync to cloud if enabled and signed in
+      await _cloudSyncService.autoSyncSubscription(updatedSubscription);
+      
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
       _error = AppConstants.ERROR_UPDATING_SUBSCRIPTION;

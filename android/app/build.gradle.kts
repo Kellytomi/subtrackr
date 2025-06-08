@@ -3,7 +3,8 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    // Firebase plugins removed - not currently used
+    // Firebase plugins for cloud sync
+    id("com.google.gms.google-services")
 }
 
 import java.util.Properties
@@ -109,7 +110,11 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.22")
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.annotation:annotation:1.7.1")
-    // Firebase dependencies removed - not currently used in the app
+    
+    // Firebase dependencies for cloud sync
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
     
     // Add Play Core dependencies (compatible with Android 14)
     implementation("com.google.android.play:feature-delivery:2.1.0")

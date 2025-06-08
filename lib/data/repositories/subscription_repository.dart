@@ -82,6 +82,11 @@ class SubscriptionRepository {
     await _subscriptionsBox.delete(id);
   }
   
+  // Clear all subscriptions
+  Future<void> clearAllSubscriptions() async {
+    await _subscriptionsBox.clear();
+  }
+  
   // Get subscriptions due soon (within the next 3 days)
   List<Subscription> getSubscriptionsDueSoon() {
     final now = DateTime.now();

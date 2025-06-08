@@ -53,6 +53,30 @@ class AuthService {
       return account;
     } catch (error) {
       print('Error signing in: $error');
+      
+      // Handle the known type cast error - check if sign-in actually succeeded
+      if (error.toString().contains('PigeonUserDetails') || 
+          error.toString().contains('type cast') || 
+          error.toString().contains('List<Object?>')) {
+        print('🔄 Detected type cast error, checking if sign-in actually succeeded...');
+        
+        // Wait a moment for the sign-in to complete internally
+        await Future.delayed(const Duration(milliseconds: 1000));
+        
+        // Try to get the current user from Google Sign-In
+        try {
+          final currentUser = _googleSignIn.currentUser;
+          if (currentUser != null) {
+            print('✅ Sign-in succeeded despite error! User: ${currentUser.email}');
+            _currentUser = currentUser;
+            await _initializeGmailApi(currentUser);
+            return currentUser;
+          }
+        } catch (e) {
+          print('❌ Failed to get current user after workaround: $e');
+        }
+      }
+      
       return null;
     }
   }

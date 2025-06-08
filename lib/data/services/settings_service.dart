@@ -44,6 +44,10 @@ class SettingsService {
     if (!_settingsBox.containsKey(AppConstants.SUBSCRIPTION_SORT_SETTING)) {
       await _settingsBox.put(AppConstants.SUBSCRIPTION_SORT_SETTING, AppConstants.DEFAULT_SORT_OPTION);
     }
+    
+    if (!_settingsBox.containsKey(AppConstants.AUTO_SYNC_SETTING)) {
+      await _settingsBox.put(AppConstants.AUTO_SYNC_SETTING, true);
+    }
   }
   
   /// Get the current theme mode
@@ -165,6 +169,17 @@ class SettingsService {
   /// Set the subscription sorting preference
   Future<void> setSubscriptionSort(String sortOption) async {
     await _settingsBox.put(AppConstants.SUBSCRIPTION_SORT_SETTING, sortOption);
+  }
+  
+  /// Check if auto sync is enabled
+  bool isAutoSyncEnabled() {
+    final value = _settingsBox.get(AppConstants.AUTO_SYNC_SETTING);
+    return value is bool ? value : true;
+  }
+  
+  /// Enable or disable auto sync
+  Future<void> setAutoSyncEnabled(bool enabled) async {
+    await _settingsBox.put(AppConstants.AUTO_SYNC_SETTING, enabled);
   }
   
   /// Close the box

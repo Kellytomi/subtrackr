@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:subtrackr/core/theme/app_theme.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 
-class ThemeProvider extends ChangeNotifier {
+class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
   final SettingsService _settingsService;
   ThemeMode _themeMode = ThemeMode.system;
   
@@ -12,6 +12,23 @@ class ThemeProvider extends ChangeNotifier {
   }) : _settingsService = settingsService {
     // Initialize theme from saved settings
     loadTheme();
+    // Listen for system theme changes
+    WidgetsBinding.instance.addObserver(this);
+  }
+  
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+  
+  @override
+  void didChangePlatformBrightness() {
+    // Update system UI overlay style when system brightness changes
+    if (_themeMode == ThemeMode.system) {
+      _updateStatusBarStyle(_themeMode);
+    }
+    super.didChangePlatformBrightness();
   }
   
   // Get the current theme mode
@@ -42,7 +59,7 @@ class ThemeProvider extends ChangeNotifier {
     }
   }
   
-  // Helper method to update status bar style
+  // Helper method to update system UI overlay style
   void _updateStatusBarStyle(ThemeMode mode) {
     final isDark = mode == ThemeMode.dark || 
       (mode == ThemeMode.system && 
@@ -53,12 +70,18 @@ class ThemeProvider extends ChangeNotifier {
         statusBarColor: Colors.transparent,
         statusBarBrightness: Brightness.dark, // iOS: light icons for dark background
         statusBarIconBrightness: Brightness.light, // Android: light icons for dark background
+        systemNavigationBarColor: AppTheme.darkTheme.scaffoldBackgroundColor, // Match dark theme background
+        systemNavigationBarIconBrightness: Brightness.light, // Light icons for dark nav bar
+        systemNavigationBarDividerColor: Colors.transparent,
       ));
     } else {
       SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarBrightness: Brightness.light, // iOS: dark icons for light background
         statusBarIconBrightness: Brightness.dark, // Android: dark icons for light background
+        systemNavigationBarColor: AppTheme.lightTheme.scaffoldBackgroundColor, // Match light theme background
+        systemNavigationBarIconBrightness: Brightness.dark, // Dark icons for light nav bar
+        systemNavigationBarDividerColor: Colors.transparent,
       ));
     }
   }

@@ -9,6 +9,7 @@ import 'package:subtrackr/presentation/providers/subscription_provider.dart';
 import 'package:subtrackr/presentation/providers/theme_provider.dart';
 import 'package:subtrackr/core/utils/tips_helper.dart';
 import 'package:subtrackr/data/services/auth_service.dart';
+import 'package:subtrackr/data/services/cloud_sync_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -23,8 +24,10 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   late bool _notificationsEnabled;
   late ThemeMode _themeMode;
   late String _sortOption;
+  late bool _autoSyncEnabled;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  bool _isSyncing = false;
   
   @override
   void initState() {
@@ -34,6 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     _currencyCode = settingsService.getCurrencyCode() ?? 'USD';
     _notificationsEnabled = settingsService.areNotificationsEnabled();
     _sortOption = settingsService.getSubscriptionSort();
+    _autoSyncEnabled = settingsService.isAutoSyncEnabled();
     
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     _themeMode = themeProvider.themeMode;
@@ -286,6 +290,74 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     
                     const SizedBox(height: 24),
                     
+                    // Smart Features
+                    _buildModernSection(
+                      title: 'Smart Features',
+                      icon: Icons.auto_awesome,
+                      color: Colors.orange,
+                      children: [
+                        _buildModernTile(
+                          title: 'Email Detection',
+                          subtitle: 'Auto-detect subscriptions from Gmail',
+                          icon: Icons.email_outlined,
+                          iconColor: Colors.orange,
+                          onTap: () {
+                            Navigator.pushNamed(context, '/email-detection');
+                          },
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Cloud Sync & Backup
+                    _buildModernSection(
+                      title: 'Cloud Sync & Backup',
+                      icon: Icons.cloud_sync_rounded,
+                      color: Colors.green,
+                      children: [
+                        _buildModernTile(
+                          title: 'Sync Subscriptions',
+                          subtitle: 'Manually sync your data with the cloud',
+                          icon: Icons.sync_rounded,
+                          iconColor: Colors.blue,
+                          onTap: _syncWithCloud,
+                          trailing: _isSyncing
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.sync,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                        ),
+                        _buildModernTile(
+                          title: 'Auto Sync',
+                          subtitle: _autoSyncEnabled 
+                              ? 'Automatically sync when data changes'
+                              : 'Manual sync only',
+                          icon: Icons.sync_alt_rounded,
+                          iconColor: _autoSyncEnabled ? Colors.green : Colors.grey,
+                          onTap: () {
+                            _toggleAutoSync(!_autoSyncEnabled);
+                          },
+                          trailing: Switch(
+                            value: _autoSyncEnabled,
+                            onChanged: _toggleAutoSync,
+                          ),
+                        ),
+
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
                     // Appearance & Display
                     _buildModernSection(
                       title: 'Appearance & Display',
@@ -354,85 +426,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     
                     const SizedBox(height: 24),
                     
-                    // Data & Backup
-                    _buildModernSection(
-                      title: 'Data & Backup',
-                      icon: Icons.cloud_sync_rounded,
-                      color: Colors.cyan,
-                      children: [
-                        _buildModernTile(
-                          title: 'Smart Email Detection',
-                          subtitle: 'Auto-detect subscriptions from Gmail',
-                          icon: Icons.auto_awesome,
-                          iconColor: Colors.orange,
-                          onTap: () {
-                            Navigator.pushNamed(context, '/email-detection');
-                          },
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                            ),
-                            child: Text(
-                              'NEW',
-                              style: TextStyle(
-                                color: Colors.orange.shade700,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ),
-                        ),
-                        _buildModernTile(
-                          title: 'Export Data',
-                          subtitle: 'Download your subscriptions as JSON',
-                          icon: Icons.download_rounded,
-                          iconColor: colorScheme.primary,
-                          onTap: () {
-                            _showComingSoonSnackBar('Data export');
-                          },
-                        ),
-                        _buildModernTile(
-                          title: 'Import Data',
-                          subtitle: 'Import subscriptions from other apps',
-                          icon: Icons.upload_rounded,
-                          iconColor: Colors.green,
-                          onTap: () {
-                            _showComingSoonSnackBar('Data import');
-                          },
-                        ),
-                        _buildModernTile(
-                          title: 'Cloud Backup',
-                          subtitle: 'Sync across devices (Coming Soon)',
-                          icon: Icons.cloud_upload_rounded,
-                          iconColor: Colors.blue,
-                          onTap: () {
-                            _showComingSoonSnackBar('Cloud backup');
-                          },
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                            ),
-                            child: Text(
-                              'SOON',
-                              style: TextStyle(
-                                color: Colors.blue.shade700,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
                     // Help & Support
                     _buildModernSection(
                       title: 'Help & Support',
@@ -446,32 +439,28 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                           iconColor: Colors.deepPurple,
                           onTap: _resetAppTips,
                         ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Danger Zone
+                    _buildModernSection(
+                      title: 'Danger Zone',
+                      icon: Icons.warning_rounded,
+                      color: Colors.red,
+                      children: [
                         _buildModernTile(
-                          title: 'Help Center',
-                          subtitle: 'FAQs and user guides',
-                          icon: Icons.help_outline_rounded,
-                          iconColor: Colors.teal,
-                          onTap: () {
-                            _showComingSoonSnackBar('Help center');
-                          },
-                        ),
-                        _buildModernTile(
-                          title: 'Contact Support',
-                          subtitle: 'Get help with your account',
-                          icon: Icons.support_agent_rounded,
-                          iconColor: Colors.orange,
-                          onTap: () {
-                            _showComingSoonSnackBar('Contact support');
-                          },
-                        ),
-                        _buildModernTile(
-                          title: 'Send Feedback',
-                          subtitle: 'Help us improve SubTrackr',
-                          icon: Icons.feedback_rounded,
-                          iconColor: Colors.pink,
-                          onTap: () {
-                            _showComingSoonSnackBar('Feedback form');
-                          },
+                          title: 'Clear Cloud Data',
+                          subtitle: 'Remove all data from cloud storage',
+                          icon: Icons.cloud_off_rounded,
+                          iconColor: Colors.red,
+                          onTap: _clearCloudData,
+                          trailing: Icon(
+                            Icons.warning_rounded,
+                            color: Colors.red,
+                            size: 20,
+                          ),
                         ),
                       ],
                     ),
@@ -556,6 +545,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       builder: (context, snapshot) {
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
+        final isSignedIn = snapshot.hasData && snapshot.data!['email'] != null;
+        final isCloudSyncEnabled = snapshot.hasData && snapshot.data!['isFirebaseSignedIn'] == 'true';
         
         return Container(
           padding: const EdgeInsets.all(20),
@@ -574,10 +565,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             ),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Profile Header
               Row(
                 children: [
+                  // Profile Avatar
                   Container(
                     width: 60,
                     height: 60,
@@ -589,32 +581,27 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       ),
                       shape: BoxShape.circle,
                     ),
-                    child: Center(
-                      child: snapshot.hasData && snapshot.data!['name'] != null
-                          ? Text(
-                              snapshot.data!['name']!.split(' ').map((name) => name[0]).take(2).join().toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
+                    child: ClipOval(
+                      child: isSignedIn && snapshot.data!['photoUrl'] != null
+                          ? Image.network(
+                              snapshot.data!['photoUrl']!,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => _buildAvatarFallback(snapshot, colorScheme),
                             )
-                          : const Icon(
-                              Icons.person,
-                              color: Colors.white,
-                              size: 30,
-                            ),
+                          : _buildAvatarFallback(snapshot, colorScheme),
                     ),
                   ),
                   const SizedBox(width: 16),
+                  
+                  // Profile Info
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          snapshot.hasData && snapshot.data!['name'] != null
-                              ? snapshot.data!['name']!
-                              : 'Your Profile',
+                          isSignedIn ? snapshot.data!['name']! : 'Guest User',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -623,9 +610,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          snapshot.hasData && snapshot.data!['email'] != null
-                              ? snapshot.data!['email']!
-                              : 'Connect your email account',
+                          isSignedIn ? snapshot.data!['email']! : 'Sign in to sync across devices',
                           style: TextStyle(
                             fontSize: 14,
                             color: colorScheme.onSurface.withOpacity(0.7),
@@ -634,44 +619,178 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       ],
                     ),
                   ),
+                  
+                  // Status Indicator
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: colorScheme.surface,
+                      color: isCloudSyncEnabled 
+                          ? Colors.green.withOpacity(0.1)
+                          : isSignedIn 
+                              ? Colors.orange.withOpacity(0.1)
+                              : colorScheme.surface,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isCloudSyncEnabled 
+                            ? Colors.green.withOpacity(0.3)
+                            : isSignedIn 
+                                ? Colors.orange.withOpacity(0.3)
+                                : colorScheme.outline.withOpacity(0.2),
+                      ),
                     ),
                     child: Icon(
-                      snapshot.hasData && snapshot.data!['email'] != null
+                      isCloudSyncEnabled
                           ? Icons.cloud_done_rounded
-                          : Icons.cloud_off_rounded,
-                      color: snapshot.hasData && snapshot.data!['email'] != null
+                          : isSignedIn
+                              ? Icons.cloud_sync_rounded
+                              : Icons.cloud_off_rounded,
+                      color: isCloudSyncEnabled
                           ? Colors.green
-                          : colorScheme.outline,
+                          : isSignedIn
+                              ? Colors.orange
+                              : colorScheme.outline,
                       size: 20,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildProfileStat(
-                      'Email Access',
-                      snapshot.hasData && snapshot.data!['email'] != null ? 'Connected' : 'Not Connected',
-                      snapshot.hasData && snapshot.data!['email'] != null ? Colors.green : Colors.orange,
+              
+              const SizedBox(height: 20),
+              
+              // Action Buttons
+              if (!isSignedIn) ...[
+                // Sign In Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _signInWithGoogle,
+                    icon: const Icon(Icons.login, size: 20),
+                    label: const Text('Sign In with Google'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildProfileStat(
-                      'Cloud Sync',
-                      'Coming Soon',
-                      Colors.blue,
+                ),
+              ] else ...[
+                // Status Information
+                Row(
+                  children: [
+                    // Email Access Status
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.green.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Email Access',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.green,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Connected',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Cloud Sync Status/Action
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: isCloudSyncEnabled ? null : _signInWithGoogle,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isCloudSyncEnabled 
+                                ? Colors.green.withOpacity(0.1)
+                                : Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isCloudSyncEnabled 
+                                  ? Colors.green.withOpacity(0.2)
+                                  : Colors.orange.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Cloud Sync',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: isCloudSyncEnabled ? Colors.green : Colors.orange,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                isCloudSyncEnabled ? 'Connected' : 'Tap to enable',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurface,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Sign Out Button at the bottom
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: _showLogoutDialog,
+                    icon: const Icon(Icons.logout, size: 18),
+                    label: const Text('Sign Out'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: BorderSide(color: Colors.red.withOpacity(0.5)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ],
           ),
         );
@@ -679,55 +798,240 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildProfileStat(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: color,
+  Widget _buildAvatarFallback(AsyncSnapshot<Map<String, String>?> snapshot, ColorScheme colorScheme) {
+    return Center(
+      child: snapshot.hasData && snapshot.data!['name'] != null
+          ? Text(
+              snapshot.data!['name']!.split(' ').map((name) => name[0]).take(2).join().toUpperCase(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            )
+          : const Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 30,
             ),
+    );
+  }
+
+  Future<void> _showLogoutDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out? Your data will remain on this device, but cloud sync will be disabled.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurface,
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
             ),
+            child: const Text('Sign Out'),
           ),
         ],
       ),
     );
+
+    if (result == true) {
+      await _signOut();
+    }
+  }
+
+  Future<void> _signOut() async {
+    try {
+      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+      await cloudSyncService.signOut();
+      
+      setState(() {}); // Trigger rebuild
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 8),
+              Text('Successfully signed out'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error, color: Colors.white),
+              const SizedBox(width: 8),
+              Text('Error signing out: $error'),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
   }
 
   Future<Map<String, String>?> _getUserInfo() async {
     try {
       final authService = AuthService();
-      final user = authService.currentUser;
-      if (user != null) {
-        return {
-          'name': user.displayName ?? 'User',
-          'email': user.email ?? '',
+      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+      final googleUser = authService.currentUser;
+      final firebaseUser = cloudSyncService.currentFirebaseUser;
+      
+      // Check Google user first, then fall back to Firebase user
+      if (googleUser != null) {
+        final result = <String, String>{
+          'name': googleUser.displayName ?? 'User',
+          'email': googleUser.email ?? '',
+          'isGoogleSignedIn': 'true',
+          'isFirebaseSignedIn': cloudSyncService.isUserSignedIn.toString(),
         };
+        if (googleUser.photoUrl != null) {
+          result['photoUrl'] = googleUser.photoUrl!;
+        }
+        return result;
+      } else if (firebaseUser != null) {
+        // Firebase user exists but Google user is null (due to type cast error)
+        final result = <String, String>{
+          'name': firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'User',
+          'email': firebaseUser.email ?? '',
+          'isGoogleSignedIn': 'false', // Google sign-in had issues but auth worked
+          'isFirebaseSignedIn': 'true',
+        };
+        if (firebaseUser.photoURL != null) {
+          result['photoUrl'] = firebaseUser.photoURL!;
+        }
+        return result;
       }
     } catch (e) {
       debugPrint('Error getting user info: $e');
     }
     return null;
+  }
+
+  Future<void> _signInWithGoogle() async {
+    try {
+      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+      
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Signing in and enabling cloud sync...',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Theme.of(context).primaryColor,
+          duration: Duration(seconds: 10),
+        ),
+      );
+      
+      final success = await cloudSyncService.signInWithGoogle();
+      
+      // Clear the loading snackbar
+      ScaffoldMessenger.of(context).clearSnackBars();
+      
+      if (success) {
+        print('✅ Signed in successfully and linked to Firebase');
+        
+        // Wait a moment for all services to update their state
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (mounted) {
+          setState(() {}); // Trigger rebuild
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.cloud_done, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Successfully connected! Cloud sync is now enabled.',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      } else {
+        print('❌ Sign in was cancelled or failed');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.warning, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Sign in was cancelled or failed',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (error) {
+      print('❌ Error signing in: $error');
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Error signing in: $error',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
   }
 
   Widget _buildModernSection({
@@ -1103,6 +1407,23 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
+  Future<void> _toggleAutoSync(bool value) async {
+    setState(() {
+      _autoSyncEnabled = value;
+    });
+    
+    final settingsService = Provider.of<SettingsService>(context, listen: false);
+    await settingsService.setAutoSyncEnabled(value);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(value ? 'Auto sync enabled' : 'Auto sync disabled'),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
   String _getSortOptionText(String sortOption) {
     switch (sortOption) {
       case AppConstants.SORT_BY_DATE_ADDED:
@@ -1308,6 +1629,178 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
+    }
+  }
+
+  // Cloud sync methods
+  Future<void> _syncWithCloud() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isSyncing = true;
+    });
+
+    try {
+      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      
+      if (!cloudSyncService.isUserSignedIn) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.warning, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Please sign in with Google to sync'),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+        return;
+      }
+      
+      // Reload subscriptions to trigger sync
+      await subscriptionProvider.loadSubscriptions();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.cloud_done, color: Colors.white),
+              const SizedBox(width: 8),
+              Text('Sync completed successfully'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error, color: Colors.white),
+              const SizedBox(width: 8),
+              Text('Sync failed: $e'),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _clearCloudData() async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Clear Cloud Data',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+        content: const Text(
+          'This will permanently delete all your subscription data from cloud storage. Your local data will remain unchanged.\n\nThis action cannot be undone.',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+            },
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: colorScheme.primary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Clear Data'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result == true) {
+      try {
+        final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+        
+        if (!cloudSyncService.isUserSignedIn) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text('Please sign in with Google first'),
+                ],
+              ),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+          return;
+        }
+        
+        await cloudSyncService.clearCloudData();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.cloud_off, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Cloud data cleared successfully'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Failed to clear cloud data: $e'),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
     }
   }
 

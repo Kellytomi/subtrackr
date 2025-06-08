@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/cloud_sync_service.dart';
 import '../../data/services/email_scanner_service.dart';
 import '../../presentation/providers/subscription_provider.dart';
 import '../../domain/entities/subscription.dart';
@@ -38,14 +39,51 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
     _initializeAuth();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh auth state when coming back from settings
+    _initializeAuth();
+  }
+
   Future<void> _initializeAuth() async {
     setState(() => _isLoading = true);
     
     try {
       await _authService.initialize();
+      
+      // Check both AuthService and CloudSyncService for authentication
+      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+      final isGoogleSignedIn = _authService.isSignedIn;
+      final isFirebaseSignedIn = cloudSyncService.isUserSignedIn;
+      
       setState(() {
         _currentUser = _authService.currentUser;
       });
+      
+      // If AuthService doesn't have current user but Firebase is signed in, try to get it
+      if (_currentUser == null && isFirebaseSignedIn) {
+        try {
+          // Try to refresh AuthService authentication
+          final refreshed = await _authService.refreshAuthentication();
+          if (refreshed) {
+            setState(() {
+              _currentUser = _authService.currentUser;
+            });
+          }
+        } catch (e) {
+          print('⚠️ Could not refresh Google authentication: $e');
+        }
+      }
+      
+      // Debug: Print authentication state
+      print('🔍 EmailDetectionPage Auth Debug:');
+      print('   AuthService.isSignedIn: $isGoogleSignedIn');
+      print('   AuthService.currentUser: ${_authService.currentUser?.email}');
+      print('   AuthService.gmailApi: ${_authService.gmailApi != null ? "initialized" : "null"}');
+      print('   CloudSyncService.isUserSignedIn: $isFirebaseSignedIn');
+      print('   Final _currentUser: ${_currentUser?.email}');
+      
     } catch (error) {
       setState(() {
         _errorMessage = 'Failed to initialize authentication: $error';
@@ -55,46 +93,15 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
     }
   }
 
-  Future<void> _signIn() async {
-    setState(() => _isLoading = true);
-    
-    try {
-      final account = await _authService.signIn();
-      setState(() {
-        _currentUser = account;
-        _errorMessage = null;
-      });
-    } catch (error) {
-      setState(() {
-        _errorMessage = 'Sign in failed: $error';
-      });
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
 
-  Future<void> _signOut() async {
-    setState(() => _isLoading = true);
-    
-    try {
-      await _authService.signOut();
-      setState(() {
-        _currentUser = null;
-        _detectedSubscriptions = [];
-        _selectedSubscriptions = {};
-        _errorMessage = null;
-      });
-    } catch (error) {
-      setState(() {
-        _errorMessage = 'Sign out failed: $error';
-      });
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
 
   Future<void> _scanEmails() async {
-    if (_currentUser == null) return;
+    if (_currentUser == null) {
+      setState(() {
+        _errorMessage = 'Please sign in with Google first';
+      });
+      return;
+    }
     
     setState(() {
       _isScanning = true;
@@ -103,16 +110,49 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
     });
     
     try {
+      // Debug: Check authentication state before scanning
+      print('🔍 Pre-scan debug:');
+      print('   _currentUser: ${_currentUser?.email}');
+      print('   AuthService.isSignedIn: ${_authService.isSignedIn}');
+      print('   AuthService.gmailApi: ${_authService.gmailApi != null ? "initialized" : "null"}');
+      
+      // Check if Gmail API is initialized, if not, try to initialize it
+      if (_authService.gmailApi == null && _currentUser != null) {
+        setState(() {
+          _scanProgress = 3.0;
+          _scanStatus = 'Initializing Gmail access...';
+        });
+        
+        // Try to reinitialize Gmail API
+        await _authService.initialize();
+        
+        // If still null, try refreshing authentication
+        if (_authService.gmailApi == null) {
+          setState(() {
+            _scanProgress = 5.0;
+            _scanStatus = 'Refreshing authentication...';
+          });
+          
+          final refreshed = await _authService.refreshAuthentication();
+          if (!refreshed) {
+            setState(() {
+              _errorMessage = 'Failed to initialize Gmail access. Please sign out and sign in again.';
+            });
+            return;
+          }
+        }
+      }
+      
       // Check if we have Gmail permissions
       setState(() {
-        _scanProgress = 5.0;
+        _scanProgress = 8.0;
         _scanStatus = 'Checking permissions...';
       });
       
       final hasPermissions = await _authService.hasGmailPermissions();
       if (!hasPermissions) {
         setState(() {
-          _scanProgress = 8.0;
+          _scanProgress = 12.0;
           _scanStatus = 'Requesting Gmail permissions...';
         });
         
@@ -126,12 +166,18 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
       }
       
       // Scan emails for subscriptions with progress callback
+      setState(() {
+        _scanProgress = 15.0;
+        _scanStatus = 'Starting email scan...';
+      });
+      
       final subscriptions = await _emailService.scanForSubscriptions(
         maxResults: 50,
         daysBack: 90,
         onProgress: (progress, status) {
           setState(() {
-            _scanProgress = progress;
+            // Scale progress from 15-100 to account for initial setup
+            _scanProgress = 15.0 + (progress * 0.85);
             _scanStatus = status;
           });
         },
@@ -466,29 +512,91 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Email Subscription Detection'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildIntroSection(),
-            const SizedBox(height: 24),
-            _buildAuthSection(),
-            if (_currentUser != null) ...[
-              const SizedBox(height: 24),
-              _buildScanSection(),
-              const SizedBox(height: 24),
-              _buildResultsSection(),
-            ],
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 16),
-              _buildErrorSection(),
-            ],
+            // Clean Header matching other pages
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(
+                    color: colorScheme.outline.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_rounded,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: IconButton.styleFrom(
+                      backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Email Detection',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceVariant.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.auto_awesome,
+                      size: 24,
+                      color: Colors.orange,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildIntroSection(),
+                    const SizedBox(height: 24),
+                    if (_currentUser != null) ...[
+                      _buildScanSection(),
+                      const SizedBox(height: 24),
+                      _buildResultsSection(),
+                    ] else
+                      _buildSignInPromptSection(),
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 16),
+                      _buildErrorSection(),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -541,73 +649,67 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
     );
   }
 
-  Widget _buildAuthSection() {
+  Widget _buildSignInPromptSection() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Google Account',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Icon(
+              Icons.account_circle_outlined,
+              size: 64,
+              color: colorScheme.primary.withOpacity(0.6),
             ),
             const SizedBox(height: 16),
-            if (_currentUser == null)
-              _buildSignInButton()
-            else
-              _buildUserInfo(),
+            Text(
+              'Sign In Required',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'To scan your emails for subscriptions, please sign in with your Google account first.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Go back
+                  // Open bottom navigation to settings tab (index 3)
+                  // The user will need to navigate to settings manually
+                },
+                icon: const Icon(Icons.settings_outlined),
+                label: const Text('Go to Settings'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You can sign in from the Settings page',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurface.withOpacity(0.5),
+              ),
+            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSignInButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton.icon(
-        onPressed: _isLoading ? null : _signIn,
-        icon: _isLoading 
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.login),
-        label: Text(_isLoading ? 'Signing in...' : 'Sign in with Google'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUserInfo() {
-    return Column(
-      children: [
-        ListTile(
-          leading: CircleAvatar(
-            backgroundImage: _currentUser!.photoUrl != null
-                ? NetworkImage(_currentUser!.photoUrl!)
-                : null,
-            child: _currentUser!.photoUrl == null
-                ? const Icon(Icons.person)
-                : null,
-          ),
-          title: Text(_currentUser!.displayName ?? 'Unknown'),
-          subtitle: Text(_currentUser!.email),
-          trailing: IconButton(
-            onPressed: _isLoading ? null : _signOut,
-            icon: const Icon(Icons.logout),
-          ),
-        ),
-      ],
     );
   }
 

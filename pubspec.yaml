@@ -66,10 +66,10 @@ dependencies:
   googleapis: ^13.2.0
   http: ^1.2.0
   
-  # Optional for future use
-  # firebase_core: ^2.24.2
-  # firebase_auth: ^4.15.3
-  # cloud_firestore: ^4.13.6
+  # Firebase for cloud sync
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.15.3
+  cloud_firestore: ^4.13.6
 
 dev_dependencies:
   flutter_test:
