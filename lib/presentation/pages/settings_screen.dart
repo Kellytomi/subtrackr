@@ -461,27 +461,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                             iconColor: Colors.red,
                             onTap: () => _sendTestNotification(5),
                           ),
-                          _buildModernTile(
-                            title: 'Test Main App Tutorial',
-                            subtitle: 'Force show the main app tutorial',
-                            icon: Icons.play_circle_rounded,
-                            iconColor: Colors.blue,
-                            onTap: () => _debugShowTutorial('main_app_tutorial'),
-                          ),
-                          _buildModernTile(
-                            title: 'Test Subscription Tutorial',
-                            subtitle: 'Force show subscription details tutorial',
-                            icon: Icons.article_rounded,
-                            iconColor: Colors.green,
-                            onTap: () => _debugShowTutorial('subscription_details'),
-                          ),
-                          _buildModernTile(
-                            title: 'Reset All Tutorials',
-                            subtitle: 'Reset all tutorial completion status',
-                            icon: Icons.refresh_rounded,
-                            iconColor: Colors.orange,
-                            onTap: _debugResetAllTutorials,
-                          ),
+
                         ],
                       ),
                     ],
@@ -1036,56 +1016,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  // Debug methods (only available in debug mode)
-  void _debugShowTutorial(String tutorialKey) async {
-    await TipsHelper.debugShowTutorial(tutorialKey);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('🐛 Debug: $tutorialKey tutorial reset - navigate to see it!'),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
 
-  void _debugResetAllTutorials() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('🐛 Debug: Reset All Tutorials'),
-        content: const Text('This will reset all tutorial completion status. You\'ll see tutorials again when navigating to different screens.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Reset All'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      await TipsHelper.resetAllTips();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('🐛 Debug: All tutorials reset!'),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-    }
-  }
 }
 
 class CurrencySelectorScreen extends StatefulWidget {
