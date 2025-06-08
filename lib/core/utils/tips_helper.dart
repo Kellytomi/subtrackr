@@ -8,6 +8,10 @@ class TipsHelper {
   static const String _addButtonKey = 'add_button_tip';
   static const String _historyTipKey = 'history_tip';
   static const String _statisticsTipKey = 'statistics_tip';
+  static const String _priceChangeKey = 'price_change_tip';
+  static const String _menuActionsKey = 'menu_actions_tip';
+  static const String _priceHistoryKey = 'price_history_tip';
+  static const String _mainAppTutorialKey = 'main_app_tutorial';
   
   /// Check if all tips have been shown
   static Future<bool> allTipsShown() async {
@@ -47,6 +51,23 @@ class TipsHelper {
     await prefs.remove(_addButtonKey);
     await prefs.remove(_historyTipKey);
     await prefs.remove(_statisticsTipKey);
+    await prefs.remove(_priceChangeKey);
+    await prefs.remove(_menuActionsKey);
+    await prefs.remove(_priceHistoryKey);
+    await prefs.remove(_mainAppTutorialKey);
+  }
+
+  /// Debug mode: Force show specific tutorial
+  static Future<void> debugShowTutorial(String tutorialKey) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('tutorial_${tutorialKey}_completed');
+  }
+
+  /// Debug mode: Check if we're in debug mode
+  static bool get isDebugMode {
+    bool inDebugMode = false;
+    assert(inDebugMode = true);
+    return inDebugMode;
   }
   
   /// Check if all individual tips have been shown
@@ -56,8 +77,12 @@ class TipsHelper {
     final addButtonShown = await isTipShown(_addButtonKey);
     final historyShown = await isTipShown(_historyTipKey);
     final statisticsShown = await isTipShown(_statisticsTipKey);
+    final priceChangeShown = await isTipShown(_priceChangeKey);
+    final menuActionsShown = await isTipShown(_menuActionsKey);
+    final priceHistoryShown = await isTipShown(_priceHistoryKey);
     
-    return homeShown && quickActionsShown && addButtonShown && historyShown && statisticsShown;
+    return homeShown && quickActionsShown && addButtonShown && historyShown && 
+           statisticsShown && priceChangeShown && menuActionsShown && priceHistoryShown;
   }
   
   /// Constants for tip keys
@@ -66,4 +91,8 @@ class TipsHelper {
   static String get addButtonKey => _addButtonKey;
   static String get historyTipKey => _historyTipKey;
   static String get statisticsTipKey => _statisticsTipKey;
+  static String get priceChangeKey => _priceChangeKey;
+  static String get menuActionsKey => _menuActionsKey;
+  static String get priceHistoryKey => _priceHistoryKey;
+  static String get mainAppTutorialKey => _mainAppTutorialKey;
 } 

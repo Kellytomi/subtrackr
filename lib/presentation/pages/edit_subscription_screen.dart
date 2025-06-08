@@ -449,6 +449,8 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
                                               setState(() {
                                                 _logoUrl = null;
                                                 _hasChanges = true;
+                                                // Trigger suggestions to reappear when logo is removed
+                                                _updateLogoFromName();
                                               });
                                             },
                                             icon: const Icon(Icons.delete_outline),

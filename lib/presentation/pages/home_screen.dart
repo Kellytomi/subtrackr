@@ -26,6 +26,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late ScrollController _scrollController;
   bool _isScrolled = false;
   
+  // Search functionality
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearching = false;
+  String _searchQuery = '';
+  
   // Animation controllers
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -70,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _searchController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -97,21 +103,62 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         child: Column(
           children: [
             // App Header (fixed)
-            const AppHeader(),
+            AppHeader(
+              onSearchPressed: () {
+                setState(() {
+                  _isSearching = true;
+                });
+              },
+            ),
             
             // Summary Cards - horizontal scrollable but fixed position
             SummaryCardsSection(defaultCurrencyCode: defaultCurrencyCode),
             
-            // Category Tabs (fixed)
-            CategoryTabs(
-              selectedIndex: _selectedIndex,
-              categories: _categories,
-              onCategorySelected: (index) {
-                setState(() {
-                  _selectedIndex = index;
-                });
-              },
-            ),
+            // Search bar (when searching)
+            if (_isSearching) 
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Search subscriptions...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        setState(() {
+                          _isSearching = false;
+                          _searchQuery = '';
+                          _searchController.clear();
+                        });
+                      },
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surface,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value.toLowerCase();
+                    });
+                  },
+                ),
+              ),
+            
+            // Category Tabs (fixed) - hide when searching
+            if (!_isSearching)
+              CategoryTabs(
+                selectedIndex: _selectedIndex,
+                categories: _categories,
+                onCategorySelected: (index) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
+                },
+              ),
             
             // Subscription List (scrollable)
             Expanded(
@@ -128,20 +175,44 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   List<Subscription> _getFilteredSubscriptions(SubscriptionProvider provider) {
-    switch (_selectedIndex) {
-      case 0: // All
-        return provider.subscriptions;
-      case 1: // Active
-        return provider.activeSubscriptions;
-      case 2: // Due Soon
-        return provider.subscriptionsDueSoon;
-      case 3: // Paused
-        return provider.pausedSubscriptions;
-      case 4: // Cancelled
-        return provider.cancelledSubscriptions;
-      default:
-        return provider.subscriptions;
+    List<Subscription> subscriptions;
+    
+    // First filter by category if not searching
+    if (_isSearching) {
+      subscriptions = provider.subscriptions;
+    } else {
+      switch (_selectedIndex) {
+        case 0: // All
+          subscriptions = provider.subscriptions;
+          break;
+        case 1: // Active
+          subscriptions = provider.activeSubscriptions;
+          break;
+        case 2: // Due Soon
+          subscriptions = provider.subscriptionsDueSoon;
+          break;
+        case 3: // Paused
+          subscriptions = provider.pausedSubscriptions;
+          break;
+        case 4: // Cancelled
+          subscriptions = provider.cancelledSubscriptions;
+          break;
+        default:
+          subscriptions = provider.subscriptions;
+      }
     }
+    
+    // Then filter by search query if searching
+    if (_isSearching && _searchQuery.isNotEmpty) {
+      subscriptions = subscriptions.where((subscription) {
+        return subscription.name.toLowerCase().contains(_searchQuery) ||
+               (subscription.description?.toLowerCase().contains(_searchQuery) ?? false) ||
+               (subscription.category?.toLowerCase().contains(_searchQuery) ?? false) ||
+               (subscription.website?.toLowerCase().contains(_searchQuery) ?? false);
+      }).toList();
+    }
+    
+    return subscriptions;
   }
 
   Widget _buildSubscriptionList(List<Subscription> subscriptions, String defaultCurrencyCode) {

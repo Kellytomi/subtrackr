@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/theme/app_theme.dart';
 import 'package:subtrackr/data/repositories/subscription_repository.dart';
+import 'package:subtrackr/data/repositories/price_change_repository.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
@@ -50,6 +51,9 @@ void main() async {
   final subscriptionRepository = SubscriptionRepository();
   await subscriptionRepository.init();
   
+  final priceChangeRepository = PriceChangeRepository();
+  await priceChangeRepository.init();
+  
   // Check if onboarding is complete and currency is set
   final onboardingComplete = settingsService.isOnboardingComplete();
   final currencyCode = settingsService.getCurrencyCode();
@@ -64,6 +68,7 @@ void main() async {
     notificationService: notificationService,
     logoService: logoService,
     subscriptionRepository: subscriptionRepository,
+    priceChangeRepository: priceChangeRepository,
     initialRoute: initialRoute,
   ));
 }
@@ -73,6 +78,7 @@ class MyApp extends StatelessWidget {
   final NotificationService notificationService;
   final LogoService logoService;
   final SubscriptionRepository subscriptionRepository;
+  final PriceChangeRepository priceChangeRepository;
   final String initialRoute;
   
   const MyApp({
@@ -81,6 +87,7 @@ class MyApp extends StatelessWidget {
     required this.notificationService,
     required this.logoService,
     required this.subscriptionRepository,
+    required this.priceChangeRepository,
     required this.initialRoute,
   });
 
@@ -102,6 +109,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => SubscriptionProvider(
             repository: subscriptionRepository,
+            priceChangeRepository: priceChangeRepository,
             notificationService: notificationService,
             settingsService: settingsService,
           )..loadSubscriptions(),

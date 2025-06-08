@@ -457,6 +457,8 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
                                       onPressed: () {
                                         setState(() {
                                           _logoUrl = null;
+                                          // Trigger suggestions to reappear when logo is removed
+                                          _updateLogoFromName();
                                         });
                                       },
                                       icon: const Icon(Icons.delete_outline),

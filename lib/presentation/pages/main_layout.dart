@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
-import 'package:subtrackr/core/widgets/feature_tutorial.dart';
+import 'package:subtrackr/core/widgets/enhanced_tutorial.dart';
+import 'package:subtrackr/core/utils/tips_helper.dart';
 import 'package:subtrackr/presentation/providers/theme_provider.dart';
+import 'package:subtrackr/domain/entities/subscription.dart';
+import 'package:subtrackr/presentation/pages/subscription_details_screen.dart';
+import 'package:subtrackr/core/constants/app_constants.dart';
+import 'package:subtrackr/presentation/providers/subscription_provider.dart';
 import 'package:subtrackr/presentation/pages/home_screen.dart';
 import 'package:subtrackr/presentation/pages/settings_screen.dart';
 import 'package:subtrackr/presentation/pages/statistics_screen.dart';
@@ -31,6 +36,48 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
   }
+  
+  // Create example subscription for tutorial
+  Subscription _createExampleSubscription() {
+    final now = DateTime.now();
+    return Subscription(
+      id: 'tutorial_example',
+      name: 'Netflix',
+      logoUrl: 'https://logo.clearbit.com/netflix.com',
+      amount: 15.99,
+      billingCycle: AppConstants.BILLING_CYCLE_MONTHLY,
+      startDate: now.subtract(const Duration(days: 30)),
+      renewalDate: now.add(const Duration(days: 15)),
+      status: AppConstants.STATUS_ACTIVE,
+      currencyCode: 'USD',
+      category: AppConstants.CATEGORY_ENTERTAINMENT,
+      website: 'https://netflix.com',
+      description: 'Streaming service for movies and TV shows',
+    );
+  }
+  
+  // Navigate to subscription details for tutorial
+  void _navigateToSubscriptionTutorial() async {
+    // First, we need to add the example subscription to the provider
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+    final exampleSubscription = _createExampleSubscription();
+    
+    // Add to provider temporarily for tutorial
+    await subscriptionProvider.addSubscription(exampleSubscription);
+    
+    // Navigate with subscription ID
+    await Navigator.pushNamed(
+      context,
+      AppConstants.SUBSCRIPTION_DETAILS_ROUTE,
+      arguments: {
+        'id': exampleSubscription.id,
+        'isTutorialMode': true, // Flag to indicate this is tutorial mode
+      },
+    );
+    
+    // Clean up: remove the example subscription after tutorial
+    await subscriptionProvider.deleteSubscription(exampleSubscription.id);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,48 +94,62 @@ class _MainLayoutState extends State<MainLayout> {
           });
         }
       },
-      child: FeatureTutorial(
-        tutorialKey: 'main_app_tutorial',
+      child: EnhancedTutorial(
+        tutorialKey: TipsHelper.mainAppTutorialKey,
         tips: [
-          TutorialTip(
-            title: 'Welcome to SubTrackr!',
-            message: 'Your personal subscription tracker. Let\'s get started with a quick tour.',
+          EnhancedTip(
+            title: 'Welcome to SubTrackr! 🎉',
+            message: 'Your personal subscription tracker. Let\'s get started with a quick tour to show you all the amazing features.',
             icon: Icons.celebration,
             position: const Offset(0.5, 0.4),
+            backgroundColor: Colors.blue,
           ),
-          TutorialTip(
-            title: 'Track Your Subscriptions',
-            message: 'All your subscriptions appear on the home screen. You\'ll see total cost and upcoming renewals at a glance.',
+          EnhancedTip(
+            title: 'Track Your Subscriptions 🏠',
+            message: 'All your subscriptions appear on the home screen. You\'ll see total cost, upcoming renewals, and can manage everything at a glance.',
             icon: Icons.home,
-            position: const Offset(0.5, 0.4),
+            position: const Offset(0.5, 0.2),
             targetKey: _homeNavKey,
+            backgroundColor: Colors.green,
           ),
-          TutorialTip(
-            title: 'Add New Subscriptions',
-            message: 'Tap the + button to add a new subscription. Enter details like name, amount, and billing cycle.',
+          EnhancedTip(
+            title: 'Add New Subscriptions ➕',
+            message: 'Tap the + button to add a new subscription. Enter details like name, amount, billing cycle, and even add logos!',
             icon: Icons.add_circle,
             position: const Offset(0.5, 0.7),
             targetKey: _fabKey,
+            backgroundColor: Colors.purple,
           ),
-          TutorialTip(
-            title: 'View Your Statistics',
-            message: 'See charts and insights about your spending habits on the Statistics tab.',
+          EnhancedTip(
+            title: 'Subscription Management 📋',
+            message: 'Now let\'s see how to manage individual subscriptions! We\'ll show you an example subscription with all the features.',
+            icon: Icons.article,
+            position: const Offset(0.5, 0.5),
+            backgroundColor: Colors.indigo,
+            onTipShown: _navigateToSubscriptionTutorial,
+          ),
+          EnhancedTip(
+            title: 'View Your Statistics 📊',
+            message: 'See beautiful charts and insights about your spending habits on the Statistics tab. Track trends and patterns.',
             icon: Icons.bar_chart,
-            position: const Offset(0.5, 0.4),
+            position: const Offset(0.5, 0.2),
             targetKey: _statsNavKey,
+            backgroundColor: Colors.orange,
           ),
-          TutorialTip(
-            title: 'Customize Your Experience',
-            message: 'Change currency, theme, and notification settings in the Settings tab.',
+          EnhancedTip(
+            title: 'Customize Your Experience ⚙️',
+            message: 'Change currency, theme, notification settings, and access debug features in the Settings tab.',
             icon: Icons.settings,
-            position: const Offset(0.5, 0.4),
+            position: const Offset(0.5, 0.2),
             targetKey: _settingsNavKey,
+            backgroundColor: Colors.teal,
           ),
-          TutorialTip(
-            title: 'You\'re All Set!',
-            message: 'Start tracking your subscriptions now. If you need to see these tips again, you can reset them in Settings.',
+          EnhancedTip(
+            title: 'You\'re All Set! ✨',
+            message: 'Welcome to SubTrackr! You\'ve completed the guided tour. Start tracking your subscriptions and take control of your spending!',
             icon: Icons.check_circle,
             position: const Offset(0.5, 0.5),
+            backgroundColor: Colors.green,
           ),
         ],
         child: Scaffold(

@@ -3,7 +3,9 @@ import 'package:subtrackr/core/constants/app_constants.dart';
 
 /// App header widget displayed at the top of the home screen
 class AppHeader extends StatelessWidget {
-  const AppHeader({super.key});
+  final VoidCallback? onSearchPressed;
+  
+  const AppHeader({super.key, this.onSearchPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -22,27 +24,48 @@ class AppHeader extends StatelessWidget {
           ),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            AppConstants.APP_NAME,
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppConstants.APP_NAME,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Track your subscriptions',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: theme.brightness == Brightness.dark 
+                        ? Colors.white.withOpacity(0.7) 
+                        : Colors.black.withOpacity(0.7),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Track your subscriptions',
-            style: TextStyle(
-              fontSize: 16,
-              color: theme.brightness == Brightness.dark 
-                  ? Colors.white.withOpacity(0.7) 
-                  : Colors.black.withOpacity(0.7),
+          if (onSearchPressed != null)
+            IconButton(
+              icon: Icon(
+                Icons.search,
+                color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
+              ),
+              onPressed: onSearchPressed,
+              tooltip: 'Search',
+              style: IconButton.styleFrom(
+                backgroundColor: (theme.brightness == Brightness.dark ? Colors.white : Colors.black).withOpacity(0.05),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );

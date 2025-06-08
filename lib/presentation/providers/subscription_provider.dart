@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/date_utils.dart';
 import 'package:subtrackr/data/repositories/subscription_repository.dart';
+import 'package:subtrackr/data/repositories/price_change_repository.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
+import 'package:subtrackr/data/services/price_history_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
+import 'package:subtrackr/domain/entities/price_change.dart';
 
 class SubscriptionProvider extends ChangeNotifier {
   final SubscriptionRepository _repository;
+  final PriceChangeRepository _priceChangeRepository;
   final NotificationService _notificationService;
   final SettingsService _settingsService;
+  final PriceHistoryService _priceHistoryService;
   
   List<Subscription> _subscriptions = [];
   bool _isLoading = false;
@@ -17,11 +22,14 @@ class SubscriptionProvider extends ChangeNotifier {
   
   SubscriptionProvider({
     required SubscriptionRepository repository,
+    required PriceChangeRepository priceChangeRepository,
     required NotificationService notificationService,
     required SettingsService settingsService,
   })  : _repository = repository,
+        _priceChangeRepository = priceChangeRepository,
         _notificationService = notificationService,
-        _settingsService = settingsService;
+        _settingsService = settingsService,
+        _priceHistoryService = PriceHistoryService();
   
   // Getters
   List<Subscription> get subscriptions => _subscriptions;
@@ -314,6 +322,117 @@ class SubscriptionProvider extends ChangeNotifier {
     } catch (e) {
       _error = AppConstants.ERROR_UPDATING_SUBSCRIPTION;
       notifyListeners();
+    }
+  }
+
+  // Add a price change to a subscription
+  Future<void> addPriceChange(PriceChange priceChange) async {
+    try {
+      await _priceChangeRepository.addPriceChange(priceChange);
+      
+      // If the price change is effective now or in the past, update the subscription price
+      if (priceChange.effectiveDate.isBefore(DateTime.now().add(const Duration(days: 1)))) {
+        final subscription = _subscriptions.firstWhere(
+          (s) => s.id == priceChange.subscriptionId,
+          orElse: () => throw Exception('Subscription not found'),
+        );
+        
+        final updatedSubscription = subscription.copyWith(
+          amount: priceChange.newPrice,
+        );
+        
+        await updateSubscription(updatedSubscription);
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      _error = 'Error adding price change';
+      notifyListeners();
+    }
+  }
+
+  // Get price history for a subscription
+  Future<List<PriceChange>> getPriceHistory(String subscriptionId) async {
+    try {
+      return await _priceChangeRepository.getPriceChangesForSubscription(subscriptionId);
+    } catch (e) {
+      debugPrint('Error getting price history: $e');
+      return [];
+    }
+  }
+
+  // Get upcoming price changes for a subscription
+  Future<List<PriceChange>> getUpcomingPriceChanges(String subscriptionId) async {
+    try {
+      final allChanges = await _priceChangeRepository.getPriceChangesForSubscription(subscriptionId);
+      return _priceHistoryService.getUpcomingPriceChanges(
+        subscription: _subscriptions.firstWhere((s) => s.id == subscriptionId),
+        priceChanges: allChanges,
+      );
+    } catch (e) {
+      debugPrint('Error getting upcoming price changes: $e');
+      return [];
+    }
+  }
+
+  // Calculate total monthly spending with price history
+  Future<double> getTotalMonthlySpendingWithHistory({DateTime? forMonth}) async {
+    try {
+      double total = 0.0;
+      
+      for (final subscription in activeSubscriptions) {
+        final priceChanges = await _priceChangeRepository.getPriceChangesForSubscription(subscription.id);
+        final monthlySpent = _priceHistoryService.calculateMonthlySpentWithHistory(
+          subscription: subscription,
+          priceChanges: priceChanges,
+          forMonth: forMonth,
+        );
+        total += monthlySpent;
+      }
+      
+      return total;
+    } catch (e) {
+      debugPrint('Error calculating monthly spending with history: $e');
+      return totalMonthlySpending; // Fallback to basic calculation
+    }
+  }
+
+  // Calculate total yearly spending with price history
+  Future<double> getTotalYearlySpendingWithHistory({int? forYear}) async {
+    try {
+      double total = 0.0;
+      
+      for (final subscription in activeSubscriptions) {
+        final priceChanges = await _priceChangeRepository.getPriceChangesForSubscription(subscription.id);
+        final yearlySpent = _priceHistoryService.calculateYearlySpentWithHistory(
+          subscription: subscription,
+          priceChanges: priceChanges,
+          forYear: forYear,
+        );
+        total += yearlySpent;
+      }
+      
+      return total;
+    } catch (e) {
+      debugPrint('Error calculating yearly spending with history: $e');
+      return totalYearlySpending; // Fallback to basic calculation
+    }
+  }
+
+  // Get current effective price for a subscription
+  Future<double> getCurrentEffectivePrice(String subscriptionId) async {
+    try {
+      final subscription = _subscriptions.firstWhere((s) => s.id == subscriptionId);
+      final priceChanges = await _priceChangeRepository.getPriceChangesForSubscription(subscriptionId);
+      
+      return _priceHistoryService.getCurrentPrice(
+        subscription: subscription,
+        priceChanges: priceChanges,
+      );
+    } catch (e) {
+      debugPrint('Error getting current effective price: $e');
+      final subscription = _subscriptions.firstWhere((s) => s.id == subscriptionId);
+      return subscription.amount; // Fallback to subscription's base price
     }
   }
   

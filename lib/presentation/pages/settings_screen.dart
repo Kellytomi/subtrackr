@@ -58,6 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -66,15 +67,15 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     final currency = CurrencyUtils.getCurrencyByCode(_currencyCode) ?? 
         CurrencyUtils.getAllCurrencies().first;
     
+
+
     return Scaffold(
       body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
+            // Clean Header
             Container(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
               decoration: BoxDecoration(
                 color: colorScheme.surface,
                 border: Border(
@@ -89,219 +90,422 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   Text(
                     'Settings',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
+                      letterSpacing: -0.5,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceVariant.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.tune_rounded,
+                      size: 24,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
             
-            // Settings list
+            // Settings Content
             Expanded(
               child: FadeTransition(
                 opacity: _fadeAnimation,
-              child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                children: [
-                    // Theme section
-                    _buildSectionHeader('Appearance', Icons.palette_outlined, colorScheme),
-                    _buildSettingCard(
-                      title: 'Theme',
-                      subtitle: _getThemeModeText(_themeMode),
-                      icon: _getThemeModeIcon(_themeMode),
-                      iconColor: _getThemeModeColor(_themeMode, isDarkMode, colorScheme),
-                      onTap: _showThemeSelector,
-                      colorScheme: colorScheme,
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    // Subscription Management
+                    _buildModernSection(
+                      title: 'Subscription Management',
+                      icon: Icons.manage_accounts_rounded,
+                      color: colorScheme.primary,
+                      children: [
+                        _buildModernTile(
+                          title: 'Default Currency',
+                          subtitle: '${currency.flag} ${currency.code} - ${currency.name}',
+                          icon: Icons.currency_exchange_rounded,
+                          iconColor: colorScheme.tertiary,
+                          onTap: _showCurrencySelector,
+                          trailing: Text(
+                            currency.symbol,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.tertiary,
+                            ),
+                          ),
+                        ),
+                        _buildModernTile(
+                          title: 'Auto-Categorization',
+                          subtitle: 'Automatically categorize new subscriptions',
+                          icon: Icons.auto_awesome_rounded,
+                          iconColor: Colors.purple,
+                          onTap: () {
+                            // TODO: Implement auto-categorization settings
+                            _showComingSoonSnackBar('Auto-categorization settings');
+                          },
+                          trailing: Switch(
+                            value: true, // TODO: Connect to actual setting
+                            onChanged: (value) {
+                              // TODO: Implement toggle
+                            },
+                          ),
+                        ),
+                        _buildModernTile(
+                          title: 'Price Alerts',
+                          subtitle: 'Get notified about price changes',
+                          icon: Icons.trending_up_rounded,
+                          iconColor: Colors.orange,
+                          onTap: () {
+                            _showComingSoonSnackBar('Price alert settings');
+                          },
+                          trailing: Switch(
+                            value: true, // TODO: Connect to actual setting
+                            onChanged: (value) {
+                              // TODO: Implement toggle
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                     
                     const SizedBox(height: 24),
                     
-                    // Notifications section
-                    _buildSectionHeader('Notifications', Icons.notifications_outlined, colorScheme),
-                    _buildToggleCard(
-                      context: context,
-                      title: 'Enable Notifications',
-                      subtitle: _notificationsEnabled ? 'Enabled' : 'Disabled',
-                      value: _notificationsEnabled,
-                      onChanged: _toggleNotifications,
-                      leadingIcon: Icons.notifications,
-                      iconColor: _notificationsEnabled ? Colors.blue : Colors.grey,
+                    // Notifications & Reminders
+                    _buildModernSection(
+                      title: 'Notifications & Reminders',
+                      icon: Icons.notifications_active_rounded,
+                      color: Colors.blue,
+                      children: [
+                        _buildModernTile(
+                          title: 'Renewal Notifications',
+                          subtitle: _notificationsEnabled 
+                              ? 'Enabled at ${_formatTimeOfDay(_notificationTime)}' 
+                              : 'Disabled',
+                          icon: Icons.notification_important_rounded,
+                          iconColor: _notificationsEnabled ? Colors.blue : Colors.grey,
+                          onTap: () {
+                            if (_notificationsEnabled) {
+                              _showTimePicker();
+                            } else {
+                              _toggleNotifications(!_notificationsEnabled);
+                            }
+                          },
+                          trailing: Switch(
+                            value: _notificationsEnabled,
+                            onChanged: _toggleNotifications,
+                          ),
+                        ),
+                        if (_notificationsEnabled)
+                          _buildModernTile(
+                            title: 'Notification Time',
+                            subtitle: 'When to receive daily reminders',
+                            icon: Icons.schedule_rounded,
+                            iconColor: Colors.orange,
+                            onTap: _showTimePicker,
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                              ),
+                              child: Text(
+                                _formatTimeOfDay(_notificationTime),
+                                style: TextStyle(
+                                  color: Colors.orange.shade700,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        _buildModernTile(
+                          title: 'Smart Reminders',
+                          subtitle: 'AI-powered renewal predictions',
+                          icon: Icons.psychology_rounded,
+                          iconColor: Colors.purple,
+                          onTap: () {
+                            _showComingSoonSnackBar('Smart reminders');
+                          },
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.purple.withOpacity(0.3)),
+                            ),
+                            child: Text(
+                              'BETA',
+                              style: TextStyle(
+                                color: Colors.purple.shade700,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    if (_notificationsEnabled)
-                      _buildTimePickerCard(
-                        context: context,
-                        title: 'Notification Time',
-                        subtitle:
-                            'Notifications will be sent at ${_formatTimeOfDay(_notificationTime)}',
-                        onTap: _showTimePicker,
-                        leadingIcon: Icons.access_time,
-                        color: Colors.orange,
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Appearance & Display
+                    _buildModernSection(
+                      title: 'Appearance & Display',
+                      icon: Icons.palette_rounded,
+                      color: Colors.teal,
+                      children: [
+                        _buildModernTile(
+                          title: 'Theme',
+                          subtitle: _getThemeModeText(_themeMode),
+                          icon: _getThemeModeIcon(_themeMode),
+                          iconColor: _getThemeModeColor(_themeMode, isDarkMode, colorScheme),
+                          onTap: _showThemeSelector,
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _getThemeModeIcon(_themeMode),
+                                  size: 16,
+                                  color: colorScheme.onSecondaryContainer,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _getThemeModeText(_themeMode),
+                                  style: TextStyle(
+                                    color: colorScheme.onSecondaryContainer,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        _buildModernTile(
+                          title: 'Chart Style',
+                          subtitle: 'Customize statistics appearance',
+                          icon: Icons.bar_chart_rounded,
+                          iconColor: Colors.green,
+                          onTap: () {
+                            _showComingSoonSnackBar('Chart customization');
+                          },
+                        ),
+                        _buildModernTile(
+                          title: 'Compact View',
+                          subtitle: 'Show more subscriptions per screen',
+                          icon: Icons.view_compact_rounded,
+                          iconColor: Colors.indigo,
+                          onTap: () {
+                            _showComingSoonSnackBar('Compact view settings');
+                          },
+                          trailing: Switch(
+                            value: false, // TODO: Connect to actual setting
+                            onChanged: (value) {
+                              // TODO: Implement toggle
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Data & Backup
+                    _buildModernSection(
+                      title: 'Data & Backup',
+                      icon: Icons.cloud_sync_rounded,
+                      color: Colors.cyan,
+                      children: [
+                        _buildModernTile(
+                          title: 'Export Data',
+                          subtitle: 'Download your subscriptions as JSON',
+                          icon: Icons.download_rounded,
+                          iconColor: colorScheme.primary,
+                          onTap: () {
+                            _showComingSoonSnackBar('Data export');
+                          },
+                        ),
+                        _buildModernTile(
+                          title: 'Import Data',
+                          subtitle: 'Import subscriptions from other apps',
+                          icon: Icons.upload_rounded,
+                          iconColor: Colors.green,
+                          onTap: () {
+                            _showComingSoonSnackBar('Data import');
+                          },
+                        ),
+                        _buildModernTile(
+                          title: 'Cloud Backup',
+                          subtitle: 'Sync across devices (Coming Soon)',
+                          icon: Icons.cloud_upload_rounded,
+                          iconColor: Colors.blue,
+                          onTap: () {
+                            _showComingSoonSnackBar('Cloud backup');
+                          },
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                            ),
+                            child: Text(
+                              'SOON',
+                              style: TextStyle(
+                                color: Colors.blue.shade700,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Help & Support
+                    _buildModernSection(
+                      title: 'Help & Support',
+                      icon: Icons.help_center_rounded,
+                      color: Colors.deepPurple,
+                      children: [
+                        _buildModernTile(
+                          title: 'Tutorial & Tips',
+                          subtitle: 'Learn how to use SubTrackr effectively',
+                          icon: Icons.school_rounded,
+                          iconColor: Colors.deepPurple,
+                          onTap: _resetAppTips,
+                        ),
+                        _buildModernTile(
+                          title: 'Help Center',
+                          subtitle: 'FAQs and user guides',
+                          icon: Icons.help_outline_rounded,
+                          iconColor: Colors.teal,
+                          onTap: () {
+                            _showComingSoonSnackBar('Help center');
+                          },
+                        ),
+                        _buildModernTile(
+                          title: 'Contact Support',
+                          subtitle: 'Get help with your account',
+                          icon: Icons.support_agent_rounded,
+                          iconColor: Colors.orange,
+                          onTap: () {
+                            _showComingSoonSnackBar('Contact support');
+                          },
+                        ),
+                        _buildModernTile(
+                          title: 'Send Feedback',
+                          subtitle: 'Help us improve SubTrackr',
+                          icon: Icons.feedback_rounded,
+                          iconColor: Colors.pink,
+                          onTap: () {
+                            _showComingSoonSnackBar('Feedback form');
+                          },
+                        ),
+                      ],
+                    ),
+                    
+                    // Debug Tools (only in debug mode)
+                    if (kDebugMode) ...[
+                      const SizedBox(height: 24),
+                      _buildModernSection(
+                        title: 'Debug Tools',
+                        icon: Icons.developer_mode_rounded,
+                        color: Colors.red,
+                        children: [
+                          _buildModernTile(
+                            title: 'Test Notifications',
+                            subtitle: 'Send test notifications',
+                            icon: Icons.bug_report_rounded,
+                            iconColor: Colors.red,
+                            onTap: () => _sendTestNotification(5),
+                          ),
+                          _buildModernTile(
+                            title: 'Test Main App Tutorial',
+                            subtitle: 'Force show the main app tutorial',
+                            icon: Icons.play_circle_rounded,
+                            iconColor: Colors.blue,
+                            onTap: () => _debugShowTutorial('main_app_tutorial'),
+                          ),
+                          _buildModernTile(
+                            title: 'Test Subscription Tutorial',
+                            subtitle: 'Force show subscription details tutorial',
+                            icon: Icons.article_rounded,
+                            iconColor: Colors.green,
+                            onTap: () => _debugShowTutorial('subscription_details'),
+                          ),
+                          _buildModernTile(
+                            title: 'Reset All Tutorials',
+                            subtitle: 'Reset all tutorial completion status',
+                            icon: Icons.refresh_rounded,
+                            iconColor: Colors.orange,
+                            onTap: _debugResetAllTutorials,
+                          ),
+                        ],
                       ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Currency section
-                    _buildSectionHeader('Currency', Icons.attach_money_rounded, colorScheme),
-                  _buildSettingCard(
-                    title: 'Default Currency',
-                    subtitle: '${currency.flag} ${currency.code} - ${currency.name} (${currency.symbol})',
-                      icon: Icons.currency_exchange_rounded,
-                    iconColor: colorScheme.tertiary,
-                    onTap: _showCurrencySelector,
-                    colorScheme: colorScheme,
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Debug section (only in debug mode)
-                  if (kDebugMode) ...[
-                    _buildSectionHeader('Debug Tools', Icons.bug_report_outlined, colorScheme),
-                    _buildSettingCard(
-                      title: 'Test Notification (5s)',
-                      subtitle: 'Send a test notification in 5 seconds',
-                      icon: Icons.notifications_active,
-                      iconColor: Colors.orange,
-                      onTap: () => _sendTestNotification(5),
-                      colorScheme: colorScheme,
+                    ],
+                    
+                    const SizedBox(height: 32),
+                    
+                    // App Info
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceVariant.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'SubTrackr',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Version 1.0.0',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Track your subscriptions with ease',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: colorScheme.onSurface.withOpacity(0.8),
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
-                    _buildSettingCard(
-                      title: 'Test Notification (30s)',
-                      subtitle: 'Send a test notification in 30 seconds',
-                      icon: Icons.schedule,
-                      iconColor: Colors.blue,
-                      onTap: () => _sendTestNotification(30),
-                      colorScheme: colorScheme,
-                    ),
-                    _buildSettingCard(
-                      title: 'Test Immediate Notification',
-                      subtitle: 'Send a test notification immediately',
-                      icon: Icons.flash_on,
-                      iconColor: Colors.green,
-                      onTap: () => _sendTestNotification(0),
-                      colorScheme: colorScheme,
-                    ),
-                    const SizedBox(height: 24),
+                    
+                    const SizedBox(height: 40),
                   ],
-                  
-                  // Data management section
-                    _buildSectionHeader('Data Management', Icons.storage_rounded, colorScheme),
-                  _buildSettingCard(
-                    title: 'Export Data',
-                    subtitle: 'Export your subscriptions as JSON',
-                      icon: Icons.file_download_outlined,
-                    iconColor: colorScheme.primary,
-                    onTap: () {
-                      // TODO: Implement export functionality
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Export functionality coming soon'),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                      );
-                    },
-                    colorScheme: colorScheme,
-                  ),
-                  _buildSettingCard(
-                    title: 'Import Data',
-                    subtitle: 'Import subscriptions from JSON',
-                      icon: Icons.file_upload_outlined,
-                    iconColor: colorScheme.secondary,
-                    onTap: () {
-                      // TODO: Implement import functionality
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Import functionality coming soon'),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                      );
-                    },
-                    colorScheme: colorScheme,
-                  ),
-                  _buildSettingCard(
-                    title: 'Clear All Data',
-                    subtitle: 'Delete all subscriptions and reset settings',
-                      icon: Icons.delete_forever_rounded,
-                    iconColor: Colors.red,
-                    onTap: _showClearDataConfirmation,
-                    colorScheme: colorScheme,
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Help & Support Section
-                  Text(
-                    'Help & Support',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 12),
-                  
-                  // Reset Tips and Tutorials
-                  _buildActionCard(
-                    context: context,
-                    title: 'Reset App Tips',
-                    subtitle: 'Show first-time user tips and tutorials again',
-                    leadingIcon: Icons.lightbulb_outline,
-                    iconColor: colorScheme.tertiary,
-                    onTap: _resetAppTips,
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // About section
-                    _buildSectionHeader('About', Icons.info_outline_rounded, colorScheme),
-                  _buildSettingCard(
-                    title: 'Version',
-                    subtitle: AppConstants.APP_VERSION,
-                      icon: Icons.android_rounded,
-                    iconColor: colorScheme.tertiary,
-                    onTap: null,
-                    colorScheme: colorScheme,
-                  ),
-                  _buildSettingCard(
-                    title: 'Privacy Policy',
-                    subtitle: 'Read our privacy policy',
-                      icon: Icons.privacy_tip_outlined,
-                    iconColor: colorScheme.primary,
-                    onTap: () {
-                      // TODO: Open privacy policy
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Privacy policy coming soon'),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                      );
-                    },
-                    colorScheme: colorScheme,
-                  ),
-                  _buildSettingCard(
-                    title: 'Terms of Service',
-                    subtitle: 'Read our terms of service',
-                      icon: Icons.description_outlined,
-                    iconColor: colorScheme.secondary,
-                    onTap: () {
-                      // TODO: Open terms of service
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Terms of service coming soon'),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                      );
-                    },
-                    colorScheme: colorScheme,
-                  ),
-                  
-                  const SizedBox(height: 40),
-                ],
                 ),
               ),
             ),
@@ -311,58 +515,73 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon, ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16, left: 8),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+
+
+  Widget _buildModernSection({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required List<Widget> children,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: color,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
             ),
-            child: Icon(
-            icon, 
-              size: 18, 
-              color: colorScheme.primary,
           ),
+          child: Column(
+            children: children,
           ),
-          const SizedBox(width: 12),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildSettingCard({
+  Widget _buildModernTile({
     required String title,
     required String subtitle,
     required IconData icon,
     required Color iconColor,
-    required VoidCallback? onTap,
-    required ColorScheme colorScheme,
+    required VoidCallback onTap,
+    Widget? trailing,
   }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 0,
-      color: theme.colorScheme.surface,
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
@@ -371,12 +590,16 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
                   color: iconColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: iconColor, size: 24),
+                child: Icon(
+                  icon,
+                  size: 24,
+                  color: iconColor,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -384,33 +607,52 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-          title,
-          style: TextStyle(
+                      title,
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black,
-          ),
-        ),
-                    const SizedBox(height: 4),
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
                     Text(
-          subtitle,
-          style: TextStyle(
+                      subtitle,
+                      style: TextStyle(
                         fontSize: 14,
-            color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
+                        color: colorScheme.onSurface.withOpacity(0.7),
                       ),
                     ),
                   ],
                 ),
               ),
-              if (onTap != null)
+              if (trailing != null) ...[
+                const SizedBox(width: 12),
+                trailing,
+              ] else
                 Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 16,
-                  color: (isDark ? Colors.white : Colors.black).withOpacity(0.3),
+                  Icons.chevron_right_rounded,
+                  color: colorScheme.onSurface.withOpacity(0.4),
                 ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showComingSoonSnackBar(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.upcoming_rounded, color: Colors.white),
+            const SizedBox(width: 8),
+            Text('$feature coming soon!'),
+          ],
+        ),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -674,206 +916,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  Future<void> _showClearDataConfirmation() async {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Clear All Data',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
-          ),
-        ),
-        content: const Text(
-          'Are you sure you want to delete all subscriptions and reset settings? This action cannot be undone.',
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context, false);
-            },
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: colorScheme.primary),
-          ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, true);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Clear All Data'),
-          ),
-        ],
-      ),
-    );
-    
-    if (result == true) {
-      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-      await subscriptionProvider.deleteAllSubscriptions();
-      
-      // Reset settings to defaults by updating them to initial values
-      final settingsService = Provider.of<SettingsService>(context, listen: false);
-      await settingsService.setNotificationsEnabled(true);
-      await settingsService.setNotificationTime(const TimeOfDay(hour: 9, minute: 0));
-      await settingsService.setCurrencyCode('USD');
-      
-      // Update UI with new settings
-      setState(() {
-        _notificationTime = const TimeOfDay(hour: 9, minute: 0);
-        _currencyCode = 'USD';
-        _notificationsEnabled = true;
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('All data cleared'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-    }
-  }
-
-  Widget _buildToggleCard({
-    required BuildContext context,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required Function(bool) onChanged,
-    required IconData leadingIcon,
-    required Color iconColor,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 0,
-      color: colorScheme.surface,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: SwitchListTile(
-          title: Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: isDark ? Colors.white : Colors.black,
-            ),
-          ),
-          subtitle: Text(
-            subtitle,
-            style: TextStyle(
-              color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
-              fontSize: 13,
-            ),
-          ),
-          value: value,
-          onChanged: onChanged,
-          secondary: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: value ? iconColor.withOpacity(0.1) : (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              leadingIcon,
-              color: value ? iconColor : Colors.grey,
-              size: 24,
-            ),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimePickerCard({
-    required BuildContext context,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    required IconData leadingIcon,
-    required Color color,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 0,
-      color: theme.colorScheme.surface,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(leadingIcon, color: color, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color: (isDark ? Colors.white : Colors.black).withOpacity(0.3),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _sendTestNotification(int delaySeconds) async {
     final notificationService = Provider.of<NotificationService>(context, listen: false);
     
@@ -969,82 +1011,55 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  Widget _buildActionCard({
-    required BuildContext context,
-    required String title,
-    required String subtitle,
-    required IconData leadingIcon,
-    required Color iconColor,
-    required VoidCallback onTap,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+  // Debug methods (only available in debug mode)
+  void _debugShowTutorial(String tutorialKey) async {
+    await TipsHelper.debugShowTutorial(tutorialKey);
     
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.colorScheme.outline.withOpacity(0.2),
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  leadingIcon,
-                  color: iconColor,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                    ),
-                    if (subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isDark ? Colors.white70 : Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color: isDark ? Colors.white54 : Colors.black45,
-              ),
-            ],
-          ),
-        ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('🐛 Debug: $tutorialKey tutorial reset - navigate to see it!'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
+  }
+
+  void _debugResetAllTutorials() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🐛 Debug: Reset All Tutorials'),
+        content: const Text('This will reset all tutorial completion status. You\'ll see tutorials again when navigating to different screens.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Reset All'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      await TipsHelper.resetAllTips();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('🐛 Debug: All tutorials reset!'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
   }
 }
 

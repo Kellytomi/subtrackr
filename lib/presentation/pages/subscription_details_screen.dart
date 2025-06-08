@@ -6,8 +6,12 @@ import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/core/utils/date_utils.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
+import 'package:subtrackr/domain/entities/price_change.dart';
 import 'package:subtrackr/presentation/providers/subscription_provider.dart';
+import 'package:subtrackr/presentation/dialogs/price_change_dialog.dart';
+import 'package:subtrackr/presentation/widgets/price_history_card.dart';
 import 'package:subtrackr/core/widgets/app_tip.dart';
+import 'package:subtrackr/core/widgets/enhanced_tutorial.dart';
 import 'package:subtrackr/core/utils/tips_helper.dart';
 
 class SubscriptionDetailsScreen extends StatefulWidget {
@@ -26,6 +30,10 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
   
   // Create a unique hero tag for this screen
   final String _heroTag = 'details_logo_${UniqueKey()}';
+  
+  // Keys for tutorial targeting
+  final GlobalKey _menuButtonKey = GlobalKey();
+  final GlobalKey _priceHistoryKey = GlobalKey();
   
   @override
   void initState() {
@@ -73,7 +81,26 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
         _isLoading = false;
       });
       _animationController.forward();
+      
+      // Check if this is tutorial mode and auto-start tutorial
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final isTutorialMode = args?['isTutorialMode'] as bool? ?? false;
+      
+      if (isTutorialMode) {
+        // Auto-start the subscription tutorial after a short delay
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          // Force start the subscription tutorial
+          if (mounted) {
+            _startSubscriptionTutorial();
+          }
+        });
+      }
     });
+  }
+  
+  void _startSubscriptionTutorial() {
+    // This will trigger the enhanced tutorial to start
+    TipsHelper.debugShowTutorial('subscription_details_tutorial');
   }
 
   void _deleteSubscription(BuildContext context, String subscriptionId) async {
@@ -266,15 +293,47 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
     // Get currency data
     final currency = CurrencyUtils.getCurrencyByCode(sub.currencyCode);
     
-    return PopScope(
-      canPop: true,
-      onPopInvokedWithResult: (didPop, result) {
-        // Ensure animations are completed
-        if (_animationController.status == AnimationStatus.forward) {
-          _animationController.forward();
+    return EnhancedTutorial(
+      tutorialKey: 'subscription_details',
+      onComplete: () {
+        // Check if this is tutorial mode and auto-return to main page
+        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final isTutorialMode = args?['isTutorialMode'] as bool? ?? false;
+        
+        if (isTutorialMode) {
+          // Return to main page after tutorial completion
+          Navigator.of(context).pop();
         }
       },
-      child: Scaffold(
+      tips: [
+        EnhancedTip(
+          title: 'Subscription Actions',
+          message: 'Tap the menu button to access actions like changing price, editing details, or deleting this subscription.',
+          icon: Icons.menu,
+          position: const Offset(0.85, 0.15),
+          targetKey: _menuButtonKey,
+          backgroundColor: const Color(0xFF8B5CF6), // Purple
+          debugLabel: 'Menu Actions',
+        ),
+        EnhancedTip(
+          title: 'Price Change History',
+          message: 'Track all price changes for this subscription. See upcoming price increases and historical changes.',
+          icon: Icons.trending_up,
+          position: const Offset(0.5, 0.7),
+          targetKey: _priceHistoryKey,
+          backgroundColor: const Color(0xFF10B981), // Green
+          debugLabel: 'Price History Card',
+        ),
+      ],
+      child: PopScope(
+        canPop: true,
+        onPopInvokedWithResult: (didPop, result) {
+          // Ensure animations are completed
+          if (_animationController.status == AnimationStatus.forward) {
+            _animationController.forward();
+          }
+        },
+        child: Scaffold(
         body: SafeArea(
           child: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -302,41 +361,81 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                           ),
                         ),
                         
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                Icons.edit_outlined,
-                                color: isDark ? Colors.white : Colors.black,
-                              ),
-                              onPressed: () {
+                        PopupMenuButton<String>(
+                          key: _menuButtonKey,
+                          icon: Icon(
+                            Icons.more_vert,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                          style: IconButton.styleFrom(
+                            backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onSelected: (String value) {
+                            switch (value) {
+                              case 'change_price':
+                                _showPriceChangeDialog(context, sub);
+                                break;
+                              case 'edit':
                                 Navigator.pushNamed(
-                                  context, 
+                                  context,
                                   '/edit-subscription',
                                   arguments: {'id': sub.id},
                                 );
-                              },
-                              tooltip: 'Edit',
-                              style: IconButton.styleFrom(
-                                backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                                break;
+                              case 'delete':
+                                _deleteSubscription(context, sub.id);
+                                break;
+                            }
+                          },
+                          itemBuilder: (BuildContext context) => [
+                            PopupMenuItem<String>(
+                              value: 'change_price',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.attach_money,
+                                    color: colorScheme.primary,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text('Change Price'),
+                                ],
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              icon: Icon(
-                                Icons.delete_outline,
-                                color: theme.colorScheme.error,
+                            PopupMenuItem<String>(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.edit_outlined,
+                                    color: colorScheme.onSurface,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text('Edit Subscription'),
+                                ],
                               ),
-                              onPressed: () => _deleteSubscription(context, sub.id),
-                              tooltip: 'Delete',
-                              style: IconButton.styleFrom(
-                                backgroundColor: theme.colorScheme.error.withOpacity(0.1),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                            ),
+                            PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.delete_outline,
+                                    color: colorScheme.error,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Delete Subscription',
+                                    style: TextStyle(
+                                      color: colorScheme.error,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -528,18 +627,30 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                 color: theme.colorScheme.surface,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: theme.colorScheme.outline.withOpacity(0.2),
+                                  color: theme.colorScheme.outline.withOpacity(0.4),
+                                  width: 1.5,
                                 ),
                               ),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Payment Details',
-                                    style: theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
+                                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.payment_rounded,
+                                          color: colorScheme.primary,
+                                          size: 24,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'Payment Details',
+                                          style: theme.textTheme.titleLarge?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ),
                                   const SizedBox(height: 16),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -694,17 +805,29 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                                   color: theme.colorScheme.surface,
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: theme.colorScheme.outline.withOpacity(0.2),
+                                    color: theme.colorScheme.outline.withOpacity(0.4),
+                                    width: 1.5,
                                   ),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      'Additional Details',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.info_outline_rounded,
+                                          color: colorScheme.primary,
+                                          size: 24,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'Additional Details',
+                                          style: theme.textTheme.titleLarge?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     
                                     if (sub.category != null) ...[
@@ -765,94 +888,27 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
                             
                             const SizedBox(height: 24),
                             
-                            // Notification settings
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.surface,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: theme.colorScheme.outline.withOpacity(0.2),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
+                            // Price History
+                            FutureBuilder<List<PriceChange>>(
+                              future: Provider.of<SubscriptionProvider>(context, listen: false)
+                                  .getPriceHistory(sub.id),
+                              builder: (context, snapshot) {
+                                if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                                  return Column(
                                     children: [
-                                      Icon(
-                                        Icons.notifications_active_rounded,
-                                        color: colorScheme.primary,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        'Notification Settings',
-                                        style: theme.textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Renewal Notifications',
-                                        style: theme.textTheme.bodyLarge,
-                                      ),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: sub.notificationsEnabled
-                                              ? colorScheme.primary.withOpacity(0.1)
-                                              : Colors.grey.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          sub.notificationsEnabled ? 'Enabled' : 'Disabled',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: sub.notificationsEnabled
-                                                ? colorScheme.primary
-                                                : Colors.grey,
-                                          ),
+                                        key: _priceHistoryKey,
+                                        child: PriceHistoryCard(
+                                          subscription: sub,
+                                          priceHistory: snapshot.data!,
                                         ),
                                       ),
+                                      const SizedBox(height: 24),
                                     ],
-                                  ),
-                                  
-                                  if (sub.notificationsEnabled) ...[
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Flexible(
-                                          flex: 2,
-                                          child: Text(
-                                            'Notification Schedule',
-                                            style: theme.textTheme.bodyLarge,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Flexible(
-                                          flex: 3,
-                                          child: Text(
-                                            '${sub.notificationDays} days before renewal',
-                                            style: theme.textTheme.bodyLarge?.copyWith(
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            textAlign: TextAlign.end,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ],
-                              ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
                             ),
                             
                             const SizedBox(height: 32),
@@ -927,6 +983,7 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
               ),
         ),
       ),
+    ), // EnhancedTutorial
     );
   }
   
@@ -1000,5 +1057,39 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
         ),
       );
     });
+  }
+
+  void _showPriceChangeDialog(BuildContext context, Subscription subscription) async {
+    final result = await showDialog<PriceChange>(
+      context: context,
+      builder: (context) => PriceChangeDialog(subscription: subscription),
+    );
+
+    if (result != null) {
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      
+      try {
+        await subscriptionProvider.addPriceChange(result);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Price change scheduled for ${subscription.name}'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        
+        // Refresh the screen to show updated price history
+        setState(() {});
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to add price change'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 } 
