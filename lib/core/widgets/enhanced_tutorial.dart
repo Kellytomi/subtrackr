@@ -72,20 +72,20 @@ class _EnhancedTutorialState extends State<EnhancedTutorial>
   void initState() {
     super.initState();
     
-    // Initialize multiple animation controllers for smoother effects
+    // Initialize multiple animation controllers with faster transitions
     _fadeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 200), // Much faster fade
     );
     
     _scaleController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 250), // Faster scale
     );
     
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 1500), // Slightly faster pulse
     );
     
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -164,7 +164,7 @@ class _EnhancedTutorialState extends State<EnhancedTutorial>
     final tutorialCompleted = prefs.getBool('tutorial_${widget.tutorialKey}_completed') ?? false;
     
     if (!tutorialCompleted && mounted) {
-      Future.delayed(const Duration(milliseconds: 1000), () {
+      Future.delayed(const Duration(milliseconds: 300), () { // Faster start
         if (mounted) {
           _startTutorial();
         }
@@ -196,9 +196,11 @@ class _EnhancedTutorialState extends State<EnhancedTutorial>
     
     // Call the onTipShown callback if it exists
     if (widget.tips.isNotEmpty && widget.tips[0].onTipShown != null) {
-      // Delay the callback slightly to ensure the tip is visible
-      Future.delayed(const Duration(milliseconds: 300), () {
-        widget.tips[0].onTipShown!();
+      // Minimal delay for immediate response
+      Future.delayed(const Duration(milliseconds: 50), () {
+        if (mounted) {
+          widget.tips[0].onTipShown!();
+        }
       });
     }
   }
@@ -209,27 +211,27 @@ class _EnhancedTutorialState extends State<EnhancedTutorial>
       return;
     }
     
-    // Smooth transition between tips
-    _fadeController.reverse().then((_) {
-      _scaleController.reverse().then((_) {
-        if (mounted) {
-          setState(() {
-            _currentTipIndex++;
-          });
-          _fadeController.forward();
-          _scaleController.forward();
-          
-          // Call the onTipShown callback for the new tip if it exists
-          final currentTip = widget.tips[_currentTipIndex];
-          if (currentTip.onTipShown != null) {
-            // Delay the callback slightly to ensure the tip is visible
-            Future.delayed(const Duration(milliseconds: 300), () {
-              currentTip.onTipShown!();
-            });
-          }
-        }
+    // Faster transition between tips - run animations in parallel
+    if (mounted) {
+      setState(() {
+        _currentTipIndex++;
       });
-    });
+      
+      // Immediately show the next tip without waiting for reverse animations
+      _fadeController.forward();
+      _scaleController.forward();
+      
+      // Call the onTipShown callback for the new tip if it exists
+      final currentTip = widget.tips[_currentTipIndex];
+      if (currentTip.onTipShown != null) {
+        // Minimal delay for immediate response
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted) {
+            currentTip.onTipShown!();
+          }
+        });
+      }
+    }
   }
   
   Future<void> _endTutorial() async {

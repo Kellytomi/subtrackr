@@ -72,10 +72,10 @@ class _FeatureTutorialState extends State<FeatureTutorial> with SingleTickerProv
   void initState() {
     super.initState();
     
-    // Initialize animations
+    // Initialize animations with faster duration
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 200), // Faster transitions
     );
     
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -103,8 +103,8 @@ class _FeatureTutorialState extends State<FeatureTutorial> with SingleTickerProv
     
     // If the tutorial hasn't been completed, start it
     if (!tutorialCompleted && mounted) {
-      // Delay showing the first tip to allow widgets to layout
-      Future.delayed(const Duration(milliseconds: 1000), () {
+      // Shorter delay for faster startup
+      Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
           _startTutorial();
         }
@@ -127,15 +127,13 @@ class _FeatureTutorialState extends State<FeatureTutorial> with SingleTickerProv
       return;
     }
     
-    // Animate out current tip
-    _animationController.reverse().then((_) {
-      if (mounted) {
-        setState(() {
-          _currentTipIndex++;
-        });
-        _animationController.forward();
-      }
-    });
+    // Immediate transition to next tip for faster response
+    if (mounted) {
+      setState(() {
+        _currentTipIndex++;
+      });
+      _animationController.forward();
+    }
   }
   
   Future<void> _endTutorial() async {

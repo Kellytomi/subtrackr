@@ -317,7 +317,7 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
         ),
         EnhancedTip(
           title: 'Price Change History',
-          message: 'Track all price changes for this subscription. See upcoming price increases and historical changes.',
+          message: 'Track all price changes for this subscription. Tap the menu → "Change Price" to log when your subscription cost changes. Example: Netflix goes from \$12.99 to \$15.99 next month.',
           icon: Icons.trending_up,
           position: const Offset(0.5, 0.7),
           targetKey: _priceHistoryKey,
