@@ -79,6 +79,9 @@ class AppConstants {
   
   /// Setting key for onboarding completion status
   static const String ONBOARDING_COMPLETE_SETTING = 'onboardingComplete';
+  
+  /// Setting key for subscription sorting preference
+  static const String SUBSCRIPTION_SORT_SETTING = 'subscriptionSort';
 
   // Default values
   /// Default currency symbol (US Dollar)
@@ -89,6 +92,22 @@ class AppConstants {
   
   /// Default number of days before renewal to send notifications
   static const int DEFAULT_NOTIFICATION_DAYS_BEFORE_RENEWAL = 3;
+
+  // Subscription sorting options
+  /// Sort subscriptions by date added (newest first)
+  static const String SORT_BY_DATE_ADDED = 'dateAdded';
+  
+  /// Sort subscriptions by name (A-Z)
+  static const String SORT_BY_NAME = 'name';
+  
+  /// Sort subscriptions by amount (highest first)
+  static const String SORT_BY_AMOUNT = 'amount';
+  
+  /// Sort subscriptions by next renewal date
+  static const String SORT_BY_RENEWAL_DATE = 'renewalDate';
+  
+  /// Default sorting option
+  static const String DEFAULT_SORT_OPTION = SORT_BY_DATE_ADDED;
 
   // UI Messages
   /// Success message shown when a subscription is added

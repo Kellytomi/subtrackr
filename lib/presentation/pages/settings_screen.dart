@@ -8,6 +8,7 @@ import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/presentation/providers/subscription_provider.dart';
 import 'package:subtrackr/presentation/providers/theme_provider.dart';
 import 'package:subtrackr/core/utils/tips_helper.dart';
+import 'package:subtrackr/data/services/auth_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -21,6 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   late String _currencyCode;
   late bool _notificationsEnabled;
   late ThemeMode _themeMode;
+  late String _sortOption;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   
@@ -31,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     _notificationTime = settingsService.getNotificationTime();
     _currencyCode = settingsService.getCurrencyCode() ?? 'USD';
     _notificationsEnabled = settingsService.areNotificationsEnabled();
+    _sortOption = settingsService.getSubscriptionSort();
     
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     _themeMode = themeProvider.themeMode;
@@ -120,6 +123,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 child: ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
+                    // User Profile Section
+                    _buildUserProfileSection(),
+                    
+                    const SizedBox(height: 24),
+                    
                     // Subscription Management
                     _buildModernSection(
                       title: 'Subscription Management',
@@ -138,6 +146,28 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: colorScheme.tertiary,
+                            ),
+                          ),
+                        ),
+                        _buildModernTile(
+                          title: 'Sort Subscriptions',
+                          subtitle: _getSortOptionText(_sortOption),
+                          icon: Icons.sort_rounded,
+                          iconColor: colorScheme.primary,
+                          onTap: _showSortSelector,
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              _getSortOptionText(_sortOption),
+                              style: TextStyle(
+                                color: colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ),
@@ -520,7 +550,185 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
+  Widget _buildUserProfileSection() {
+    return FutureBuilder<Map<String, String>?>(
+      future: _getUserInfo(),
+      builder: (context, snapshot) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+        
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                colorScheme.primary.withOpacity(0.1),
+                colorScheme.secondary.withOpacity(0.05),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: colorScheme.outline.withOpacity(0.1),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [colorScheme.primary, colorScheme.secondary],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: snapshot.hasData && snapshot.data!['name'] != null
+                          ? Text(
+                              snapshot.data!['name']!.split(' ').map((name) => name[0]).take(2).join().toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          snapshot.hasData && snapshot.data!['name'] != null
+                              ? snapshot.data!['name']!
+                              : 'Your Profile',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          snapshot.hasData && snapshot.data!['email'] != null
+                              ? snapshot.data!['email']!
+                              : 'Connect your email account',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      snapshot.hasData && snapshot.data!['email'] != null
+                          ? Icons.cloud_done_rounded
+                          : Icons.cloud_off_rounded,
+                      color: snapshot.hasData && snapshot.data!['email'] != null
+                          ? Colors.green
+                          : colorScheme.outline,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildProfileStat(
+                      'Email Access',
+                      snapshot.hasData && snapshot.data!['email'] != null ? 'Connected' : 'Not Connected',
+                      snapshot.hasData && snapshot.data!['email'] != null ? Colors.green : Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildProfileStat(
+                      'Cloud Sync',
+                      'Coming Soon',
+                      Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
+  Widget _buildProfileStat(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<Map<String, String>?> _getUserInfo() async {
+    try {
+      final authService = AuthService();
+      final user = authService.currentUser;
+      if (user != null) {
+        return {
+          'name': user.displayName ?? 'User',
+          'email': user.email ?? '',
+        };
+      }
+    } catch (e) {
+      debugPrint('Error getting user info: $e');
+    }
+    return null;
+  }
 
   Widget _buildModernSection({
     required String title,
@@ -893,6 +1101,93 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
+  }
+
+  String _getSortOptionText(String sortOption) {
+    switch (sortOption) {
+      case AppConstants.SORT_BY_DATE_ADDED:
+        return 'Date Added';
+      case AppConstants.SORT_BY_NAME:
+        return 'Name';
+      case AppConstants.SORT_BY_AMOUNT:
+        return 'Amount';
+      case AppConstants.SORT_BY_RENEWAL_DATE:
+        return 'Renewal Date';
+      default:
+        return 'Date Added';
+    }
+  }
+
+  Future<void> _showSortSelector() async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sort Subscriptions'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<String>(
+              title: const Text('Date Added (Newest First)'),
+              subtitle: const Text('Most recently added subscriptions first'),
+              value: AppConstants.SORT_BY_DATE_ADDED,
+              groupValue: _sortOption,
+              onChanged: (value) => Navigator.pop(context, value),
+            ),
+            RadioListTile<String>(
+              title: const Text('Name (A-Z)'),
+              subtitle: const Text('Alphabetical order'),
+              value: AppConstants.SORT_BY_NAME,
+              groupValue: _sortOption,
+              onChanged: (value) => Navigator.pop(context, value),
+            ),
+            RadioListTile<String>(
+              title: const Text('Amount (Highest First)'),
+              subtitle: const Text('By monthly cost'),
+              value: AppConstants.SORT_BY_AMOUNT,
+              groupValue: _sortOption,
+              onChanged: (value) => Navigator.pop(context, value),
+            ),
+            RadioListTile<String>(
+              title: const Text('Renewal Date (Soonest First)'),
+              subtitle: const Text('By next renewal date'),
+              value: AppConstants.SORT_BY_RENEWAL_DATE,
+              groupValue: _sortOption,
+              onChanged: (value) => Navigator.pop(context, value),
+            ),
+          ],
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: TextStyle(color: colorScheme.primary)),
+          ),
+        ],
+      ),
+    );
+    
+    if (result != null && result != _sortOption) {
+      setState(() {
+        _sortOption = result;
+      });
+      
+      final settingsService = Provider.of<SettingsService>(context, listen: false);
+      await settingsService.setSubscriptionSort(result);
+      
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      subscriptionProvider.resortSubscriptions();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sorting changed to ${_getSortOptionText(result)}'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
   }
 
   Future<void> _showCurrencySelector() async {

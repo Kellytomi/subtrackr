@@ -143,7 +143,7 @@ class SubscriptionProvider extends ChangeNotifier {
     
     try {
       final loadedSubscriptions = _repository.getAllSubscriptions();
-      loadedSubscriptions.sort((a, b) => a.name.compareTo(b.name)); // Sort alphabetically
+      _sortSubscriptions(loadedSubscriptions);
       
       // Ensure each subscription has a valid currency code
       for (int i = 0; i < loadedSubscriptions.length; i++) {
@@ -174,7 +174,7 @@ class SubscriptionProvider extends ChangeNotifier {
     try {
       await _repository.addSubscription(subscription);
       _subscriptions = [..._subscriptions, subscription];
-      _subscriptions.sort((a, b) => a.name.compareTo(b.name));
+      _sortSubscriptions(_subscriptions);
       notifyListeners();
       
       // Schedule notification if active
@@ -194,7 +194,7 @@ class SubscriptionProvider extends ChangeNotifier {
       _subscriptions = _subscriptions.map((s) => 
         s.id == subscription.id ? subscription : s
       ).toList();
-      _subscriptions.sort((a, b) => a.name.compareTo(b.name));
+      _sortSubscriptions(_subscriptions);
       notifyListeners();
       
       // Update notification if active
@@ -466,10 +466,16 @@ class SubscriptionProvider extends ChangeNotifier {
         final fallbackDate = DateTime.now().add(const Duration(minutes: 1));
         debugPrint('DEBUG: Using fallback date $fallbackDate for ${subscription.name}');
         
+        final isTrial = subscription.description?.toLowerCase().contains('free trial') ?? false;
+        final fallbackTitle = isTrial ? 'Free Trial Expiring' : 'Upcoming Subscription Renewal';
+        final fallbackBody = isTrial 
+            ? 'Your ${subscription.name} free trial expires ${subscription.notificationDays == 0 ? "today" : "soon"}'
+            : '${subscription.name} will renew ${subscription.notificationDays == 0 ? "today" : "soon"}';
+        
         _notificationService.scheduleNotification(
           id: subscription.id.hashCode,
-          title: 'Upcoming Subscription Renewal',
-          body: '${subscription.name} will renew ${subscription.notificationDays == 0 ? "today" : "soon"}',
+          title: fallbackTitle,
+          body: fallbackBody,
           scheduledDate: fallbackDate,
         );
       }
@@ -478,11 +484,19 @@ class SubscriptionProvider extends ChangeNotifier {
     
           debugPrint('DEBUG: Scheduling notification for ${subscription.name} on $notificationDate');
     
-    // Schedule notification
+    // Determine if this is a trial or regular subscription
+    final isTrial = subscription.description?.toLowerCase().contains('free trial') ?? false;
+    
+    // Schedule notification with appropriate message
+    final title = isTrial ? 'Free Trial Expiring' : 'Subscription Renewal Reminder';
+    final body = isTrial 
+        ? 'Your ${subscription.name} free trial expires in ${subscription.notificationDays} ${subscription.notificationDays == 1 ? 'day' : 'days'}'
+        : '${subscription.name} will renew in ${subscription.notificationDays} ${subscription.notificationDays == 1 ? 'day' : 'days'}';
+    
     _notificationService.scheduleNotification(
       id: subscription.id.hashCode,
-      title: 'Subscription Renewal Reminder',
-      body: '${subscription.name} will renew in ${subscription.notificationDays} days',
+      title: title,
+      body: body,
       scheduledDate: notificationDate,
     );
   }
@@ -569,5 +583,38 @@ class SubscriptionProvider extends ChangeNotifier {
       debugPrint('DEBUG: Is renewal date in past: ${renewalDate.isBefore(now)}');
       debugPrint('DEBUG: ---------------------');
     }
+  }
+
+  // Sort subscriptions based on current setting
+  void _sortSubscriptions(List<Subscription> subscriptions) {
+    final sortOption = _settingsService.getSubscriptionSort();
+    
+    switch (sortOption) {
+      case AppConstants.SORT_BY_DATE_ADDED:
+        // Sort by start date descending (most recent first)
+        subscriptions.sort((a, b) => b.startDate.compareTo(a.startDate));
+        break;
+      case AppConstants.SORT_BY_NAME:
+        // Sort alphabetically
+        subscriptions.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        break;
+      case AppConstants.SORT_BY_AMOUNT:
+        // Sort by monthly cost descending (highest first)
+        subscriptions.sort((a, b) => b.monthlyCost.compareTo(a.monthlyCost));
+        break;
+      case AppConstants.SORT_BY_RENEWAL_DATE:
+        // Sort by next renewal date ascending (soonest first)
+        subscriptions.sort((a, b) => a.renewalDate.compareTo(b.renewalDate));
+        break;
+      default:
+        // Default to date added
+        subscriptions.sort((a, b) => b.startDate.compareTo(a.startDate));
+    }
+  }
+
+  // Public method to re-sort subscriptions (called when user changes sort preference)
+  void resortSubscriptions() {
+    _sortSubscriptions(_subscriptions);
+    notifyListeners();
   }
 } 

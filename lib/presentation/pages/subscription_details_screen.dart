@@ -100,7 +100,7 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
   
   void _startSubscriptionTutorial() {
     // This will trigger the enhanced tutorial to start
-    TipsHelper.debugShowTutorial('subscription_details_tutorial');
+    // (Tutorial auto-starts if not completed before)
   }
 
   void _deleteSubscription(BuildContext context, String subscriptionId) async {
@@ -313,7 +313,6 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
           position: const Offset(0.85, 0.15),
           targetKey: _menuButtonKey,
           backgroundColor: const Color(0xFF8B5CF6), // Purple
-          debugLabel: 'Menu Actions',
         ),
         EnhancedTip(
           title: 'Price Change History',
@@ -322,7 +321,6 @@ class _SubscriptionDetailsScreenState extends State<SubscriptionDetailsScreen> w
           position: const Offset(0.5, 0.7),
           targetKey: _priceHistoryKey,
           backgroundColor: const Color(0xFF10B981), // Green
-          debugLabel: 'Price History Card',
         ),
       ],
       child: PopScope(

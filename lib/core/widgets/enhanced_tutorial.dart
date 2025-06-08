@@ -39,7 +39,6 @@ class EnhancedTip {
   final Alignment alignment;
   final GlobalKey? targetKey;
   final Color? backgroundColor;
-  final String? debugLabel; // For debug mode
   final VoidCallback? onTipShown; // Callback when tip is shown
 
   EnhancedTip({
@@ -50,7 +49,6 @@ class EnhancedTip {
     this.alignment = Alignment.center,
     this.targetKey,
     this.backgroundColor,
-    this.debugLabel,
     this.onTipShown,
   });
 }
@@ -107,12 +105,7 @@ class _EnhancedTutorialState extends State<EnhancedTutorial>
       _checkTutorialStatus();
     }
     
-    // Debug mode: Listen for debug commands
-    if (TipsHelper.isDebugMode) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showDebugOptions();
-      });
-    }
+
   }
   
   @override
@@ -123,41 +116,7 @@ class _EnhancedTutorialState extends State<EnhancedTutorial>
     super.dispose();
   }
 
-  void _showDebugOptions() {
-    if (!TipsHelper.isDebugMode) return;
-    
-    // Add a debug gesture detector
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('🐛 Debug: Tutorial Options'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.play_arrow, color: Colors.green),
-              title: Text('Start ${widget.tutorialKey} Tutorial'),
-              onTap: () {
-                Navigator.pop(context);
-                _forceTutorial();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.refresh, color: Colors.orange),
-              title: const Text('Reset All Tips'),
-              onTap: () async {
-                Navigator.pop(context);
-                await TipsHelper.resetAllTips();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('🐛 Debug: All tips reset!')),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
   
   Future<void> _checkTutorialStatus() async {
     final prefs = await SharedPreferences.getInstance();
@@ -261,18 +220,7 @@ class _EnhancedTutorialState extends State<EnhancedTutorial>
       children: [
         widget.child,
         
-        // Debug overlay (only in debug mode)
-        if (TipsHelper.isDebugMode)
-          Positioned(
-            top: 50,
-            right: 20,
-            child: FloatingActionButton.small(
-              heroTag: "debug_tutorial_${widget.tutorialKey}",
-              backgroundColor: Colors.red.withOpacity(0.8),
-              child: const Icon(Icons.bug_report, color: Colors.white),
-              onPressed: _showDebugOptions,
-            ),
-          ),
+
         
         // Tutorial overlay
         if (_isTutorialActive && _currentTipIndex >= 0 && _currentTipIndex < widget.tips.length)
@@ -499,15 +447,7 @@ class _EnhancedTutorialState extends State<EnhancedTutorial>
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      // Debug label
-                      if (TipsHelper.isDebugMode && tip.debugLabel != null)
-                        Text(
-                          '🐛 ${tip.debugLabel}',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 12,
-                          ),
-                        ),
+
                     ],
                   ),
                 ),

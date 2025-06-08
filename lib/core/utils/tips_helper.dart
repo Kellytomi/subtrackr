@@ -57,18 +57,7 @@ class TipsHelper {
     await prefs.remove(_mainAppTutorialKey);
   }
 
-  /// Debug mode: Force show specific tutorial
-  static Future<void> debugShowTutorial(String tutorialKey) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('tutorial_${tutorialKey}_completed');
-  }
 
-  /// Debug mode: Check if we're in debug mode
-  static bool get isDebugMode {
-    bool inDebugMode = false;
-    assert(inDebugMode = true);
-    return inDebugMode;
-  }
   
   /// Check if all individual tips have been shown
   static Future<bool> _areAllIndividualTipsShown() async {

@@ -70,8 +70,10 @@ class AuthService {
       final authHeaders = await account.authHeaders;
       final authenticateClient = GoogleAuthClient(authHeaders);
       _gmailApi = gmail.GmailApi(authenticateClient);
+      print('✅ Gmail API initialized successfully');
     } catch (error) {
-      print('Error initializing Gmail API: $error');
+      print('❌ Error initializing Gmail API: $error');
+      _gmailApi = null;
     }
   }
 
@@ -106,6 +108,34 @@ class AuthService {
       return scopes;
     } catch (error) {
       print('Error requesting Gmail permissions: $error');
+      return false;
+    }
+  }
+
+  /// Refresh authentication and reinitialize Gmail API
+  Future<bool> refreshAuthentication() async {
+    if (_currentUser == null) return false;
+    
+    try {
+      print('🔄 Refreshing authentication...');
+      
+      // Clear current API instance
+      _gmailApi = null;
+      
+      // Re-authenticate
+      await _currentUser!.clearAuthCache();
+      await _initializeGmailApi(_currentUser!);
+      
+      // Test the API with a simple call
+      if (_gmailApi != null) {
+        await _gmailApi!.users.getProfile('me');
+        print('✅ Authentication refresh successful');
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      print('❌ Error refreshing authentication: $error');
       return false;
     }
   }

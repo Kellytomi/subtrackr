@@ -1069,17 +1069,20 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
       if (_lastPaymentDate != null) {
         calculatedRenewalDate = _renewalDate ?? _calculateRenewalFromLastPayment();
       } else {
-        // For new subscriptions, we don't skip past dates, so we can see overdue payments
+        // For new subscriptions, skip past dates unless the start date is very recent
+        // This prevents new subscriptions from showing as overdue immediately
+        final shouldSkipPastDates = DateTime.now().difference(_startDate).inDays > 1;
         calculatedRenewalDate = AppDateUtils.calculateNextRenewalDate(
         _startDate,
         _billingCycle,
           customBillingDays,
-          false, // skipPastDates - don't skip past dates for new subscriptions
+          shouldSkipPastDates, // Skip past dates for subscriptions with older start dates
       );
       }
       
              // Debug info
        debugPrint('DEBUG: Creating subscription: startDate: $_startDate, renewalDate: $calculatedRenewalDate, lastPaymentDate: $_lastPaymentDate');
+       debugPrint('DEBUG: Days since start date: ${DateTime.now().difference(_startDate).inDays}');
       
       // Create new subscription (always set to active)
       final subscription = Subscription(

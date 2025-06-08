@@ -40,6 +40,10 @@ class SettingsService {
     if (!_settingsBox.containsKey(AppConstants.CURRENCY_CODE_SETTING)) {
       await _settingsBox.put(AppConstants.CURRENCY_CODE_SETTING, AppConstants.DEFAULT_CURRENCY_CODE);
     }
+    
+    if (!_settingsBox.containsKey(AppConstants.SUBSCRIPTION_SORT_SETTING)) {
+      await _settingsBox.put(AppConstants.SUBSCRIPTION_SORT_SETTING, AppConstants.DEFAULT_SORT_OPTION);
+    }
   }
   
   /// Get the current theme mode
@@ -150,6 +154,17 @@ class SettingsService {
   /// Set onboarding complete
   Future<void> setOnboardingComplete(bool complete) async {
     await _settingsBox.put(AppConstants.ONBOARDING_COMPLETE_SETTING, complete);
+  }
+  
+  /// Get the subscription sorting preference
+  String getSubscriptionSort() {
+    final value = _settingsBox.get(AppConstants.SUBSCRIPTION_SORT_SETTING);
+    return value is String ? value : AppConstants.DEFAULT_SORT_OPTION;
+  }
+  
+  /// Set the subscription sorting preference
+  Future<void> setSubscriptionSort(String sortOption) async {
+    await _settingsBox.put(AppConstants.SUBSCRIPTION_SORT_SETTING, sortOption);
   }
   
   /// Close the box

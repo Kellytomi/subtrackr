@@ -355,16 +355,40 @@ class SubscriptionCard extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  subscription.name,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 17,
-                                    color: theme.colorScheme.onSurface,
-                                    letterSpacing: -0.2,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        subscription.name,
+                                        style: theme.textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 17,
+                                          color: theme.colorScheme.onSurface,
+                                          letterSpacing: -0.2,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (_isCurrentlyInTrial(subscription))
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Text(
+                                          'TRIAL',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 const SizedBox(height: 6),
                                 Row(
@@ -523,5 +547,47 @@ class SubscriptionCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Check if a subscription is currently in its free trial period
+  bool _isCurrentlyInTrial(Subscription subscription) {
+    // A subscription is in trial if:
+    // 1. Its description mentions "Free trial"
+    // 2. The current date is before the renewal date (first billing)
+    // 3. The subscription is active
+    
+    print('🔍 Checking trial status for ${subscription.name}:');
+    print('   Status: ${subscription.status}');
+    print('   Description: ${subscription.description}');
+    print('   Renewal Date: ${subscription.renewalDate}');
+    print('   Current Date: ${DateTime.now()}');
+    
+    if (subscription.status != AppConstants.STATUS_ACTIVE) {
+      print('   ❌ Not active');
+      return false;
+    }
+    
+    // Check if description mentions free trial
+    final description = subscription.description?.toLowerCase() ?? '';
+    final isTrialSubscription = description.contains('free trial');
+    
+    print('   Free trial in description: $isTrialSubscription');
+    
+    if (!isTrialSubscription) {
+      print('   ❌ No free trial in description');
+      return false;
+    }
+    
+    // Check if we're still before the first billing date
+    final now = DateTime.now();
+    final renewalDate = subscription.renewalDate;
+    
+    final isInFuture = renewalDate.isAfter(now);
+    print('   Renewal in future: $isInFuture');
+    
+    // If renewal is in the future, and this was detected as a trial, we're still in trial
+    final result = isInFuture;
+    print('   Final result: $result');
+    return result;
   }
 } 

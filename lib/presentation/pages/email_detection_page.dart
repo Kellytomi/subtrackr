@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:provider/provider.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/email_scanner_service.dart';
+import '../../presentation/providers/subscription_provider.dart';
+import '../../domain/entities/subscription.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/utils/date_utils.dart';
+import '../../data/services/logo_service.dart';
 
 class EmailDetectionPage extends StatefulWidget {
   const EmailDetectionPage({super.key});
@@ -16,9 +22,15 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
   
   bool _isLoading = false;
   bool _isScanning = false;
+  bool _isAddingSubscriptions = false;
   GoogleSignInAccount? _currentUser;
   List<DetectedSubscription> _detectedSubscriptions = [];
+  Set<int> _selectedSubscriptions = {};
   String? _errorMessage;
+  
+  // Progress tracking
+  double _scanProgress = 0.0;
+  String _scanStatus = '';
 
   @override
   void initState() {
@@ -69,6 +81,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
       setState(() {
         _currentUser = null;
         _detectedSubscriptions = [];
+        _selectedSubscriptions = {};
         _errorMessage = null;
       });
     } catch (error) {
@@ -83,12 +96,26 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
   Future<void> _scanEmails() async {
     if (_currentUser == null) return;
     
-    setState(() => _isScanning = true);
+    setState(() {
+      _isScanning = true;
+      _scanProgress = 0.0;
+      _scanStatus = 'Starting email scan...';
+    });
     
     try {
       // Check if we have Gmail permissions
+      setState(() {
+        _scanProgress = 5.0;
+        _scanStatus = 'Checking permissions...';
+      });
+      
       final hasPermissions = await _authService.hasGmailPermissions();
       if (!hasPermissions) {
+        setState(() {
+          _scanProgress = 8.0;
+          _scanStatus = 'Requesting Gmail permissions...';
+        });
+        
         final granted = await _authService.requestGmailPermissions();
         if (!granted) {
           setState(() {
@@ -98,14 +125,21 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
         }
       }
       
-      // Scan emails for subscriptions
+      // Scan emails for subscriptions with progress callback
       final subscriptions = await _emailService.scanForSubscriptions(
         maxResults: 50,
         daysBack: 90,
+        onProgress: (progress, status) {
+          setState(() {
+            _scanProgress = progress;
+            _scanStatus = status;
+          });
+        },
       );
       
       setState(() {
         _detectedSubscriptions = subscriptions;
+        _selectedSubscriptions = Set.from(List.generate(subscriptions.length, (index) => index));
         _errorMessage = null;
       });
       
@@ -115,12 +149,309 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
         _showSnackBar('Found ${subscriptions.length} potential subscriptions!', isError: false);
       }
     } catch (error) {
+      String errorMessage = 'Error scanning emails: $error';
+      
+      // Provide more helpful error messages for common issues
+      if (error.toString().contains('401') || error.toString().contains('authentication')) {
+        errorMessage = 'Authentication failed. Please sign out and sign in again to refresh your Gmail permissions.';
+      } else if (error.toString().contains('403')) {
+        errorMessage = 'Gmail access was denied. Please ensure you grant Gmail permissions when signing in.';
+      } else if (error.toString().contains('network') || error.toString().contains('connection')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      }
+      
       setState(() {
-        _errorMessage = 'Error scanning emails: $error';
+        _errorMessage = errorMessage;
       });
     } finally {
       setState(() => _isScanning = false);
     }
+  }
+
+  Future<void> _addSelectedSubscriptions() async {
+    if (_selectedSubscriptions.isEmpty) {
+      _showSnackBar('Please select at least one subscription to add', isError: true);
+      return;
+    }
+
+    setState(() => _isAddingSubscriptions = true);
+
+    try {
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      int addedCount = 0;
+
+      for (final index in _selectedSubscriptions) {
+        if (index < _detectedSubscriptions.length) {
+          final detected = _detectedSubscriptions[index];
+          
+          // Convert detected subscription to Subscription entity
+          final subscription = await _convertDetectedToSubscription(detected);
+          
+          // Check if subscription already exists (by name and amount)
+          final existingSubscriptions = subscriptionProvider.subscriptions;
+          final isDuplicate = existingSubscriptions.any((existing) =>
+              existing.name.toLowerCase() == subscription.name.toLowerCase() &&
+              existing.amount == subscription.amount);
+
+          if (!isDuplicate) {
+            await subscriptionProvider.addSubscription(subscription);
+            addedCount++;
+          } else {
+            print('⚠️ Duplicate subscription skipped: ${subscription.name} - ${subscription.currencyCode}${subscription.amount}');
+          }
+        }
+      }
+
+      if (addedCount > 0) {
+        final skippedCount = _selectedSubscriptions.length - addedCount;
+        if (skippedCount > 0) {
+          _showSnackBar('Added $addedCount subscription(s)! Skipped $skippedCount duplicate(s).', isError: false);
+        } else {
+          _showSnackBar('Successfully added $addedCount subscription(s)!', isError: false);
+        }
+        
+        // Navigate back to homepage (pop all routes back to root)
+        Navigator.popUntil(context, (route) => route.isFirst);
+      } else {
+        _showSnackBar('All selected subscriptions already exist in your app', isError: true);
+      }
+    } catch (error) {
+      _showSnackBar('Error adding subscriptions: $error', isError: true);
+    } finally {
+      setState(() => _isAddingSubscriptions = false);
+    }
+  }
+
+  Future<Subscription> _convertDetectedToSubscription(DetectedSubscription detected) async {
+    final now = DateTime.now();
+    
+    // For free trials, we need to handle dates carefully
+    DateTime startDate;
+    DateTime renewalDate;
+    
+    if (detected.isFreeTrial) {
+      // For free trials: use email date as trial start, and billing start date as first renewal
+      startDate = detected.emailDate ?? now;
+      
+      print('🔍 Debug trial dates:');
+      print('   detected.emailDate: ${detected.emailDate}');
+      print('   detected.startDate: ${detected.startDate}');
+      print('   detected.billingStartDate: ${detected.billingStartDate}');
+      print('   detected.trialDays: ${detected.trialDays}');
+      print('   Will use startDate: $startDate');
+      
+      if (detected.billingStartDate != null) {
+        // Check if billing start date is the same as trial start (incorrect parsing)
+        if (detected.billingStartDate!.difference(startDate).inDays.abs() <= 1) {
+          print('⚠️ Warning: Billing start date is same as trial start, calculating from trial days');
+          if (detected.trialDays != null && detected.trialDays! > 0) {
+            renewalDate = startDate.add(Duration(days: detected.trialDays!));
+            print('🆓 Fixed free trial: ${detected.serviceName} starts ${startDate.day}/${startDate.month}/${startDate.year}, ${detected.trialDays} days trial, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year}');
+          } else {
+            // Fallback: assume 7-day trial
+            renewalDate = startDate.add(const Duration(days: 7));
+            print('🆓 Fixed free trial (fallback): ${detected.serviceName} starts ${startDate.day}/${startDate.month}/${startDate.year}, assuming 7-day trial, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year}');
+          }
+        } else {
+          // First renewal is when billing starts (end of trial)
+          renewalDate = detected.billingStartDate!;
+          print('🆓 Free trial: ${detected.serviceName} starts ${startDate.day}/${startDate.month}/${startDate.year}, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year}');
+        }
+      } else if (detected.trialDays != null && detected.trialDays! > 0) {
+        // Calculate billing start from trial start + trial days
+        renewalDate = startDate.add(Duration(days: detected.trialDays!));
+        print('🆓 Free trial: ${detected.serviceName} starts ${startDate.day}/${startDate.month}/${startDate.year}, ${detected.trialDays} days trial, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year}');
+      } else {
+        // Fallback: assume 7-day trial
+        renewalDate = startDate.add(const Duration(days: 7));
+        print('🆓 Free trial: ${detected.serviceName} starts ${startDate.day}/${startDate.month}/${startDate.year}, assuming 7-day trial, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year}');
+      }
+    } else {
+      // Regular subscription: use standard logic
+      startDate = detected.startDate ?? detected.emailDate ?? now;
+      renewalDate = _calculateRenewalDate(startDate, detected.billingCycle);
+      print('💰 Regular subscription: ${detected.serviceName} starts ${startDate.day}/${startDate.month}, next renewal ${renewalDate.day}/${renewalDate.month}');
+    }
+    
+    // Convert billing cycle
+    String billingCycle;
+    int? customBillingDays;
+    
+    switch (detected.billingCycle) {
+      case BillingCycle.weekly:
+        billingCycle = AppConstants.BILLING_CYCLE_CUSTOM;
+        customBillingDays = 7;
+        break;
+      case BillingCycle.monthly:
+        billingCycle = AppConstants.BILLING_CYCLE_MONTHLY;
+        break;
+      case BillingCycle.yearly:
+        billingCycle = AppConstants.BILLING_CYCLE_YEARLY;
+        break;
+    }
+
+    // Determine category based on service name
+    String category = _categorizeService(detected.serviceName);
+
+    // Use the already-fetched logo from detection
+    String? logoUrl = detected.logoUrl;
+
+          return Subscription(
+        name: detected.serviceName,
+        amount: detected.amount,
+        currencyCode: detected.currency,
+        billingCycle: billingCycle,
+        customBillingDays: customBillingDays,
+        startDate: startDate,
+        renewalDate: renewalDate,
+        status: AppConstants.STATUS_ACTIVE,
+        category: category,
+        logoUrl: logoUrl,
+                description: detected.isFreeTrial 
+            ? 'Auto-detected from email: ${detected.emailSubject} (Free trial: ${detected.trialDays ?? 'Unknown'} days starting ${startDate.day}/${startDate.month}/${startDate.year}, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year})'
+            : 'Auto-detected from email: ${detected.emailSubject}',
+        notificationsEnabled: true,
+        notificationDays: detected.isFreeTrial ? 1 : 1, // 1 day before for email-detected subscriptions
+      );
+  }
+  
+  DateTime _calculateRenewalDate(DateTime startDate, BillingCycle billingCycle) {
+    switch (billingCycle) {
+      case BillingCycle.weekly:
+        return startDate.add(const Duration(days: 7));
+      case BillingCycle.monthly:
+        return DateTime(startDate.year, startDate.month + 1, startDate.day);
+      case BillingCycle.yearly:
+        return DateTime(startDate.year + 1, startDate.month, startDate.day);
+    }
+  }
+
+  String _categorizeService(String serviceName) {
+    final lowerName = serviceName.toLowerCase();
+    
+    // Entertainment services (check specific video services first)
+    if (lowerName.contains('prime video') ||
+        lowerName.contains('amazon prime video') ||
+        lowerName.contains('netflix') || 
+        lowerName.contains('spotify') ||
+        lowerName.contains('disney') ||
+        lowerName.contains('hulu') ||
+        lowerName.contains('youtube') ||
+        lowerName.contains('hbo') ||
+        lowerName.contains('paramount') ||
+        lowerName.contains('twitch') ||
+        lowerName.contains('apple tv') ||
+        lowerName.contains('peacock') ||
+        lowerName.contains('crunchyroll')) {
+      return AppConstants.CATEGORY_ENTERTAINMENT;
+    }
+    
+    // Productivity services
+    if (lowerName.contains('notion') ||
+        lowerName.contains('slack') ||
+        lowerName.contains('zoom') ||
+        lowerName.contains('canva') ||
+        lowerName.contains('figma') ||
+        lowerName.contains('adobe') ||
+        lowerName.contains('microsoft') ||
+        lowerName.contains('google')) {
+      return AppConstants.CATEGORY_PRODUCTIVITY;
+    }
+    
+    // Software/Developer services
+    if (lowerName.contains('github') ||
+        lowerName.contains('gitlab') ||
+        lowerName.contains('atlassian')) {
+      return AppConstants.CATEGORY_SOFTWARE;
+    }
+    
+    // Security services
+    if (lowerName.contains('vpn') ||
+        lowerName.contains('1password') ||
+        lowerName.contains('lastpass') ||
+        lowerName.contains('dashlane')) {
+      return AppConstants.CATEGORY_SOFTWARE;
+    }
+    
+    // Gaming services
+    if (lowerName.contains('playstation') ||
+        lowerName.contains('xbox') ||
+        lowerName.contains('nintendo')) {
+      return AppConstants.CATEGORY_GAMING;
+    }
+    
+    // Shopping services (after entertainment checks)
+    if (lowerName.contains('amazon prime') && !lowerName.contains('video')) {
+      return AppConstants.CATEGORY_SHOPPING;
+    }
+    if (lowerName.contains('amazon') && !lowerName.contains('prime video')) {
+      return AppConstants.CATEGORY_SHOPPING;
+    }
+    
+    // Default to Other
+    return AppConstants.CATEGORY_OTHER;
+  }
+
+  /// Convert detected service names to better logo search terms
+  String _getLogoSearchTerm(String serviceName) {
+    final lowerName = serviceName.toLowerCase();
+    
+    // Map detected names to better logo search terms
+    if (lowerName.contains('amazon prime video') || lowerName == 'amazon prime video') {
+      return 'Prime Video';
+    }
+    
+    if (lowerName.contains('youtube premium') || lowerName == 'youtube premium') {
+      return 'YouTube Premium';
+    }
+    
+    if (lowerName.contains('youtube music') || lowerName == 'youtube music') {
+      return 'YouTube Music';
+    }
+    
+    if (lowerName.contains('microsoft 365') || lowerName == 'microsoft 365') {
+      return 'Microsoft 365';
+    }
+    
+    if (lowerName.contains('office 365') || lowerName == 'office 365') {
+      return 'Microsoft 365';
+    }
+    
+    if (lowerName.contains('google one') || lowerName == 'google one') {
+      return 'Google One';
+    }
+    
+    if (lowerName.contains('google drive') || lowerName == 'google drive') {
+      return 'Google Drive';
+    }
+    
+    if (lowerName.contains('icloud') || lowerName == 'icloud storage') {
+      return 'iCloud';
+    }
+    
+    if (lowerName.contains('adobe creative cloud') || lowerName == 'adobe creative cloud') {
+      return 'Adobe Creative Cloud';
+    }
+    
+    if (lowerName.contains('github pro') || lowerName == 'github pro') {
+      return 'GitHub';
+    }
+    
+    if (lowerName.contains('discord nitro') || lowerName == 'discord nitro') {
+      return 'Discord Nitro';
+    }
+    
+    // For services ending with specific suffixes, clean them up
+    if (lowerName.endsWith(' subscription')) {
+      return serviceName.substring(0, serviceName.length - 12);
+    }
+    
+    if (lowerName.endsWith(' premium')) {
+      return serviceName;  // Keep "Premium" for services like "Spotify Premium"
+    }
+    
+    // Default: return the original service name
+    return serviceName;
   }
 
   void _showSnackBar(String message, {bool isError = true}) {
@@ -300,6 +631,47 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
               style: TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
+            
+            // Progress bar (shown when scanning)
+            if (_isScanning) ...[
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _scanStatus,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        '${_scanProgress.toInt()}%',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: _scanProgress / 100,
+                      backgroundColor: Colors.grey[300],
+                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.orange),
+                      minHeight: 6,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ],
+            
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -309,10 +681,13 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
                       )
                     : const Icon(Icons.email_outlined),
-                label: Text(_isScanning ? 'Scanning emails...' : 'Scan My Emails'),
+                label: Text(_isScanning ? 'Scanning...' : 'Scan My Emails'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                   foregroundColor: Colors.white,
@@ -336,12 +711,56 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Detected Subscriptions (${_detectedSubscriptions.length})',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Detected Subscriptions (${_detectedSubscriptions.length})',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        if (_selectedSubscriptions.length == _detectedSubscriptions.length) {
+                          _selectedSubscriptions.clear();
+                        } else {
+                          _selectedSubscriptions = Set.from(
+                            List.generate(_detectedSubscriptions.length, (index) => index)
+                          );
+                        }
+                      });
+                    },
+                    icon: Icon(
+                      _selectedSubscriptions.length == _detectedSubscriptions.length 
+                          ? Icons.deselect 
+                          : Icons.select_all,
+                      size: 18,
+                    ),
+                    label: Text(
+                      _selectedSubscriptions.length == _detectedSubscriptions.length 
+                          ? 'Deselect All' 
+                          : 'Select All',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                      foregroundColor: Theme.of(context).primaryColor,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             ListView.separated(
@@ -358,12 +777,19 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  // TODO: Navigate to add subscriptions page with detected data
-                  _showSnackBar('Feature coming soon: Add selected subscriptions', isError: false);
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Add Selected Subscriptions'),
+                onPressed: _selectedSubscriptions.isEmpty || _isAddingSubscriptions
+                    ? null 
+                    : _addSelectedSubscriptions,
+                icon: _isAddingSubscriptions
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.add),
+                label: Text(_isAddingSubscriptions 
+                    ? 'Adding subscriptions...' 
+                    : 'Add Selected Subscriptions (${_selectedSubscriptions.length})'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
@@ -377,38 +803,160 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> {
   }
 
   Widget _buildSubscriptionTile(DetectedSubscription subscription) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-        child: Icon(
-          Icons.subscriptions,
-          color: Theme.of(context).primaryColor,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withOpacity(0.1),
         ),
-      ),
-      title: Text(
-        subscription.serviceName,
-        style: const TextStyle(fontWeight: FontWeight.bold),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('${subscription.currency} ${subscription.amount.toStringAsFixed(2)} / ${subscription.billingCycle.name}'),
-          Text(
-            'From: ${subscription.detectedFrom}',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          if (subscription.emailDate != null)
-            Text(
-              'Date: ${subscription.emailDate!.toLocal().toString().split(' ')[0]}',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
         ],
       ),
-      trailing: Checkbox(
-        value: true, // TODO: Implement selection state
-        onChanged: (value) {
-          // TODO: Implement selection logic
-        },
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Logo
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: subscription.logoUrl != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        subscription.logoUrl!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.subscriptions,
+                          color: Theme.of(context).primaryColor,
+                          size: 24,
+                        ),
+                      ),
+                    )
+                  : Icon(
+                      Icons.subscriptions,
+                      color: Theme.of(context).primaryColor,
+                      size: 24,
+                    ),
+            ),
+            
+            const SizedBox(width: 16),
+            
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Service name and trial badge
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          subscription.serviceName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (subscription.isFreeTrial) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'TRIAL',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  // Price
+                  Text(
+                    '${subscription.currency} ${subscription.amount.toStringAsFixed(2)} / ${subscription.billingCycle.name}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.8),
+                    ),
+                  ),
+                  
+                  if (subscription.isFreeTrial) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Free for ${subscription.trialDays ?? '?'} days',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.green,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 8),
+                  
+                  // Date
+                  if (subscription.emailDate != null)
+                    Text(
+                      'Detected ${subscription.emailDate!.toLocal().toString().split(' ')[0]}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(width: 16),
+            
+            // Checkbox
+            Transform.scale(
+              scale: 1.2,
+              child: Checkbox(
+                value: _selectedSubscriptions.contains(_detectedSubscriptions.indexOf(subscription)),
+                onChanged: (value) {
+                  final index = _detectedSubscriptions.indexOf(subscription);
+                  setState(() {
+                    if (value == true) {
+                      _selectedSubscriptions.add(index);
+                    } else {
+                      _selectedSubscriptions.remove(index);
+                    }
+                  });
+                },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
