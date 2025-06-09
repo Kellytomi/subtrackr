@@ -593,6 +593,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                             fontSize: 14,
                             color: colorScheme.onSurface.withOpacity(0.7),
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
