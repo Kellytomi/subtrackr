@@ -81,8 +81,6 @@ dev_dependencies:
   very_good_analysis: ^6.0.0
   
   # For testing
-  integration_test:
-    sdk: flutter
   mockito: ^5.4.4
   
   # For Hive code generation
