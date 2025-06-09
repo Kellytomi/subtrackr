@@ -45,5 +45,23 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>REVERSED_CLIENT_ID</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.752788778229-t063i6qt715bt57nuougslgnfe9q5b84</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSUserNotificationAlertStyle</key>
+	<string>alert</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

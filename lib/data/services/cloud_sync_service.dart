@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/widgets.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../domain/entities/subscription.dart';
@@ -157,13 +158,24 @@ class CloudSyncService {
       bool hadTypecastError = false;
       
       try {
+        // Force re-initialize the AuthService before attempting sign-in
+        await _authService.initialize();
+        print('📱 AuthService re-initialized');
+        
         googleUser = await _authService.signIn();
-        print('✅ Google Sign-In completed successfully');
+        print('✅ Google Sign-In completed successfully: ${googleUser?.email}');
       } catch (e) {
         print('❌ Google Sign-In failed with error: $e');
+        print('❌ Error type: ${e.runtimeType}');
+        print('❌ Full error details: ${e.toString()}');
         
-        // If it's the known type cast error, try alternative approach
-        if (e.toString().contains('PigeonUserDetails') || e.toString().contains('type cast') || e.toString().contains('List<Object?>')) {
+        // If it's the known type cast error or Android-specific errors, try alternative approach
+        if (e.toString().contains('PigeonUserDetails') || 
+            e.toString().contains('type cast') || 
+            e.toString().contains('List<Object?>') ||
+            e.toString().contains('sign_in_failed') ||
+            e.toString().contains('network_error') ||
+            e.toString().contains('GoogleSignInException')) {
           print('🔄 Detected type cast error, implementing workaround...');
           hadTypecastError = true;
           
@@ -198,6 +210,10 @@ class CloudSyncService {
         }
         
         print('❌ No Google user and no Firebase user - sign-in truly failed');
+        print('🔍 Debug info:');
+        print('   AuthService.isSignedIn: ${_authService.isSignedIn}');
+        print('   AuthService.currentUser: ${_authService.currentUser?.email}');
+        print('   Firebase.currentUser: ${_auth.currentUser?.uid}');
         return false;
       }
 
@@ -301,6 +317,7 @@ class CloudSyncService {
     try {
       final data = subscription.toMap();
       data['lastModified'] = FieldValue.serverTimestamp();
+              data['appVersion'] = '1.0.5+2'; // Current app version with new sync logic
       
       await _userSubscriptionsCollection.doc(subscription.id).set(data);
       print('Uploaded subscription: ${subscription.name}');
@@ -323,6 +340,7 @@ class CloudSyncService {
       for (final subscription in subscriptions) {
         final data = subscription.toMap();
         data['lastModified'] = FieldValue.serverTimestamp();
+        data['appVersion'] = '1.0.5+2'; // Current app version with new sync logic
         
         final docRef = _userSubscriptionsCollection.doc(subscription.id);
         batch.set(docRef, data);
@@ -363,15 +381,23 @@ class CloudSyncService {
   /// Delete a subscription from cloud
   Future<void> deleteSubscription(String subscriptionId) async {
     if (!isUserSignedIn) {
-      print('Cannot delete subscription: user not signed in');
+      print('❌ Cannot delete subscription: user not signed in');
       return;
     }
 
     try {
-      await _userSubscriptionsCollection.doc(subscriptionId).delete();
-      print('Deleted subscription from cloud: $subscriptionId');
+      print('🗑️ Deleting subscription from Firestore collection: ${_userSubscriptionsCollection.path}');
+      print('🗑️ Subscription ID: $subscriptionId');
+      
+      final docRef = _userSubscriptionsCollection.doc(subscriptionId);
+      print('🗑️ Document reference path: ${docRef.path}');
+      
+      await docRef.delete();
+      print('✅ Successfully deleted subscription from cloud: $subscriptionId');
     } catch (e) {
-      print('Error deleting subscription from cloud: $e');
+      print('❌ Error deleting subscription from cloud: $e');
+      print('❌ Error type: ${e.runtimeType}');
+      print('❌ Stack trace: ${StackTrace.current}');
       rethrow;
     }
   }
@@ -387,42 +413,53 @@ class CloudSyncService {
       // Download cloud subscriptions
       final cloudSubscriptions = await downloadSubscriptions();
       
+      // Check if cloud has any subscriptions with version info
+      final cloudHasVersionInfo = cloudSubscriptions.any((sub) => 
+        sub.toMap().containsKey('appVersion'));
+      
+      const currentVersion = '1.0.5+2';
+      
+      // If cloud has version info but we're potentially an old version, be very conservative
+      if (cloudHasVersionInfo) {
+        print('🔢 Cloud has version info - using conservative sync mode');
+        print('⚠️ If you\'re seeing unexpected behavior, please update to the latest app version');
+        
+        // Just return cloud data, don't upload anything
+        // This prevents old versions from corrupting the sync
+        return cloudSubscriptions;
+      }
+      
       // Create maps for easier lookup
       final localMap = {for (var sub in localSubscriptions) sub.id: sub};
       final cloudMap = {for (var sub in cloudSubscriptions) sub.id: sub};
       
       final toUpload = <Subscription>[];
-      final merged = <Subscription>[];
+      final result = <Subscription>[];
       
-      // Process local subscriptions
+      // First, add all cloud subscriptions to result (cloud is source of truth)
+      result.addAll(cloudSubscriptions);
+      
+      // Then, check for local-only subscriptions that need to be uploaded
       for (final localSub in localSubscriptions) {
-        final cloudSub = cloudMap[localSub.id];
-        
-        if (cloudSub == null) {
+        if (!cloudMap.containsKey(localSub.id)) {
           // Local subscription doesn't exist in cloud - upload it
           toUpload.add(localSub);
-          merged.add(localSub);
-        } else {
-          // Both exist - use the more recently modified one
-          // For simplicity, we'll prefer cloud version in conflicts
-          merged.add(cloudSub);
+          result.add(localSub);
+          print('📤 Will upload new local subscription: ${localSub.name}');
         }
       }
       
-      // Add cloud-only subscriptions
-      for (final cloudSub in cloudSubscriptions) {
-        if (!localMap.containsKey(cloudSub.id)) {
-          merged.add(cloudSub);
-        }
-      }
-      
-      // Upload new local subscriptions
+      // Upload new local subscriptions to cloud
       if (toUpload.isNotEmpty) {
         await uploadSubscriptions(toUpload);
+        print('Uploaded ${toUpload.length} new subscriptions to cloud');
       }
       
-      print('Sync completed: ${merged.length} total subscriptions');
-      return merged;
+      // Log version compatibility info
+      print('🔢 Sync completed with app version: $currentVersion');
+      print('📊 Final result: ${result.length} total subscriptions');
+      
+      return result;
     } catch (e) {
       print('Error syncing subscriptions: $e');
       // Return local subscriptions if sync fails
@@ -453,51 +490,70 @@ class CloudSyncService {
     }
   }
 
-  /// Check if auto sync is enabled
-  bool get isAutoSyncEnabled {
-    return _settingsService.isAutoSyncEnabled();
+  /// Check if auto backup is enabled
+  bool get isAutoBackupEnabled {
+    return _settingsService.isAutoSyncEnabled(); // Will rename this setting method later
   }
 
-  /// Auto sync a subscription if auto sync is enabled
-  Future<void> autoSyncSubscription(Subscription subscription) async {
-    if (!isAutoSyncEnabled) {
-      print('Auto sync disabled, skipping');
+  /// Auto backup a subscription if auto backup is enabled
+  Future<void> autoBackupSubscription(Subscription subscription) async {
+    if (!isAutoBackupEnabled) {
+      print('Auto backup disabled, skipping');
       return;
     }
     
     if (!isUserSignedIn) {
-      print('Cannot auto sync: user not signed in');
+      print('Cannot auto backup: user not signed in');
       return;
     }
     
     try {
       await uploadSubscription(subscription);
-      print('Auto sync completed for: ${subscription.name}');
+      print('Auto backup completed for: ${subscription.name}');
     } catch (e) {
-      print('Auto sync failed for ${subscription.name}: $e');
-      // Don't rethrow for auto sync - it should be silent
+      print('Auto backup failed for ${subscription.name}: $e');
+      // Don't rethrow for auto backup - it should be silent
     }
   }
 
-  /// Auto sync subscription deletion if auto sync is enabled
-  Future<void> autoSyncDeleteSubscription(String subscriptionId) async {
-    if (!isAutoSyncEnabled) {
-      print('Auto sync disabled, skipping deletion');
+  /// Auto backup subscription deletion if auto backup is enabled
+  Future<void> autoBackupDeleteSubscription(String subscriptionId) async {
+    print('🔄 autoBackupDeleteSubscription called for: $subscriptionId');
+    
+    if (!isAutoBackupEnabled) {
+      print('❌ Auto backup disabled, skipping deletion');
       return;
     }
+    
+    print('✅ Auto backup is enabled');
     
     if (!isUserSignedIn) {
-      print('Cannot auto sync deletion: user not signed in');
+      print('❌ Cannot auto backup deletion: user not signed in');
       return;
     }
     
+    print('✅ User is signed in: ${_auth.currentUser?.email}');
+    
     try {
+      print('🗑️ Attempting to delete subscription from cloud: $subscriptionId');
       await deleteSubscription(subscriptionId);
-      print('Auto sync deletion completed for: $subscriptionId');
+      print('✅ Auto backup deletion completed for: $subscriptionId');
     } catch (e) {
-      print('Auto sync deletion failed for $subscriptionId: $e');
-      // Don't rethrow for auto sync - it should be silent
+      print('❌ Auto backup deletion failed for $subscriptionId: $e');
+      print('❌ Error details: ${e.toString()}');
+      // Don't rethrow for auto backup - it should be silent to user but we log the error
     }
+  }
+
+  // Keep old method names for backward compatibility (will update provider next)
+  /// @deprecated Use autoBackupSubscription instead
+  Future<void> autoSyncSubscription(Subscription subscription) async {
+    await autoBackupSubscription(subscription);
+  }
+
+  /// @deprecated Use autoBackupDeleteSubscription instead
+  Future<void> autoSyncDeleteSubscription(String subscriptionId) async {
+    await autoBackupDeleteSubscription(subscriptionId);
   }
 
   void dispose() {

@@ -103,7 +103,23 @@ class AuthService {
 
   /// Check if user has granted Gmail permissions
   Future<bool> hasGmailPermissions() async {
-    if (_currentUser == null) return false;
+    // If Gmail API is already initialized, we likely have permissions
+    if (_gmailApi != null) {
+      try {
+        // Test Gmail API access with a simple call
+        await _gmailApi!.users.getProfile('me');
+        print('✅ Gmail API is working, permissions confirmed');
+        return true;
+      } catch (e) {
+        print('❌ Gmail API test failed: $e');
+        // Fall through to normal permission check
+      }
+    }
+    
+    if (_currentUser == null) {
+      print('❌ No current user for Gmail permission check');
+      return false;
+    }
     
     try {
       final scopes = await _googleSignIn.requestScopes([
@@ -118,7 +134,21 @@ class AuthService {
 
   /// Request Gmail permissions
   Future<bool> requestGmailPermissions() async {
-    if (_currentUser == null) return false;
+    // If Gmail API is already working, permissions are already granted
+    if (_gmailApi != null) {
+      try {
+        await _gmailApi!.users.getProfile('me');
+        print('✅ Gmail API already working, permissions confirmed');
+        return true;
+      } catch (e) {
+        print('❌ Gmail API test failed, requesting fresh permissions: $e');
+      }
+    }
+    
+    if (_currentUser == null) {
+      print('❌ No current user for Gmail permission request');
+      return false;
+    }
     
     try {
       final scopes = await _googleSignIn.requestScopes([

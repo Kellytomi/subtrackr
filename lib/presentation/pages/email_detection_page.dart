@@ -326,15 +326,14 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
       );
       
       setState(() {
-        _detectedSubscriptions = subscriptions;
-        _selectedSubscriptions = Set.from(List.generate(subscriptions.length, (index) => index));
         _errorMessage = null;
       });
       
+      // Show detected subscriptions in a popup dialog
       if (subscriptions.isEmpty) {
         _showSnackBar('No subscriptions found in your recent emails', isError: false);
       } else {
-        _showSnackBar('Found ${subscriptions.length} potential subscriptions!', isError: false);
+        _showDetectedSubscriptionsDialog(subscriptions);
       }
     } catch (error) {
       String errorMessage = 'Error scanning emails: $error';
@@ -1072,129 +1071,139 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
   }
 
   Widget _buildSubscriptionTile(DetectedSubscription subscription) {
+    // Get responsive sizing based on screen size and pixel density
+    final mediaQuery = MediaQuery.of(context);
+    final screenWidth = mediaQuery.size.width;
+    final screenHeight = mediaQuery.size.height;
+    final pixelRatio = mediaQuery.devicePixelRatio;
+    final textScaleFactor = mediaQuery.textScaleFactor;
+    
+    // Calculate responsive dimensions
+    // Smaller devices or higher pixel density = more compact layout
+    final isCompactScreen = screenHeight < 700 || textScaleFactor > 1.1;
+    final isLargeScreen = screenWidth > 400;
+    
+    // Adaptive spacing and sizing
+    final cardPadding = isCompactScreen ? 12.0 : 16.0;
+    final cardMargin = isCompactScreen ? 8.0 : 12.0;
+    final logoSize = isCompactScreen ? 40.0 : 48.0;
+    final horizontalSpacing = isCompactScreen ? 12.0 : 16.0;
+    final verticalSpacing = isCompactScreen ? 4.0 : 8.0;
+    final smallVerticalSpacing = isCompactScreen ? 2.0 : 4.0;
+    
+    // Adaptive font sizes
+    final titleFontSize = isCompactScreen ? 14.0 : 16.0;
+    final priceFontSize = isCompactScreen ? 12.0 : 14.0;
+    final trialFontSize = isCompactScreen ? 10.0 : 12.0;
+    final dateFontSize = isCompactScreen ? 9.0 : 11.0;
+    final badgeFontSize = isCompactScreen ? 8.0 : 10.0;
+    
+    // Adaptive trial badge sizing
+    final badgePadding = isCompactScreen 
+        ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2)
+        : const EdgeInsets.symmetric(horizontal: 8, vertical: 4);
+    
+    // Adaptive checkbox scaling
+    final checkboxScale = isCompactScreen ? 1.0 : 1.2;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: cardMargin),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isCompactScreen ? 12 : 16),
         border: Border.all(
           color: Theme.of(context).dividerColor.withOpacity(0.1),
         ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
+            blurRadius: isCompactScreen ? 6 : 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(cardPadding),
         child: Row(
           children: [
             // Logo
             Container(
-              width: 48,
-              height: 48,
+              width: logoSize,
+              height: logoSize,
               decoration: BoxDecoration(
                 color: Theme.of(context).primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(isCompactScreen ? 10 : 12),
               ),
               child: subscription.logoUrl != null
                   ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(isCompactScreen ? 10 : 12),
                       child: Image.network(
                         subscription.logoUrl!,
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => Icon(
                           Icons.subscriptions,
                           color: Theme.of(context).primaryColor,
-                          size: 24,
+                          size: logoSize * 0.5,
                         ),
                       ),
                     )
                   : Icon(
                       Icons.subscriptions,
                       color: Theme.of(context).primaryColor,
-                      size: 24,
+                      size: logoSize * 0.5,
                     ),
             ),
             
-            const SizedBox(width: 16),
+            SizedBox(width: horizontalSpacing),
             
             // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Service name and trial badge
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          subscription.serviceName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (subscription.isFreeTrial) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'TRIAL',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                  // Service name only (trial badge moved to top-right)
+                  Text(
+                    subscription.serviceName,
+                    style: TextStyle(
+                      fontSize: titleFontSize,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   
-                  const SizedBox(height: 8),
+                  SizedBox(height: verticalSpacing),
                   
                   // Price
                   Text(
-                    '${subscription.currency} ${subscription.amount.toStringAsFixed(2)} / ${subscription.billingCycle.name}',
+                    '${subscription.currency} ${subscription.amount.toStringAsFixed(2)} / ${_getBillingCycleText(subscription.billingCycle)}',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: priceFontSize,
                       fontWeight: FontWeight.w500,
                       color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.8),
                     ),
                   ),
                   
                   if (subscription.isFreeTrial) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: smallVerticalSpacing),
                     Text(
                       'Free for ${subscription.trialDays ?? '?'} days',
-                      style: const TextStyle(
-                        fontSize: 12,
+                      style: TextStyle(
+                        fontSize: trialFontSize,
                         color: Colors.green,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                   
-                  const SizedBox(height: 8),
+                  SizedBox(height: verticalSpacing),
                   
                   // Date
                   if (subscription.emailDate != null)
                     Text(
                       'Detected ${subscription.emailDate!.toLocal().toString().split(' ')[0]}',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: dateFontSize,
                         color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
                       ),
                     ),
@@ -1202,32 +1211,287 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
               ),
             ),
             
-            const SizedBox(width: 16),
+            SizedBox(width: horizontalSpacing),
             
-            // Checkbox
-            Transform.scale(
-              scale: 1.2,
-              child: Checkbox(
-                value: _selectedSubscriptions.contains(_detectedSubscriptions.indexOf(subscription)),
-                onChanged: (value) {
-                  final index = _detectedSubscriptions.indexOf(subscription);
-                  setState(() {
-                    if (value == true) {
-                      _selectedSubscriptions.add(index);
-                    } else {
-                      _selectedSubscriptions.remove(index);
-                    }
-                  });
-                },
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
+            // Right side with trial badge and checkbox
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Trial badge at top
+                if (subscription.isFreeTrial) ...[
+                  Container(
+                    padding: badgePadding,
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      borderRadius: BorderRadius.circular(isCompactScreen ? 6 : 8),
+                    ),
+                    child: Text(
+                      'TRIAL',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: badgeFontSize,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: verticalSpacing),
+                ],
+                
+                // Checkbox at bottom
+                Transform.scale(
+                  scale: checkboxScale,
+                  child: Checkbox(
+                    value: _selectedSubscriptions.contains(_detectedSubscriptions.indexOf(subscription)),
+                    onChanged: (value) {
+                      final index = _detectedSubscriptions.indexOf(subscription);
+                      setState(() {
+                        if (value == true) {
+                          _selectedSubscriptions.add(index);
+                        } else {
+                          _selectedSubscriptions.remove(index);
+                        }
+                      });
+                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Get proper grammar for billing cycle text
+  String _getBillingCycleText(BillingCycle billingCycle) {
+    switch (billingCycle) {
+      case BillingCycle.weekly:
+        return 'week';
+      case BillingCycle.monthly:
+        return 'month';
+      case BillingCycle.yearly:
+        return 'year';
+    }
+  }
+
+  /// Show detected subscriptions in a popup dialog
+  void _showDetectedSubscriptionsDialog(List<DetectedSubscription> subscriptions) {
+    final selectedSubscriptions = Set<int>.from(List.generate(subscriptions.length, (index) => index));
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Detected Subscriptions (${subscriptions.length})'),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 400,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Select/Deselect All
+                    Row(
+                      children: [
+                        TextButton.icon(
+                          onPressed: () {
+                            setDialogState(() {
+                              if (selectedSubscriptions.length == subscriptions.length) {
+                                selectedSubscriptions.clear();
+                              } else {
+                                selectedSubscriptions.clear();
+                                selectedSubscriptions.addAll(List.generate(subscriptions.length, (index) => index));
+                              }
+                            });
+                          },
+                          icon: Icon(
+                            selectedSubscriptions.length == subscriptions.length
+                                ? Icons.check_box
+                                : selectedSubscriptions.isEmpty
+                                    ? Icons.check_box_outline_blank
+                                    : Icons.indeterminate_check_box,
+                          ),
+                          label: Text(
+                            selectedSubscriptions.length == subscriptions.length
+                                ? 'Deselect All'
+                                : 'Select All',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(),
+                    // Subscription list
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: subscriptions.length,
+                        itemBuilder: (context, index) {
+                          final subscription = subscriptions[index];
+                          final isSelected = selectedSubscriptions.contains(index);
+                          
+                          return Card(
+                            child: ListTile(
+                              leading: subscription.logoUrl != null
+                                  ? CircleAvatar(
+                                      backgroundImage: NetworkImage(subscription.logoUrl!),
+                                      backgroundColor: Colors.grey.shade200,
+                                    )
+                                  : CircleAvatar(
+                                      backgroundColor: Colors.grey.shade200,
+                                      child: const Icon(Icons.subscriptions),
+                                    ),
+                              title: Text(
+                                subscription.serviceName,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('${subscription.currency} ${subscription.amount.toStringAsFixed(2)} / ${_getBillingCycleText(subscription.billingCycle)}'),
+                                  if (subscription.isFreeTrial)
+                                    Text(
+                                      'Free for ${subscription.trialDays ?? '?'} days',
+                                      style: const TextStyle(color: Colors.green, fontSize: 12),
+                                    ),
+                                  if (subscription.emailDate != null)
+                                    Text(
+                                      'Detected ${subscription.emailDate!.toLocal().toString().split(' ')[0]}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (subscription.isFreeTrial)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'TRIAL',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(width: 8),
+                                  Checkbox(
+                                    value: isSelected,
+                                    onChanged: (value) {
+                                      setDialogState(() {
+                                        if (value == true) {
+                                          selectedSubscriptions.add(index);
+                                        } else {
+                                          selectedSubscriptions.remove(index);
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: selectedSubscriptions.isEmpty
+                      ? null
+                      : () async {
+                          Navigator.of(context).pop();
+                          // Add selected subscriptions
+                          await _addSubscriptionsFromDialog(subscriptions, selectedSubscriptions);
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text('Add Selected (${selectedSubscriptions.length})'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Add selected subscriptions from dialog
+  Future<void> _addSubscriptionsFromDialog(List<DetectedSubscription> subscriptions, Set<int> selectedIndices) async {
+    if (selectedIndices.isEmpty) {
+      _showSnackBar('Please select at least one subscription to add', isError: true);
+      return;
+    }
+
+    setState(() => _isAddingSubscriptions = true);
+
+    try {
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      int addedCount = 0;
+
+      for (final index in selectedIndices) {
+        if (index < subscriptions.length) {
+          final detected = subscriptions[index];
+          
+          // Convert detected subscription to Subscription entity
+          final subscription = await _convertDetectedToSubscription(detected);
+          
+          // Check if subscription already exists (by name and amount)
+          final existingSubscriptions = subscriptionProvider.subscriptions;
+          final isDuplicate = existingSubscriptions.any((existing) =>
+              existing.name.toLowerCase() == subscription.name.toLowerCase() &&
+              existing.amount == subscription.amount);
+
+          if (!isDuplicate) {
+            await subscriptionProvider.addSubscription(subscription);
+            addedCount++;
+          } else {
+            print('⚠️ Duplicate subscription skipped: ${subscription.name} - ${subscription.currencyCode}${subscription.amount}');
+          }
+        }
+      }
+
+      if (addedCount > 0) {
+        final skippedCount = selectedIndices.length - addedCount;
+        if (skippedCount > 0) {
+          _showSnackBar('Added $addedCount subscription(s)! Skipped $skippedCount duplicate(s).', isError: false);
+        } else {
+          _showSnackBar('Successfully added $addedCount subscription(s)!', isError: false);
+        }
+        
+        // Navigate back to homepage (pop all routes back to root)
+        Navigator.popUntil(context, (route) => route.isFirst);
+      } else {
+        _showSnackBar('All selected subscriptions already exist in your app', isError: true);
+      }
+    } catch (error) {
+      _showSnackBar('Error adding subscriptions: $error', isError: true);
+    } finally {
+      setState(() => _isAddingSubscriptions = false);
+    }
   }
 
   Widget _buildErrorSection() {

@@ -29,9 +29,10 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     
     // Check for updates after the widget is built
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkForUpdatesOnStartup();
-    });
+    // Temporarily disabled to debug crash issues
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   _checkForUpdatesOnStartup();
+    // });
   }
 
   @override

@@ -339,11 +339,19 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                 ),
                         ),
                         _buildModernTile(
-                          title: 'Auto Sync',
+                          title: 'Restore Backup',
+                          subtitle: 'Replace local data with cloud backup',
+                          icon: Icons.cloud_download_rounded,
+                          iconColor: Colors.purple,
+                          onTap: _restoreFromCloud,
+                          trailing: Icon(Icons.download, color: Colors.purple, size: 20),
+                        ),
+                        _buildModernTile(
+                          title: 'Auto Backup',
                           subtitle: _autoSyncEnabled 
-                              ? 'Automatically sync when data changes'
-                              : 'Manual sync only',
-                          icon: Icons.sync_alt_rounded,
+                              ? 'Automatically backup changes to cloud'
+                              : 'Manual backup only',
+                          icon: Icons.cloud_upload_rounded,
                           iconColor: _autoSyncEnabled ? Colors.green : Colors.grey,
                           onTap: () {
                             _toggleAutoSync(!_autoSyncEnabled);
@@ -818,6 +826,12 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   Future<void> _signOut() async {
     try {
       final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      
+      // Stop real-time sync
+      subscriptionProvider.stopRealTimeSync();
+      
+      // Sign out from cloud services
       await cloudSyncService.signOut();
       
       setState(() {}); // Trigger rebuild
@@ -931,6 +945,13 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       if (success) {
         print('✅ Signed in successfully and linked to Firebase');
         
+        // Start real-time sync for the newly signed-in user
+        final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+        await subscriptionProvider.startRealTimeSync();
+        
+        // Reload subscriptions to get latest cloud data
+        await subscriptionProvider.loadSubscriptions();
+        
         // Wait a moment for all services to update their state
         await Future.delayed(const Duration(milliseconds: 500));
         
@@ -945,7 +966,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Successfully connected! Cloud sync is now enabled.',
+                      'Successfully connected! Real-time sync is now active.',
                       style: TextStyle(color: Colors.white),
                     ),
                   ),
@@ -1387,7 +1408,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(value ? 'Auto sync enabled' : 'Auto sync disabled'),
+        content: Text(value ? 'Auto backup enabled' : 'Auto backup disabled'),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -1774,7 +1795,111 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-
+  Future<void> _restoreFromCloud() async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Restore from Cloud',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+        content: const Text(
+          'This will replace all your local subscriptions with data from your cloud backup. Local changes that haven\'t been backed up will be lost.\n\nAre you sure you want to continue?',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+            },
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: colorScheme.primary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result == true) {
+      try {
+        final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+        final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+        
+        if (!cloudSyncService.isUserSignedIn) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text('Please sign in with Google to restore'),
+                ],
+              ),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+          return;
+        }
+        
+        // Download subscriptions from cloud
+        final cloudSubscriptions = await cloudSyncService.downloadSubscriptions();
+        
+        // Replace local data with cloud data
+        await subscriptionProvider.restoreFromBackup(cloudSubscriptions);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.cloud_done, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Successfully restored ${cloudSubscriptions.length} subscriptions from backup'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Restore failed: $e'),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
 
   // Get app version information
   Future<Map<String, dynamic>> _getVersionInfo() async {
@@ -1784,6 +1909,232 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       'updateStatus': 'Auto-updating',
       'hasPatch': false,
     };
+  }
+
+  /// Check for app updates with progress dialog
+  Future<void> _checkForUpdates() async {
+    // Show initial checking dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.system_update, color: Theme.of(context).primaryColor),
+              const SizedBox(width: 8),
+              const Text('Checking for Updates'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              const Text('Checking for available updates...'),
+            ],
+          ),
+        );
+      },
+    );
+
+    try {
+      // Simulate checking for updates (replace with actual update check logic)
+      await Future.delayed(const Duration(seconds: 2));
+      
+      // Simulate update availability check
+      final hasUpdate = false; // Replace with actual check
+      
+      // Close checking dialog
+      Navigator.of(context).pop();
+      
+      if (hasUpdate) {
+        // Show update available dialog with download progress
+        _showUpdateAvailableDialog();
+      } else {
+        // Show no updates available
+        _showNoUpdatesDialog();
+      }
+    } catch (error) {
+      // Close checking dialog
+      Navigator.of(context).pop();
+      
+      // Show error dialog
+      _showUpdateErrorDialog(error.toString());
+    }
+  }
+
+  /// Show update available dialog with download progress
+  void _showUpdateAvailableDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            double downloadProgress = 0.0;
+            bool isDownloading = false;
+            
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.new_releases, color: Colors.green),
+                  const SizedBox(width: 8),
+                  const Text('Update Available'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('A new version of SubTrackr is available!'),
+                  const SizedBox(height: 8),
+                  const Text('Version 1.0.5+7', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  if (isDownloading) ...[
+                    const Text('Downloading update...'),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(value: downloadProgress),
+                    const SizedBox(height: 8),
+                    Text('${(downloadProgress * 100).toInt()}% complete'),
+                  ] else
+                    const Text('Tap "Update Now" to download and install the latest version.'),
+                ],
+              ),
+              actions: [
+                if (!isDownloading)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Later'),
+                  ),
+                ElevatedButton(
+                  onPressed: isDownloading ? null : () async {
+                    setDialogState(() {
+                      isDownloading = true;
+                      downloadProgress = 0.0;
+                    });
+                    
+                    // Simulate download progress
+                    for (int i = 0; i <= 100; i += 10) {
+                      await Future.delayed(const Duration(milliseconds: 300));
+                      setDialogState(() {
+                        downloadProgress = i / 100;
+                      });
+                    }
+                    
+                    // Close dialog and show completion
+                    Navigator.of(context).pop();
+                    _showUpdateCompleteDialog();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: isDownloading 
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text('Update Now'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Show no updates available dialog
+  void _showNoUpdatesDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green),
+              const SizedBox(width: 8),
+              const Text('Up to Date'),
+            ],
+          ),
+          content: const Text('You are using the latest version of SubTrackr!'),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Show update error dialog
+  void _showUpdateErrorDialog(String error) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.error, color: Colors.red),
+              const SizedBox(width: 8),
+              const Text('Update Check Failed'),
+            ],
+          ),
+          content: Text('Failed to check for updates: $error'),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Show update complete dialog
+  void _showUpdateCompleteDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.download_done, color: Colors.green),
+              const SizedBox(width: 8),
+              const Text('Update Complete'),
+            ],
+          ),
+          content: const Text('SubTrackr has been updated successfully! The app will restart to apply changes.'),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // In a real app, you would trigger an app restart here
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Update complete! Restart the app to see changes.'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Restart App'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildAppInfoTile(ColorScheme colorScheme) {
@@ -1905,6 +2256,27 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               color: colorScheme.onSurface.withOpacity(0.8),
             ),
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _checkForUpdates,
+                  icon: Icon(Icons.system_update, size: 16),
+                  label: Text(
+                    'Check for Updates',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -33,7 +33,13 @@ class SubscriptionProvider extends ChangeNotifier {
         _notificationService = notificationService,
         _settingsService = settingsService,
         _priceHistoryService = PriceHistoryService(),
-        _cloudSyncService = cloudSyncService;
+        _cloudSyncService = cloudSyncService {
+    // Set up real-time sync callback
+    _cloudSyncService.onSubscriptionsUpdated = _handleRealTimeUpdate;
+    
+    // Start real-time sync if user is signed in
+    _initializeRealTimeSync();
+  }
   
   // Getters
   List<Subscription> get subscriptions => _subscriptions;
@@ -200,8 +206,8 @@ class SubscriptionProvider extends ChangeNotifier {
       _sortSubscriptions(_subscriptions);
       notifyListeners();
       
-      // Auto sync to cloud if enabled and signed in
-      await _cloudSyncService.autoSyncSubscription(subscription);
+      // Auto backup to cloud if enabled and signed in
+      await _cloudSyncService.autoBackupSubscription(subscription);
       
       // Schedule notification if active
       if (subscription.status == AppConstants.STATUS_ACTIVE) {
@@ -223,8 +229,8 @@ class SubscriptionProvider extends ChangeNotifier {
       _sortSubscriptions(_subscriptions);
       notifyListeners();
       
-      // Auto sync to cloud if enabled and signed in
-      await _cloudSyncService.autoSyncSubscription(subscription);
+      // Auto backup to cloud if enabled and signed in
+      await _cloudSyncService.autoBackupSubscription(subscription);
       
       // Update notification if active
       if (subscription.status == AppConstants.STATUS_ACTIVE) {
@@ -244,8 +250,8 @@ class SubscriptionProvider extends ChangeNotifier {
       await _repository.deleteSubscription(id);
       await _notificationService.cancelNotification(id.hashCode);
       
-      // Auto sync deletion to cloud if enabled and signed in
-      await _cloudSyncService.autoSyncDeleteSubscription(id);
+      // Auto backup deletion to cloud if enabled and signed in
+      await _cloudSyncService.autoBackupDeleteSubscription(id);
       
       _subscriptions = _subscriptions.where((s) => s.id != id).toList();
       notifyListeners();
@@ -274,8 +280,8 @@ class SubscriptionProvider extends ChangeNotifier {
       
       await _repository.updateSubscription(updatedSubscription);
       
-      // Auto sync to cloud if enabled and signed in
-      await _cloudSyncService.autoSyncSubscription(updatedSubscription);
+      // Auto backup to cloud if enabled and signed in
+      await _cloudSyncService.autoBackupSubscription(updatedSubscription);
       
       await loadSubscriptions(); // Reload to ensure proper state update
       
@@ -301,8 +307,8 @@ class SubscriptionProvider extends ChangeNotifier {
       await _repository.updateSubscription(updatedSubscription);
       await _notificationService.cancelNotification(id.hashCode);
       
-      // Auto sync to cloud if enabled and signed in
-      await _cloudSyncService.autoSyncSubscription(updatedSubscription);
+      // Auto backup to cloud if enabled and signed in
+      await _cloudSyncService.autoBackupSubscription(updatedSubscription);
       
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
@@ -325,8 +331,8 @@ class SubscriptionProvider extends ChangeNotifier {
       await _repository.updateSubscription(updatedSubscription);
       _scheduleNotification(updatedSubscription);
       
-      // Auto sync to cloud if enabled and signed in
-      await _cloudSyncService.autoSyncSubscription(updatedSubscription);
+      // Auto backup to cloud if enabled and signed in
+      await _cloudSyncService.autoBackupSubscription(updatedSubscription);
       
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
@@ -349,8 +355,8 @@ class SubscriptionProvider extends ChangeNotifier {
       await _repository.updateSubscription(updatedSubscription);
       await _notificationService.cancelNotification(id.hashCode);
       
-      // Auto sync to cloud if enabled and signed in
-      await _cloudSyncService.autoSyncSubscription(updatedSubscription);
+      // Auto backup to cloud if enabled and signed in
+      await _cloudSyncService.autoBackupSubscription(updatedSubscription);
       
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
@@ -665,5 +671,93 @@ class SubscriptionProvider extends ChangeNotifier {
   void resortSubscriptions() {
     _sortSubscriptions(_subscriptions);
     notifyListeners();
+  }
+
+  /// Initialize real-time sync for signed-in users
+  Future<void> _initializeRealTimeSync() async {
+    print('🔄 Initializing real-time sync...');
+    
+    // Add a small delay to ensure all services are properly initialized
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    if (_cloudSyncService.isUserSignedIn) {
+      print('✅ User is signed in, starting real-time sync');
+      await _cloudSyncService.startSync();
+    } else {
+      print('❌ User not signed in, skipping real-time sync');
+    }
+  }
+
+  /// Handle real-time updates from cloud
+  Future<void> _handleRealTimeUpdate(List<Subscription> cloudSubscriptions) async {
+    print('📡 Real-time update received: ${cloudSubscriptions.length} subscriptions');
+    
+    // Don't update if we're currently loading to avoid conflicts
+    if (_isLoading) {
+      print('⏸️ Skipping real-time update - currently loading subscriptions');
+      return;
+    }
+    
+    try {
+      // Update local repository with cloud data
+      await _repository.clearAllSubscriptions();
+      for (final subscription in cloudSubscriptions) {
+        await _repository.addSubscription(subscription);
+      }
+      
+      // Update in-memory subscriptions
+      _subscriptions = cloudSubscriptions;
+      _sortSubscriptions(_subscriptions);
+      
+      // Reschedule all notifications to match new data
+      await rescheduleAllNotifications();
+      
+      notifyListeners();
+      print('✅ Real-time update applied successfully');
+    } catch (e) {
+      print('❌ Error applying real-time update: $e');
+    }
+  }
+
+  /// Start real-time sync (call this after user signs in)
+  Future<void> startRealTimeSync() async {
+    print('🔄 Starting real-time sync...');
+    await _cloudSyncService.startSync();
+    print('✅ Real-time sync started');
+  }
+
+  /// Stop real-time sync (call this when user signs out)
+  void stopRealTimeSync() {
+    print('⏹️ Stopping real-time sync...');
+    _cloudSyncService.stopSync();
+    print('✅ Real-time sync stopped');
+  }
+
+  /// Restore subscriptions from cloud backup
+  Future<void> restoreFromBackup(List<Subscription> backupSubscriptions) async {
+    try {
+      // Clear all local subscriptions
+      await _repository.clearAllSubscriptions();
+      
+      // Add all backup subscriptions to local storage
+      for (final subscription in backupSubscriptions) {
+        await _repository.addSubscription(subscription);
+      }
+      
+      // Update in-memory list
+      _subscriptions = backupSubscriptions;
+      _sortSubscriptions(_subscriptions);
+      
+      // Reschedule all notifications
+      await rescheduleAllNotifications();
+      
+      notifyListeners();
+      print('✅ Successfully restored ${backupSubscriptions.length} subscriptions from backup');
+    } catch (e) {
+      _error = 'Failed to restore from backup';
+      notifyListeners();
+      print('❌ Error restoring from backup: $e');
+      rethrow;
+    }
   }
 } 

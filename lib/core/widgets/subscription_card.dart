@@ -269,257 +269,267 @@ class SubscriptionCard extends StatelessWidget {
                 ],
                 color: theme.colorScheme.surface,
                 border: Border.all(
-                  color: theme.colorScheme.outline.withOpacity(0.08),
-                  width: 1,
+                  color: theme.brightness == Brightness.dark 
+                      ? theme.colorScheme.outline.withOpacity(0.25)
+                      : theme.colorScheme.outline.withOpacity(0.08),
+                  width: theme.brightness == Brightness.dark ? 0.8 : 1,
                 ),
               ),
               child: InkWell(
                 onTap: onTap,
                 borderRadius: BorderRadius.circular(16),
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          // Logo or icon with enhanced background
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: theme.colorScheme.outline.withOpacity(0.06),
-                                width: 1,
+                  padding: const EdgeInsets.all(18),
+                                      child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Logo or icon with clean background
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: theme.brightness == Brightness.dark 
+                                      ? theme.colorScheme.outline.withOpacity(0.15)
+                                      : theme.colorScheme.outline.withOpacity(0.06),
+                                  width: 0.5,
+                                ),
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: theme.colorScheme.shadow.withOpacity(0.06),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: subscription.logoUrl != null
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: subscription.logoUrl!.startsWith('assets/')
-                                        ? Image.asset(
-                                            subscription.logoUrl!,
-                                            key: ValueKey('card_${subscription.id}_logo'),
-                                            fit: BoxFit.contain,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Icon(
-                                                logoService.getFallbackIcon(subscription.name),
-                                                color: theme.colorScheme.onSurfaceVariant,
-                                                size: 28,
-                                              );
-                                            },
-                                          )
-                                        : Image.network(
-                                            subscription.logoUrl!,
-                                            key: ValueKey('card_${subscription.id}_logo'),
-                                            fit: BoxFit.contain,
-                                            loadingBuilder: (context, child, loadingProgress) {
-                                              if (loadingProgress == null) return child;
-                                              return Center(
-                                                child: CircularProgressIndicator(
-                                                  value: loadingProgress.expectedTotalBytes != null
-                                                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                                      : null,
-                                                  strokeWidth: 2,
+                              child: subscription.logoUrl != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: subscription.logoUrl!.startsWith('assets/')
+                                          ? Image.asset(
+                                              subscription.logoUrl!,
+                                              key: ValueKey('card_${subscription.id}_logo'),
+                                              fit: BoxFit.contain,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return Icon(
+                                                  logoService.getFallbackIcon(subscription.name),
                                                   color: theme.colorScheme.onSurfaceVariant,
-                                                ),
-                                              );
-                                            },
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Icon(
-                                                logoService.getFallbackIcon(subscription.name),
-                                                color: theme.colorScheme.onSurfaceVariant,
-                                                size: 28,
-                                              );
-                                            },
+                                                  size: 28,
+                                                );
+                                              },
+                                            )
+                                          : Image.network(
+                                              subscription.logoUrl!,
+                                              key: ValueKey('card_${subscription.id}_logo'),
+                                              fit: BoxFit.contain,
+                                              loadingBuilder: (context, child, loadingProgress) {
+                                                if (loadingProgress == null) return child;
+                                                return Center(
+                                                  child: CircularProgressIndicator(
+                                                    value: loadingProgress.expectedTotalBytes != null
+                                                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                        : null,
+                                                    strokeWidth: 2,
+                                                    color: theme.colorScheme.onSurfaceVariant,
+                                                  ),
+                                                );
+                                              },
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return Icon(
+                                                  logoService.getFallbackIcon(subscription.name),
+                                                  color: theme.colorScheme.onSurfaceVariant,
+                                                  size: 28,
+                                                );
+                                              },
+                                            ),
+                                    )
+                                  : Icon(
+                                      logoService.getFallbackIcon(subscription.name),
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      size: 28,
+                                    ),
+                                                              ),
+                            const SizedBox(width: 16),
+                            // Subscription details
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Service name with trial badge
+                                  Row(
+                                    children: [
+                                      // Constrained service name - stop before currency/status area
+                                      SizedBox(
+                                        width: 180, // Fixed width to ensure truncation before currency badge
+                                        child: Text(
+                                          subscription.name,
+                                          style: theme.textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                            color: theme.colorScheme.onSurface,
+                                            letterSpacing: -0.1,
                                           ),
-                                  )
-                                : Icon(
-                                    logoService.getFallbackIcon(subscription.name),
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                    size: 28,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const Spacer(), // Push trial badge to the right
+                                      if (_isCurrentlyInTrial(subscription))
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Text(
+                                            'TRIAL',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
-                                                            ),
-                          const SizedBox(width: 18),
-                          // Subscription details
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        subscription.name,
-                                        style: theme.textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 17,
-                                          color: theme.colorScheme.onSurface,
-                                          letterSpacing: -0.2,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    if (_isCurrentlyInTrial(subscription))
-                                      Container(
-                                        margin: const EdgeInsets.only(left: 8),
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.green,
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: const Text(
-                                          'TRIAL',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Text(
-                                      formattedAmount,
-                                      style: theme.textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w500,
-                                        color: theme.colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                    if (subscription.currencyCode != defaultCurrencySymbol) ...[
-                                      const SizedBox(width: 4),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: BackdropFilter(
-                                          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: theme.colorScheme.primary.withOpacity(0.08),
-                                              border: Border.all(
-                                                color: theme.colorScheme.primary.withOpacity(0.15),
-                                                width: 0.5,
+                                  const SizedBox(height: 6),
+                                  // Price, currency, and status with proper spacing
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        flex: 3,
+                                        child: Wrap(
+                                          children: [
+                                            Text(
+                                              formattedAmount,
+                                              style: theme.textTheme.titleSmall?.copyWith(
+                                                fontWeight: FontWeight.w500,
+                                                color: theme.colorScheme.onSurfaceVariant,
                                               ),
-                                              borderRadius: BorderRadius.circular(4),
                                             ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  currency.flag,
-                                                  style: const TextStyle(
-                                                    fontSize: 10,
+                                            if (subscription.currencyCode != defaultCurrencySymbol) ...[
+                                              const SizedBox(width: 6),
+                                              ClipRRect(
+                                                borderRadius: BorderRadius.circular(4),
+                                                child: BackdropFilter(
+                                                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: theme.colorScheme.primary.withOpacity(0.08),
+                                                      border: Border.all(
+                                                        color: theme.colorScheme.primary.withOpacity(0.15),
+                                                        width: 0.5,
+                                                      ),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          currency.flag,
+                                                          style: const TextStyle(
+                                                            fontSize: 10,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          subscription.currencyCode,
+                                                          style: TextStyle(
+                                                            color: theme.colorScheme.primary.withOpacity(0.8),
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  subscription.currencyCode,
-                                                  style: TextStyle(
-                                                    color: theme.colorScheme.primary.withOpacity(0.8),
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // Compact status indicator
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: statusColor.withOpacity(0.2),
+                                            width: 0.5,
                                           ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 3,
+                                              height: 3,
+                                              decoration: BoxDecoration(
+                                                color: statusColor,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              subscription.status == AppConstants.STATUS_ACTIVE
+                                                  ? 'Active'
+                                                  : subscription.status == AppConstants.STATUS_PAUSED
+                                                      ? 'Paused'
+                                                      : 'Cancelled',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w600,
+                                                color: statusColor,
+                                                letterSpacing: 0.1,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Enhanced status indicator
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: statusColor.withOpacity(0.25),
-                                width: 1,
+                                  ),
+                                ],
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: statusColor.withOpacity(0.08),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    color: statusColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  subscription.status == AppConstants.STATUS_ACTIVE
-                                      ? 'Active'
-                                      : subscription.status == AppConstants.STATUS_PAUSED
-                                          ? 'Paused'
-                                          : 'Cancelled',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: statusColor,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                       // Renewal info
                       const SizedBox(height: 16),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(
                             Icons.calendar_today_rounded,
-                            size: 16,
+                            size: 14,
                             color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            renewalText,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: renewalTextColor,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0.1,
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              renewalText,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: renewalTextColor,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.1,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           // Add category tag if available
                           if (subscription.category != null) ...[
-                            const Spacer(),
+                            const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: theme.colorScheme.outline.withOpacity(0.1),
                                   width: 1,
@@ -528,11 +538,13 @@ class SubscriptionCard extends StatelessWidget {
                               child: Text(
                                 subscription.category!,
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   color: theme.colorScheme.onSurfaceVariant,
                                   fontWeight: FontWeight.w500,
-                                  letterSpacing: 0.3,
+                                  letterSpacing: 0.2,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],

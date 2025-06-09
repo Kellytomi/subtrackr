@@ -580,18 +580,53 @@ class EmailScannerService {
     
     // Handle Apple email addresses specially
     if (from.toLowerCase().contains('apple.com')) {
-      // Look for specific app/service names in Apple emails
-      if (text.contains('amazon prime video') || text.contains('prime video')) return 'Amazon Prime Video';
-      if (text.contains('netflix')) return 'Netflix';
-      if (text.contains('spotify')) return 'Spotify';
-      if (text.contains('youtube')) return 'YouTube';
-      if (text.contains('disney')) return 'Disney+';
-      if (text.contains('hulu')) return 'Hulu';
-      if (text.contains('icloud')) return 'iCloud';
-      if (text.contains('apple music')) return 'Apple Music';
-      if (text.contains('apple tv')) return 'Apple TV+';
-      if (text.contains('apple arcade')) return 'Apple Arcade';
-      if (text.contains('apple one')) return 'Apple One';
+      print('🍎 Analyzing Apple email for service name...');
+      print('🍎 Subject: $subject');
+      print('🍎 Text sample: ${text.length > 200 ? text.substring(0, 200) : text}...');
+      
+             // Dynamic extraction patterns for Apple emails - capture full service names
+       final appleServicePatterns = [
+         // Pattern 1: Full service name with descriptors (prioritize complete names)
+         RegExp(r'([a-zA-Z][a-zA-Z\s&+\-]{2,40}?\s+(?:photo\s*&\s*video\s+editor|prime\s+video|tv\+?|music|arcade|one|fitness\+?|news\+?))', caseSensitive: false),
+         
+         // Pattern 2: "Your [Full Service Name] subscription"
+         RegExp(r'your\s+([a-zA-Z][a-zA-Z\s&+\-]{3,40}?)\s+subscription', caseSensitive: false),
+         
+         // Pattern 3: Complete service names in subject lines (before billing/problem keywords)
+         RegExp(r'^([a-zA-Z][a-zA-Z\s&+\-]{3,40}?)(?:\s*[-–—]\s*(?:billing|subscription|premium|problem|renewal|statement))', caseSensitive: false),
+         
+         // Pattern 4: Service names followed by plan types
+         RegExp(r'([a-zA-Z][a-zA-Z\s&+\-]{3,40}?)\s+(?:premium\s+yearly|plus|pro|basic|standard)', caseSensitive: false),
+         
+         // Pattern 5: "From [Service Name]" with extended capture
+         RegExp(r'(?:from|for)\s+([a-zA-Z][a-zA-Z\s&+\-]{3,40}?)(?:\s+(?:subscription|billing|service)|$|\s*[-–—])', caseSensitive: false),
+       ];
+      
+      print('🍎 Analyzing Apple email for service name...');
+      print('🍎 Subject: $subject');
+      print('🍎 Text sample: ${text.length > 200 ? text.substring(0, 200) : text}...');
+      
+      for (int i = 0; i < appleServicePatterns.length; i++) {
+        final pattern = appleServicePatterns[i];
+        final match = pattern.firstMatch('$subject $body');
+        
+        if (match != null && match.group(1) != null) {
+          String extractedName = match.group(1)!.trim();
+          
+          // Clean up the extracted name
+          extractedName = _cleanExtractedServiceName(extractedName);
+          
+          // Validate it's a reasonable service name (not too generic)
+          if (_isValidServiceName(extractedName)) {
+            print('🍎 ✅ Pattern ${i + 1} matched: "$extractedName"');
+            return extractedName;
+          } else {
+            print('🍎 ❌ Pattern ${i + 1} matched but invalid name: "$extractedName"');
+          }
+        }
+      }
+      
+      print('🍎 ❌ Could not extract service name from patterns, falling back to Apple Service');
       return 'Apple Service'; // Fallback for Apple
     }
     
@@ -604,12 +639,12 @@ class EmailScannerService {
     
     // Common patterns for service names
     final patterns = [
-      RegExp(r'(amazon prime video|netflix|spotify|apple|google|amazon|microsoft|adobe|dropbox|youtube|disney|hulu)'),
-      RegExp(r'your ([a-z\s]+) subscription'),
-      RegExp(r'thank you for your ([a-z\s]+) payment'),
-      RegExp(r'([a-z\s]+) billing statement'),
-      RegExp(r'app\s+([a-z\s]+)'),
-      RegExp(r'subscription\s+([a-z\s]+)'),
+      RegExp(r'(lightroom photo & video editor|amazon prime video|netflix|spotify|apple|google|amazon|microsoft|adobe|dropbox|youtube|disney|hulu)'),
+      RegExp(r'your ([a-z\s&]+) subscription'),
+      RegExp(r'thank you for your ([a-z\s&]+) payment'),
+      RegExp(r'([a-z\s&]+) billing statement'),
+      RegExp(r'app\s+([a-z\s&]+)'),
+      RegExp(r'subscription\s+([a-z\s&]+)'),
     ];
     
     for (final pattern in patterns) {
@@ -1123,6 +1158,10 @@ class EmailScannerService {
       return 'Prime Video';
     }
     
+    if (lowerName.contains('lightroom photo & video editor') || lowerName == 'lightroom photo & video editor') {
+      return 'Adobe Lightroom';
+    }
+    
     if (lowerName.contains('youtube premium') || lowerName == 'youtube premium') {
       return 'YouTube Premium';
     }
@@ -1190,6 +1229,81 @@ class EmailScannerService {
     }
     
     return uniqueSubscriptions.values.toList();
+  }
+
+  /// Clean extracted service name by removing unwanted characters and formatting
+  String _cleanExtractedServiceName(String name) {
+    String cleaned = name.trim();
+    
+    // Remove common prefixes that aren't part of the service name
+    cleaned = cleaned.replaceAll(RegExp(r'^(the|your|my)\s+', caseSensitive: false), '');
+    
+    // Remove trailing unwanted suffixes but preserve important descriptors
+    cleaned = cleaned.replaceAll(RegExp(r'\s+(subscription|billing|payment|plan|service|statement|problem|renewal)$', caseSensitive: false), '');
+    
+    // Remove trailing punctuation but preserve + symbols in service names
+    cleaned = cleaned.replaceAll(RegExp(r'[.,:;!?\-]+$'), '');
+    
+    // Clean up multiple spaces
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+    
+    // Capitalize properly but preserve existing + symbols and & characters
+    cleaned = cleaned.split(' ')
+        .map((word) {
+          if (word.isEmpty) return word;
+          
+          // Handle special cases
+          if (word.toLowerCase() == 'tv+' || word.toLowerCase() == 'tv') {
+            return word.contains('+') ? 'TV+' : 'TV';
+          }
+          if (word == '&') return '&';
+          if (word.endsWith('+')) {
+            return word.substring(0, word.length - 1).toLowerCase().replaceFirst(word[0], word[0].toUpperCase()) + '+';
+          }
+          
+          // Regular capitalization
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
+    
+    return cleaned;
+  }
+
+  /// Check if extracted name is a valid service name (not too generic or suspicious)
+  bool _isValidServiceName(String name) {
+    if (name.length < 3 || name.length > 50) return false;
+    
+    // Exclude overly generic terms and email-specific words
+    final invalidTerms = [
+      'subscription', 'billing', 'payment', 'service', 'app', 'plan',
+      'premium', 'plus', 'pro', 'basic', 'standard', 'monthly', 'yearly',
+      'annual', 'free', 'trial', 'your', 'my', 'the', 'problem', 'help',
+      'receipt', 'invoice', 'statement', 'confirmation', 'renewal',
+      'billing problem', 'help with', 'your subscription', 'billing statement',
+      'payment problem', 'account', 'update', 'important', 'notice',
+      'reminder', 'expired', 'failed', 'error', 'issue'
+    ];
+    
+    final lowerName = name.toLowerCase().trim();
+    
+    // Check exact matches or if the name starts with invalid terms
+    for (final term in invalidTerms) {
+      if (lowerName == term || lowerName.startsWith('$term ') || lowerName.endsWith(' $term')) {
+        return false;
+      }
+    }
+    
+    // Must contain at least one letter
+    if (!RegExp(r'[a-zA-Z]').hasMatch(name)) return false;
+    
+    // Exclude names that are mostly numbers or special characters
+    final letterCount = RegExp(r'[a-zA-Z]').allMatches(name).length;
+    if (letterCount < name.length * 0.6) return false;
+    
+    // Should not be all uppercase unless it's a known acronym
+    if (name == name.toUpperCase() && name.length > 4) return false;
+    
+    return true;
   }
 }
 

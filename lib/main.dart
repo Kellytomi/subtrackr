@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/theme/app_theme.dart';
 
@@ -31,7 +32,9 @@ void main() async {
   
   // Initialize Firebase with error handling
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     print('✅ Firebase initialized successfully');
   } catch (e) {
     print('❌ Firebase initialization failed: $e');
@@ -74,7 +77,13 @@ void main() async {
   
   // Initialize cloud sync service
   final cloudSyncService = CloudSyncService();
-  await cloudSyncService.initialize();
+  try {
+    await cloudSyncService.initialize();
+    print('✅ CloudSyncService initialized successfully');
+  } catch (e) {
+    print('⚠️ CloudSyncService initialization failed: $e');
+    // Continue without cloud sync - app should still work
+  }
   
   // Check if onboarding is complete and currency is set
   final onboardingComplete = settingsService.isOnboardingComplete();

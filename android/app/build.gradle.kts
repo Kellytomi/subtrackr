@@ -19,7 +19,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.example.subtrackr"
+    namespace = "com.kelvin.subtrackr"
     compileSdk = 35
 
     compileOptions {
@@ -60,10 +60,11 @@ android {
         applicationId = "com.kelvin.subtrackr"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 21
+        minSdk = 23
         targetSdk = 34
         versionCode = 6
         versionName = "1.0.4"
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -107,7 +108,7 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.22")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.0")
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.annotation:annotation:1.7.1")
     
@@ -115,6 +116,9 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
+    
+    // Multidex support for Android
+    implementation("androidx.multidex:multidex:2.0.1")
     
     // Add Play Core dependencies (compatible with Android 14)
     implementation("com.google.android.play:feature-delivery:2.1.0")
