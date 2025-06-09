@@ -774,7 +774,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
                   child: Column(
                     children: [
                       _buildModernIntroSection(),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       if (_currentUser != null) ...[
                         _buildModernScanSection(),
                       ] else
@@ -783,7 +783,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
                         const SizedBox(height: 16),
                         _buildModernErrorSection(),
                       ],
-                      const SizedBox(height: 20), // Bottom padding
+                      const SizedBox(height: 16), // Bottom padding
                     ],
                   ),
                 ),
@@ -800,7 +800,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
     final isDark = theme.brightness == Brightness.dark;
     
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -881,23 +881,23 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
             ],
           ),
           
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           
           // Description
           Text(
             'Automatically discover subscriptions from your email receipts and billing statements. Our AI scans your Gmail for subscription-related emails and extracts subscription details to save you time.',
             style: TextStyle(
-              fontSize: 15,
-              height: 1.5,
+              fontSize: 14,
+              height: 1.4,
               color: theme.colorScheme.onSurface.withOpacity(0.8),
             ),
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           
           // Privacy note with better styling
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: Colors.green.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
@@ -936,7 +936,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
     final isDark = theme.brightness == Brightness.dark;
     
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark 
             ? Colors.white.withOpacity(0.03)
@@ -985,23 +985,23 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
             ],
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           
           Text(
             'Scan your recent emails (last 90 days) for subscription receipts and billing statements.',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               color: theme.colorScheme.onSurface.withOpacity(0.7),
-              height: 1.4,
+              height: 1.3,
             ),
           ),
           
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           
-          // Progress bar (shown when scanning)
-          if (_isScanning) ...[
-            Container(
-              padding: const EdgeInsets.all(16),
+                     // Progress bar (shown when scanning)
+           if (_isScanning) ...[
+             Container(
+               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: Colors.orange.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
@@ -1052,13 +1052,13 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-          ],
-          
-          // Scan button
-          Container(
-            width: double.infinity,
-            height: 56,
+                         const SizedBox(height: 16),
+           ],
+           
+           // Scan button
+           Container(
+             width: double.infinity,
+             height: 52,
             child: ElevatedButton(
               onPressed: _isScanning ? null : _scanEmails,
               style: ElevatedButton.styleFrom(
@@ -1086,13 +1086,13 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
                   else
                     const Icon(Icons.search_rounded, size: 20),
                   const SizedBox(width: 8),
-                  Text(
-                    _isScanning ? 'Scanning Emails...' : 'Scan My Emails',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                                     Text(
+                     _isScanning ? 'Scanning Emails...' : 'Scan My Emails',
+                     style: const TextStyle(
+                       fontSize: 15,
+                       fontWeight: FontWeight.w600,
+                     ),
+                   ),
                 ],
               ),
             ),
@@ -1898,16 +1898,19 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
                     // Select/Deselect All Button
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white.withOpacity(0.15)
-                                : Colors.grey.withOpacity(0.3),
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                      child:                         Container(
+                         width: double.infinity,
+                         decoration: BoxDecoration(
+                           color: Theme.of(context).brightness == Brightness.dark
+                               ? Colors.white.withOpacity(0.05)
+                               : Colors.grey.withOpacity(0.05),
+                           border: Border.all(
+                             color: Theme.of(context).brightness == Brightness.dark
+                                 ? Colors.white.withOpacity(0.3)
+                                 : Colors.grey.withOpacity(0.3),
+                           ),
+                           borderRadius: BorderRadius.circular(12),
+                         ),
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
