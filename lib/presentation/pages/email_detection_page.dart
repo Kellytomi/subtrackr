@@ -961,18 +961,18 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
           // Header
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: theme.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.email_outlined,
-                  color: theme.primaryColor,
-                  size: 20,
-                ),
-              ),
+                             Container(
+                 padding: const EdgeInsets.all(10),
+                 decoration: BoxDecoration(
+                   color: theme.colorScheme.primary.withOpacity(0.1),
+                   borderRadius: BorderRadius.circular(12),
+                 ),
+                 child: Icon(
+                   Icons.email_outlined,
+                   color: theme.colorScheme.primary,
+                   size: 20,
+                 ),
+               ),
               const SizedBox(width: 12),
               Text(
                 'Email Scanning',
