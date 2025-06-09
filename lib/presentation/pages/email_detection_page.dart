@@ -398,7 +398,9 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
         }
         
         // Navigate back to homepage (pop all routes back to root)
-        Navigator.popUntil(context, (route) => route.isFirst);
+        if (context.mounted) {
+          Navigator.popUntil(context, (route) => route.isFirst);
+        }
       } else {
         _showSnackBar('All selected subscriptions already exist in your app', isError: true);
       }
@@ -658,134 +660,653 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
     final isDark = theme.brightness == Brightness.dark;
     
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Clean Header matching other pages
-            Container(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                border: Border(
-                  bottom: BorderSide(
-                    color: colorScheme.outline.withOpacity(0.1),
-                    width: 1,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.surface,
+              isDark 
+                  ? colorScheme.surface.withOpacity(0.95)
+                  : colorScheme.primary.withOpacity(0.02),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Modern Header with Glassmorphism
+              Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  color: isDark 
+                      ? Colors.white.withOpacity(0.05)
+                      : Colors.white.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark 
+                        ? Colors.white.withOpacity(0.1)
+                        : Colors.white.withOpacity(0.5),
                   ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.arrow_back_ios_rounded,
-                      color: isDark ? Colors.white : Colors.black,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
                     ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: IconButton.styleFrom(
-                      backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-                      shape: RoundedRectangleBorder(
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    // Back button with modern styling
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: colorScheme.primary,
+                          size: 20,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Email Detection',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
-                      color: colorScheme.onSurface,
+                    
+                    const SizedBox(width: 16),
+                    
+                    // Title and subtitle
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Email Detection',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.onSurface,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          Text(
+                            'AI-powered subscription discovery',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: colorScheme.onSurface.withOpacity(0.6),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceVariant.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(12),
+                    
+                    // Status indicator
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.orange.withOpacity(0.2),
+                            Colors.orange.withOpacity(0.1),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.auto_awesome_rounded,
+                        color: Colors.orange,
+                        size: 24,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.auto_awesome,
-                      size: 24,
-                      color: Colors.orange,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildIntroSection(),
-                    const SizedBox(height: 24),
-                    if (_currentUser != null) ...[
-                      _buildScanSection(),
-                      const SizedBox(height: 24),
-                      _buildResultsSection(),
-                    ] else
-                      _buildSignInPromptSection(),
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      _buildErrorSection(),
-                    ],
                   ],
                 ),
               ),
-            ),
-          ],
+              
+              // Content with improved spacing
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      _buildModernIntroSection(),
+                      const SizedBox(height: 20),
+                      if (_currentUser != null) ...[
+                        _buildModernScanSection(),
+                      ] else
+                        _buildModernSignInSection(),
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: 16),
+                        _buildModernErrorSection(),
+                      ],
+                      const SizedBox(height: 20), // Bottom padding
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildIntroSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+  Widget _buildModernIntroSection() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.primaryColor.withOpacity(0.05),
+            Colors.orange.withOpacity(0.03),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark 
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.withOpacity(0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with icon
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.orange,
+                      Colors.orange.shade600,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.orange.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Smart Email Detection',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      'Powered by AI',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.orange.shade600,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Description
+          Text(
+            'Automatically discover subscriptions from your email receipts and billing statements. Our AI scans your Gmail for subscription-related emails and extracts subscription details to save you time.',
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              color: theme.colorScheme.onSurface.withOpacity(0.8),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Privacy note with better styling
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.green.withOpacity(0.2),
+              ),
+            ),
+            child: Row(
               children: [
                 Icon(
-                  Icons.auto_awesome,
-                  color: Theme.of(context).primaryColor,
-                  size: 28,
+                  Icons.shield_rounded,
+                  color: Colors.green.shade600,
+                  size: 20,
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  'Smart Email Detection',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    'Privacy protected: We only read subscription emails and never store your email content.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            const Text(
-              'Automatically detect subscriptions from your email receipts and billing statements. '
-              'This feature scans your Gmail for subscription-related emails and extracts '
-              'subscription details to save you time.',
-              style: TextStyle(fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernScanSection() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark 
+            ? Colors.white.withOpacity(0.03)
+            : Colors.white.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark 
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.withOpacity(0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.email_outlined,
+                  color: theme.primaryColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Email Scanning',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          Text(
+            'Scan your recent emails (last 90 days) for subscription receipts and billing statements.',
+            style: TextStyle(
+              fontSize: 14,
+              color: theme.colorScheme.onSurface.withOpacity(0.7),
+              height: 1.4,
             ),
-            const SizedBox(height: 12),
-            const Text(
-              '🔒 Your privacy is important: We only read subscription-related emails and never store your email content.',
-              style: TextStyle(
-                fontSize: 14,
-                fontStyle: FontStyle.italic,
-                color: Colors.grey,
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Progress bar (shown when scanning)
+          if (_isScanning) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.orange.withOpacity(0.2),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _scanStatus,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange.shade700,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${_scanProgress.toInt()}%',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: _scanProgress / 100,
+                      backgroundColor: Colors.orange.withOpacity(0.2),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                      minHeight: 8,
+                    ),
+                  ),
+                ],
               ),
             ),
+            const SizedBox(height: 20),
+          ],
+          
+          // Scan button
+          Container(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: _isScanning ? null : _scanEmails,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isScanning ? Colors.grey : Colors.orange,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: _isScanning ? 0 : 3,
+                shadowColor: Colors.orange.withOpacity(0.3),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_isScanning)
+                    Container(
+                      width: 20,
+                      height: 20,
+                      margin: const EdgeInsets.only(right: 12),
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  else
+                    const Icon(Icons.search_rounded, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isScanning ? 'Scanning Emails...' : 'Scan My Emails',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernSignInSection() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            theme.primaryColor.withOpacity(0.05),
+            theme.primaryColor.withOpacity(0.02),
           ],
         ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark 
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.withOpacity(0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Icon with gradient background
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.primaryColor,
+                  theme.primaryColor.withOpacity(0.8),
+                ],
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: theme.primaryColor.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.account_circle_rounded,
+              size: 40,
+              color: Colors.white,
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          Text(
+            'Sign In Required',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          Text(
+            'To scan your emails for subscriptions, please sign in with your Google account first.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              color: theme.colorScheme.onSurface.withOpacity(0.7),
+              height: 1.4,
+            ),
+          ),
+          
+          const SizedBox(height: 28),
+          
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.settings_outlined, size: 20),
+                    label: const Text(
+                      'Go to Settings',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _initializeAuth,
+                  icon: _isLoading 
+                      ? Container(
+                          width: 16,
+                          height: 16,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.refresh_rounded, size: 20),
+                  label: const Text(
+                    'Refresh',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.secondary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          Text(
+            'You can sign in from the Settings page or tap Refresh after signing in',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurface.withOpacity(0.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernErrorSection() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.red.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Error',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red.shade700,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(
+                    color: Colors.red.shade600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1280,7 +1801,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
 
   /// Show detected subscriptions in a popup dialog
   void _showDetectedSubscriptionsDialog(List<DetectedSubscription> subscriptions) {
-    final selectedSubscriptions = Set<int>.from(List.generate(subscriptions.length, (index) => index));
+    final selectedSubscriptions = Set<int>();
     
     showDialog(
       context: context,
@@ -1288,150 +1809,447 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text('Detected Subscriptions (${subscriptions.length})'),
-              content: SizedBox(
-                width: double.maxFinite,
-                height: 400,
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(16),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.75,
+                  maxWidth: 400,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).dialogBackgroundColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Theme.of(context).brightness == Brightness.dark
+                      ? Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
+                        )
+                      : null,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Select/Deselect All
-                    Row(
-                      children: [
-                        TextButton.icon(
-                          onPressed: () {
-                            setDialogState(() {
-                              if (selectedSubscriptions.length == subscriptions.length) {
-                                selectedSubscriptions.clear();
-                              } else {
-                                selectedSubscriptions.clear();
-                                selectedSubscriptions.addAll(List.generate(subscriptions.length, (index) => index));
-                              }
-                            });
-                          },
-                          icon: Icon(
-                            selectedSubscriptions.length == subscriptions.length
-                                ? Icons.check_box
-                                : selectedSubscriptions.isEmpty
-                                    ? Icons.check_box_outline_blank
-                                    : Icons.indeterminate_check_box,
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Theme.of(context).primaryColor.withOpacity(0.1),
+                            Theme.of(context).primaryColor.withOpacity(0.05),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).primaryColor,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.email_outlined,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                           ),
-                          label: Text(
-                            selectedSubscriptions.length == subscriptions.length
-                                ? 'Deselect All'
-                                : 'Select All',
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Detected Subscriptions',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: Theme.of(context).textTheme.titleLarge?.color,
+                                  ),
+                                ),
+                                Text(
+                                  '${subscriptions.length} subscription${subscriptions.length != 1 ? 's' : ''} found',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Select/Deselect All Button
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      child: Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white.withOpacity(0.15)
+                                : Colors.grey.withOpacity(0.3),
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () {
+                              setDialogState(() {
+                                if (selectedSubscriptions.length == subscriptions.length) {
+                                  selectedSubscriptions.clear();
+                                } else {
+                                  selectedSubscriptions.clear();
+                                  selectedSubscriptions.addAll(List.generate(subscriptions.length, (index) => index));
+                                }
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    selectedSubscriptions.length == subscriptions.length
+                                        ? Icons.check_box_rounded
+                                        : selectedSubscriptions.isEmpty
+                                            ? Icons.check_box_outline_blank_rounded
+                                            : Icons.indeterminate_check_box_rounded,
+                                    color: Theme.of(context).primaryColor,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    selectedSubscriptions.length == subscriptions.length
+                                        ? 'Deselect All'
+                                        : 'Select All',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (selectedSubscriptions.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).primaryColor,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '${selectedSubscriptions.length}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                    const Divider(),
-                    // Subscription list
-                    Expanded(
+
+                    // Subscription List
+                    Flexible(
                       child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                        shrinkWrap: true,
                         itemCount: subscriptions.length,
                         itemBuilder: (context, index) {
                           final subscription = subscriptions[index];
                           final isSelected = selectedSubscriptions.contains(index);
                           
-                          return Card(
-                            child: ListTile(
-                              leading: subscription.logoUrl != null
-                                  ? CircleAvatar(
-                                      backgroundImage: NetworkImage(subscription.logoUrl!),
-                                      backgroundColor: Colors.grey.shade200,
-                                    )
-                                  : CircleAvatar(
-                                      backgroundColor: Colors.grey.shade200,
-                                      child: const Icon(Icons.subscriptions),
-                                    ),
-                              title: Text(
-                                subscription.serviceName,
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('${subscription.currency} ${subscription.amount.toStringAsFixed(2)} / ${_getBillingCycleText(subscription.billingCycle)}'),
-                                  if (subscription.isFreeTrial)
-                                    Text(
-                                      'Free for ${subscription.trialDays ?? '?'} days',
-                                      style: const TextStyle(color: Colors.green, fontSize: 12),
-                                    ),
-                                  if (subscription.emailDate != null)
-                                    Text(
-                                      'Detected ${subscription.emailDate!.toLocal().toString().split(' ')[0]}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade600,
+                                                     return Container(
+                             margin: const EdgeInsets.only(bottom: 12),
+                             decoration: BoxDecoration(
+                               color: isSelected 
+                                   ? Theme.of(context).brightness == Brightness.dark
+                                       ? Theme.of(context).primaryColor.withOpacity(0.15)
+                                       : Theme.of(context).primaryColor.withOpacity(0.08)
+                                   : Theme.of(context).cardColor,
+                               borderRadius: BorderRadius.circular(16),
+                               border: Border.all(
+                                 color: isSelected
+                                     ? Theme.of(context).primaryColor.withOpacity(0.6)
+                                     : Theme.of(context).brightness == Brightness.dark
+                                         ? Colors.white.withOpacity(0.25)
+                                         : Colors.grey.withOpacity(0.2),
+                                 width: isSelected ? 2 : 1,
+                               ),
+                               boxShadow: [
+                                 if (isSelected)
+                                   BoxShadow(
+                                     color: Theme.of(context).primaryColor.withOpacity(0.2),
+                                     blurRadius: 12,
+                                     offset: const Offset(0, 4),
+                                   ),
+                               ],
+                             ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () {
+                                  setDialogState(() {
+                                    if (isSelected) {
+                                      selectedSubscriptions.remove(index);
+                                    } else {
+                                      selectedSubscriptions.add(index);
+                                    }
+                                  });
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    children: [
+                                      // Logo
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(12),
+                                          color: Theme.of(context).brightness == Brightness.dark
+                                              ? Colors.white.withOpacity(0.1)
+                                              : Colors.grey.shade100,
+                                        ),
+                                        child: subscription.logoUrl != null
+                                            ? ClipRRect(
+                                                borderRadius: BorderRadius.circular(12),
+                                                child: Image.network(
+                                                  subscription.logoUrl!,
+                                                  fit: BoxFit.contain,
+                                                  errorBuilder: (context, error, stackTrace) => Icon(
+                                                    Icons.subscriptions_rounded,
+                                                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                                                    size: 22,
+                                                  ),
+                                                ),
+                                              )
+                                            : Icon(
+                                                Icons.subscriptions_rounded,
+                                                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                                                size: 22,
+                                              ),
                                       ),
-                                    ),
-                                ],
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (subscription.isFreeTrial)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Text(
-                                        'TRIAL',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
+                                      
+                                      const SizedBox(width: 12),
+                                      
+                                      // Content
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Service name
+                                            Text(
+                                              subscription.serviceName,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
+                                                color: Theme.of(context).textTheme.titleMedium?.color,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            
+                                            const SizedBox(height: 4),
+                                            
+                                            // Price and billing cycle
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  '${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 14,
+                                                    color: Colors.green,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  ' / ${_getBillingCycleText(subscription.billingCycle)}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            
+                                            const SizedBox(height: 6),
+                                            
+                                            // Trial and date info
+                                            Row(
+                                              children: [
+                                                if (subscription.isFreeTrial) ...[
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.green.withOpacity(0.15),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      border: Border.all(
+                                                        color: Colors.green.withOpacity(0.3),
+                                                        width: 1,
+                                                      ),
+                                                    ),
+                                                    child: Text(
+                                                      'FREE ${subscription.trialDays ?? '?'} DAYS',
+                                                      style: TextStyle(
+                                                        color: Colors.green.shade700,
+                                                        fontSize: 9,
+                                                        fontWeight: FontWeight.w700,
+                                                        letterSpacing: 0.5,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                ],
+                                                Flexible(
+                                                  child: Text(
+                                                    subscription.emailDate != null
+                                                        ? 'Detected ${subscription.emailDate!.toLocal().toString().split(' ')[0]}'
+                                                        : 'Recently detected',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    ),
-                                  const SizedBox(width: 8),
-                                  Checkbox(
-                                    value: isSelected,
-                                    onChanged: (value) {
-                                      setDialogState(() {
-                                        if (value == true) {
-                                          selectedSubscriptions.add(index);
-                                        } else {
-                                          selectedSubscriptions.remove(index);
-                                        }
-                                      });
-                                    },
+                                      
+                                      const SizedBox(width: 8),
+                                      
+                                                                               // Selection indicator
+                                       Container(
+                                         padding: const EdgeInsets.all(2),
+                                         decoration: BoxDecoration(
+                                           shape: BoxShape.circle,
+                                           color: isSelected 
+                                               ? Theme.of(context).primaryColor
+                                               : Colors.transparent,
+                                           border: Border.all(
+                                             color: isSelected
+                                                 ? Theme.of(context).primaryColor
+                                                 : Theme.of(context).brightness == Brightness.dark
+                                                     ? Colors.white.withOpacity(0.4)
+                                                     : Colors.grey.withOpacity(0.6),
+                                             width: 2,
+                                           ),
+                                         ),
+                                         child: Icon(
+                                           isSelected ? Icons.check : Icons.add,
+                                           color: isSelected 
+                                               ? Colors.white
+                                               : Theme.of(context).brightness == Brightness.dark
+                                                   ? Colors.white.withOpacity(0.6)
+                                                   : Colors.grey.withOpacity(0.6),
+                                           size: 16,
+                                         ),
+                                       ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           );
                         },
                       ),
                     ),
+
+                    // Action Buttons
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white.withOpacity(0.1)
+                                : Colors.grey.withOpacity(0.2),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.7),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              onPressed: selectedSubscriptions.isEmpty
+                                  ? null
+                                  : () async {
+                                      Navigator.of(context).pop();
+                                      await _addSubscriptionsFromDialog(subscriptions, selectedSubscriptions);
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Theme.of(context).primaryColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: selectedSubscriptions.isEmpty ? 0 : 2,
+                              ),
+                              child: Text(
+                                selectedSubscriptions.isEmpty 
+                                    ? 'Select subscriptions'
+                                    : 'Add Selected (${selectedSubscriptions.length})',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: selectedSubscriptions.isEmpty
-                      ? null
-                      : () async {
-                          Navigator.of(context).pop();
-                          // Add selected subscriptions
-                          await _addSubscriptionsFromDialog(subscriptions, selectedSubscriptions);
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: Text('Add Selected (${selectedSubscriptions.length})'),
-                ),
-              ],
             );
           },
         );
