@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/theme/app_theme.dart';
+import 'package:subtrackr/core/config/supabase_config.dart';
 
 import 'package:subtrackr/presentation/widgets/app_wrapper.dart';
 import 'package:subtrackr/data/repositories/subscription_repository.dart';
@@ -30,15 +30,22 @@ import 'package:subtrackr/presentation/pages/email_detection_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase with error handling
+  // Initialize Firebase with error handling (legacy - keeping for backward compatibility)
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await Firebase.initializeApp();
     print('✅ Firebase initialized successfully');
   } catch (e) {
     print('❌ Firebase initialization failed: $e');
     // Continue without Firebase - app should still work with local data
+  }
+  
+  // Initialize Supabase
+  try {
+    await SupabaseConfig.initialize();
+    print('✅ Supabase initialized successfully');
+  } catch (e) {
+    print('❌ Supabase initialization failed: $e');
+    // Continue without Supabase - app should still work with local data
   }
   
   // Set initial system UI overlay style (will be updated by ThemeProvider)
