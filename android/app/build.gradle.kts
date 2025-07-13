@@ -19,7 +19,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.kelvin.subtrackr"
+    namespace = "com.kelvin.subtrackr.v2"
     compileSdk = 35
 
     compileOptions {
@@ -57,7 +57,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.kelvin.subtrackr"
+        applicationId = "com.kelvin.subtrackr.v2"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 23

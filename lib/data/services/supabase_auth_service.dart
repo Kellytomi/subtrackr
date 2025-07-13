@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 /// Service for handling Supabase authentication
 class SupabaseAuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+    serverClientId: '466119548770-el8mitrd5n7q676udv1gc7gjvbl7l38o.apps.googleusercontent.com',
+  );
   
   /// Get current authenticated user
   User? get currentUser => _supabase.auth.currentUser;
@@ -16,13 +20,35 @@ class SupabaseAuthService {
   /// Stream of authentication state changes
   Stream<AuthState> get onAuthStateChange => _supabase.auth.onAuthStateChange;
   
-  /// Sign in with Google
+  /// Sign in with Google using native Google Sign-In
   Future<AuthResponse?> signInWithGoogle() async {
     try {
       print('🔄 Starting Google Sign-In with Supabase...');
+      print('🔍 Platform: ${Platform.operatingSystem}');
+      print('🔍 GoogleSignIn instance: $_googleSignIn');
+      
+      // Check if we're on iOS and if so, check current status
+      if (Platform.isIOS) {
+        try {
+          print('🔍 Checking if user is already signed in...');
+          final currentUser = await _googleSignIn.signInSilently();
+          if (currentUser != null) {
+            print('🔍 User already signed in, signing out first...');
+            await _googleSignIn.signOut();
+          }
+        } catch (e) {
+          print('🔍 Silent sign-in check error (can be ignored): $e');
+        }
+      }
       
       // Sign in with Google
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      print('🔄 Calling _googleSignIn.signIn()...');
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn().catchError((error) {
+        print('❌ Google Sign-In error: $error');
+        print('❌ Error type: ${error.runtimeType}');
+        print('❌ Stack trace: ${StackTrace.current}');
+        return null;
+      });
       if (googleUser == null) {
         print('❌ Google Sign-In cancelled by user');
         return null;
@@ -41,7 +67,8 @@ class SupabaseAuthService {
       print('✅ Google ID token obtained, authenticating with Supabase...');
       
       // Sign in with Supabase using the Google ID token
-      final AuthResponse response = await _supabase.auth.signInWithIdToken(
+      // With serverClientId configured, this should handle nonce properly
+      final response = await _supabase.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: googleAuth.idToken!,
         accessToken: googleAuth.accessToken,
@@ -49,6 +76,14 @@ class SupabaseAuthService {
       
       if (response.user != null) {
         print('✅ Supabase authentication successful: ${response.user!.email}');
+        
+        // Debug: Log what user metadata we got from Google Sign-In
+        final userMetadata = response.user!.userMetadata;
+        print('🔍 User metadata after Google Sign-In:');
+        print('   name: ${userMetadata?['name']}');
+        print('   full_name: ${userMetadata?['full_name']}'); 
+        print('   avatar_url: ${userMetadata?['avatar_url']}');
+        
         return response;
       } else {
         print('❌ Supabase authentication failed');

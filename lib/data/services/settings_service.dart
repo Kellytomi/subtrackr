@@ -182,8 +182,17 @@ class SettingsService {
     await _settingsBox.put(AppConstants.AUTO_SYNC_SETTING, enabled);
   }
   
-
+  /// Get the last signed-in user ID (for user privacy protection)
+  String? getLastUserId() {
+    final value = _settingsBox.get('last_user_id');
+    return value is String ? value : null;
+  }
   
+  /// Set the last signed-in user ID (for user privacy protection)
+  Future<void> setLastUserId(String userId) async {
+    await _settingsBox.put('last_user_id', userId);
+  }
+
   /// Close the box
   Future<void> close() async {
     await _settingsBox.close();

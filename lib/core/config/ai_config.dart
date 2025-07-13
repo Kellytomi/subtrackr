@@ -20,7 +20,8 @@ class AiConfig {
   
   /// Enable AI-first mode (minimal pre-filtering) - dynamic from settings
   static bool aiFirstMode(SettingsService? settingsService) {
-    return settingsService?.isAiFirstModeEnabled() ?? true;
+    // For now, return true as default - can be enhanced later
+    return true;
   }
   
   /// In AI-first mode, only exclude these obvious non-subscription patterns
@@ -40,6 +41,7 @@ class AiConfig {
   
   /// Whether AI-powered email analysis is enabled (dynamic from settings)
   static bool aiAnalysisEnabled(SettingsService? settingsService) {
-    return settingsService?.isAiDetectionEnabled() ?? true;
+    // For now, return true as default - can be enhanced later
+    return true;
   }
 } 

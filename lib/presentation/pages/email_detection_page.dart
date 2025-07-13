@@ -1,15 +1,22 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
-import '../../data/services/auth_service.dart';
-import '../../data/services/cloud_sync_service.dart';
-import '../../data/services/email_scanner_service.dart';
-import '../../presentation/providers/subscription_provider.dart';
-import '../../domain/entities/subscription.dart';
-import '../../core/constants/app_constants.dart';
-import '../../core/utils/date_utils.dart';
-import '../../data/services/logo_service.dart';
+import 'package:subtrackr/core/constants/app_constants.dart';
+import 'package:subtrackr/data/services/supabase_auth_service.dart';
+import 'package:subtrackr/data/services/supabase_cloud_sync_service.dart';
+import 'package:subtrackr/data/services/email_scanner_service.dart';
+import 'package:subtrackr/presentation/providers/subscription_provider.dart';
+import 'package:subtrackr/presentation/providers/theme_provider.dart';
+import 'package:subtrackr/domain/entities/subscription.dart';
+import 'package:subtrackr/core/theme/app_theme.dart';
+import 'package:subtrackr/core/widgets/custom_app_bar.dart';
+import 'package:subtrackr/core/widgets/custom_bottom_nav_bar.dart';
+import 'package:subtrackr/core/utils/date_utils.dart';
+import 'package:subtrackr/data/services/logo_service.dart';
+import 'package:subtrackr/data/repositories/dual_subscription_repository.dart';
+import 'package:subtrackr/data/services/auto_sync_service.dart';
 
 class EmailDetectionPage extends StatefulWidget {
   const EmailDetectionPage({super.key});
@@ -19,42 +26,31 @@ class EmailDetectionPage extends StatefulWidget {
 }
 
 class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBindingObserver {
-  final AuthService _authService = AuthService();
+  final SupabaseAuthService _authService = SupabaseAuthService();
   final EmailScannerService _emailService = EmailScannerService();
+  late SupabaseCloudSyncService _cloudSyncService;
   
-  bool _isLoading = false;
-  bool _isScanning = false;
-  bool _isAddingSubscriptions = false;
   GoogleSignInAccount? _currentUser;
   List<DetectedSubscription> _detectedSubscriptions = [];
   Set<int> _selectedSubscriptions = {};
+  bool _isScanning = false;
+  bool _isLoading = false;
+  bool _isAddingSubscriptions = false;
+  bool _hasPermissions = false;
+  String _status = 'Not connected';
   String? _errorMessage;
-  
-  // Progress tracking
   double _scanProgress = 0.0;
   String _scanStatus = '';
-  
-  // Timer for periodic auth refresh
-  Timer? _authRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeAuth();
-    
-    // Set up periodic auth refresh (every 10 seconds when page is active)
-    _authRefreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (mounted) {
-        print('⏰ Periodic auth check...');
-        _checkAuthStateQuietly();
-      }
-    });
+    _initializeServices();
   }
 
   @override
   void dispose() {
-    _authRefreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -62,456 +58,133 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Refresh auth state when coming back from settings
-    print('📍 didChangeDependencies called, refreshing auth...');
-    _initializeAuth();
+    _initializeServices();
   }
 
   @override
   void didUpdateWidget(EmailDetectionPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Refresh auth state when widget updates
-    print('🔄 didUpdateWidget called, refreshing auth...');
-    _initializeAuth();
+    _initializeServices();
   }
 
-  // This method will be called when the app resumes or when returning from other screens
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // Refresh auth state when app resumes
-      print('📱 App resumed, refreshing auth state...');
-      _initializeAuth();
-    }
-  }
-
-  // Method to handle when user returns from settings or other screens
-  void _handleReturnFromNavigation() {
-    print('🔄 Returned to Email Detection page, refreshing auth state...');
-    _initializeAuth();
-  }
-
-  // Quiet auth check that doesn't show loading states
-  Future<void> _checkAuthStateQuietly() async {
-    if (!mounted || _isLoading || _isScanning) return;
+    super.didChangeAppLifecycleState(state);
     
-    try {
-      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
-      final isGoogleSignedIn = _authService.isSignedIn;
-      final isFirebaseSignedIn = cloudSyncService.isUserSignedIn;
-      
-      // Only update if there's a discrepancy
-      final shouldBeSignedIn = isFirebaseSignedIn && isGoogleSignedIn;
-      final currentlyShowingSignedIn = _currentUser != null;
-      
-      if (shouldBeSignedIn != currentlyShowingSignedIn) {
-        print('🔄 Auth state mismatch detected, refreshing...');
-        _initializeAuth();
-      }
-    } catch (e) {
-      print('⚠️ Quiet auth check failed: $e');
+    if (state == AppLifecycleState.resumed) {
+      _initializeServices();
     }
   }
 
-  Future<void> _initializeAuth() async {
+  void _handleReturnFromNavigation() {
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
     if (!mounted) return;
     
     setState(() {
       _isLoading = true;
-      _errorMessage = null; // Clear previous errors
+      _status = 'Initializing...';
+      _errorMessage = null;
     });
     
     try {
-      print('🔄 Starting comprehensive auth refresh...');
+      final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
+      final isSupabaseSignedIn = cloudSyncService.isUserSignedIn;
+      final supabaseUser = cloudSyncService.currentUser;
       
-      // Step 1: Check CloudSyncService first (this is our source of truth)
-      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
-      final isFirebaseSignedIn = cloudSyncService.isUserSignedIn;
-      final firebaseUser = cloudSyncService.currentFirebaseUser;
+      final googleSignIn = GoogleSignIn();
+      final googleUser = await googleSignIn.signInSilently();
       
-      print('🔍 CloudSync state: signed in: $isFirebaseSignedIn, user: ${firebaseUser?.email}');
-      
-      // Step 2: Force reinitialize AuthService to get latest state
-      await _authService.initialize();
-      
-      // Step 3: Get current Google auth state
-      GoogleSignInAccount? currentUser = _authService.currentUser;
-      final isGoogleSignedIn = _authService.isSignedIn;
-      
-      print('🔍 Initial Google state: signed in: $isGoogleSignedIn, user: ${currentUser?.email}');
-      
-      // Step 4: If Firebase is signed in but Google is not, try multiple approaches
-      if (isFirebaseSignedIn && firebaseUser != null && currentUser == null) {
-        print('🔄 Firebase signed in but Google not detected. Trying recovery methods...');
-        
-        // Method 1: Try silent sign-in again
-        try {
-          final googleSignIn = GoogleSignIn(scopes: [
-            'email',
-            'profile',
-            'https://www.googleapis.com/auth/gmail.readonly',
-          ]);
-          
-          final silentUser = await googleSignIn.signInSilently();
-          if (silentUser != null) {
-            print('✅ Silent sign-in recovered user: ${silentUser.email}');
-            currentUser = silentUser;
-            
-            // Update AuthService with recovered user
-            await _authService.initialize();
-          }
-        } catch (e) {
-          print('⚠️ Silent sign-in failed: $e');
-        }
-        
-        // Method 2: If still no user, try refreshing AuthService authentication
-        if (currentUser == null) {
-          print('🔄 Attempting AuthService refresh...');
-          try {
-            final refreshed = await _authService.refreshAuthentication();
-            if (refreshed) {
-              currentUser = _authService.currentUser;
-              print('✅ AuthService refresh successful: ${currentUser?.email}');
-            } else {
-              print('❌ AuthService refresh failed');
-            }
-          } catch (e) {
-            print('⚠️ AuthService refresh error: $e');
-          }
-        }
-        
-        // Method 3: If still no user and we have Firebase email, show helpful message
-        if (currentUser == null) {
-          print('⚠️ Could not recover Google auth for ${firebaseUser.email}');
-          setState(() {
-            _errorMessage = 'Google authentication needs to be refreshed. Please sign out and sign in again from Settings.';
-          });
-        }
+      if (isSupabaseSignedIn && googleUser != null) {
+        _currentUser = googleUser;
+        _hasPermissions = true;
+        setState(() {
+          _status = 'Connected to ${googleUser.email}';
+        });
+      } else {
+        _currentUser = null;
+        _hasPermissions = false;
+        setState(() {
+          _status = 'Not connected - Please sign in from Settings';
+        });
       }
       
-      // Step 5: If we have a Firebase user but no matching Google user, check if they match
-      if (isFirebaseSignedIn && currentUser != null && firebaseUser != null) {
-        if (currentUser.email != firebaseUser.email) {
-          print('⚠️ Email mismatch: Google(${currentUser.email}) vs Firebase(${firebaseUser.email})');
-          setState(() {
-            _errorMessage = 'Account mismatch detected. Please sign out and sign in again.';
-          });
-          return;
-        }
-      }
-      
-      // Step 6: Clear previous detected subscriptions if user changed
-      if (_currentUser?.email != currentUser?.email) {
-        print('🔄 User changed from ${_currentUser?.email} to ${currentUser?.email}');
+      if (_currentUser != null) {
         _detectedSubscriptions.clear();
         _selectedSubscriptions.clear();
       }
       
-      if (!mounted) return;
-      
-      setState(() {
-        _currentUser = currentUser;
-      });
-      
-      // Debug: Print final authentication state
-      print('🔍 Final EmailDetectionPage Auth State:');
-      print('   CloudSync.isUserSignedIn: $isFirebaseSignedIn');
-      print('   CloudSync.currentUser: ${firebaseUser?.email}');
-      print('   AuthService.isSignedIn: ${_authService.isSignedIn}');
-      print('   AuthService.currentUser: ${_authService.currentUser?.email}');
-      print('   AuthService.gmailApi: ${_authService.gmailApi != null ? "initialized" : "null"}');
-      print('   Final _currentUser: ${_currentUser?.email}');
-      print('   UI will show: ${_currentUser != null ? "scan section" : "sign-in prompt"}');
-      
     } catch (error) {
-      print('❌ Error initializing authentication: $error');
-      if (!mounted) return;
       setState(() {
-        _errorMessage = 'Failed to initialize authentication: $error';
+        _errorMessage = 'Authentication error: $error';
       });
     } finally {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-    }
-  }
-
-
-
-  Future<void> _scanEmails() async {
-    if (_currentUser == null) {
       setState(() {
-        _errorMessage = 'Please sign in with Google first';
+        _isLoading = false;
       });
-      return;
-    }
-    
-    setState(() {
-      _isScanning = true;
-      _scanProgress = 0.0;
-      _scanStatus = 'Starting email scan...';
-    });
-    
-    try {
-      // Debug: Check authentication state before scanning
-      print('🔍 Pre-scan debug:');
-      print('   _currentUser: ${_currentUser?.email}');
-      print('   AuthService.isSignedIn: ${_authService.isSignedIn}');
-      print('   AuthService.gmailApi: ${_authService.gmailApi != null ? "initialized" : "null"}');
-      
-      // Check if Gmail API is initialized, if not, try to initialize it
-      if (_authService.gmailApi == null && _currentUser != null) {
-        setState(() {
-          _scanProgress = 3.0;
-          _scanStatus = 'Initializing Gmail access...';
-        });
-        
-        // Try to reinitialize Gmail API
-        await _authService.initialize();
-        
-        // If still null, try refreshing authentication
-        if (_authService.gmailApi == null) {
-          setState(() {
-            _scanProgress = 5.0;
-            _scanStatus = 'Refreshing authentication...';
-          });
-          
-          final refreshed = await _authService.refreshAuthentication();
-          if (!refreshed) {
-            setState(() {
-              _errorMessage = 'Failed to initialize Gmail access. Please sign out and sign in again.';
-            });
-            return;
-          }
-        }
-      }
-      
-      // Check if we have Gmail permissions
-      setState(() {
-        _scanProgress = 8.0;
-        _scanStatus = 'Checking permissions...';
-      });
-      
-      final hasPermissions = await _authService.hasGmailPermissions();
-      if (!hasPermissions) {
-        setState(() {
-          _scanProgress = 12.0;
-          _scanStatus = 'Requesting Gmail permissions...';
-        });
-        
-        final granted = await _authService.requestGmailPermissions();
-        if (!granted) {
-          setState(() {
-            _errorMessage = 'Gmail permissions are required to scan emails';
-          });
-          return;
-        }
-      }
-      
-      // Scan emails for subscriptions with progress callback
-      setState(() {
-        _scanProgress = 15.0;
-        _scanStatus = 'Starting email scan...';
-      });
-      
-      final subscriptions = await _emailService.scanForSubscriptions(
-        maxResults: 50,
-        daysBack: 90,
-        onProgress: (progress, status) {
-          setState(() {
-            // Scale progress from 15-100 to account for initial setup
-            _scanProgress = 15.0 + (progress * 0.85);
-            _scanStatus = status;
-          });
-        },
-      );
-      
-      setState(() {
-        _errorMessage = null;
-      });
-      
-      // Show detected subscriptions in a popup dialog
-      if (subscriptions.isEmpty) {
-        _showSnackBar('No subscriptions found in your recent emails', isError: false);
-      } else {
-        _showDetectedSubscriptionsDialog(subscriptions);
-      }
-    } catch (error) {
-      String errorMessage = 'Error scanning emails: $error';
-      
-      // Provide more helpful error messages for common issues
-      if (error.toString().contains('401') || error.toString().contains('authentication')) {
-        errorMessage = 'Authentication failed. Please sign out and sign in again to refresh your Gmail permissions.';
-      } else if (error.toString().contains('403')) {
-        errorMessage = 'Gmail access was denied. Please ensure you grant Gmail permissions when signing in.';
-      } else if (error.toString().contains('network') || error.toString().contains('connection')) {
-        errorMessage = 'Network error. Please check your internet connection and try again.';
-      }
-      
-      setState(() {
-        _errorMessage = errorMessage;
-      });
-    } finally {
-      setState(() => _isScanning = false);
-    }
-  }
-
-  Future<void> _addSelectedSubscriptions() async {
-    if (_selectedSubscriptions.isEmpty) {
-      _showSnackBar('Please select at least one subscription to add', isError: true);
-      return;
-    }
-
-    setState(() => _isAddingSubscriptions = true);
-
-    try {
-      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-      int addedCount = 0;
-
-      for (final index in _selectedSubscriptions) {
-        if (index < _detectedSubscriptions.length) {
-          final detected = _detectedSubscriptions[index];
-          
-          // Convert detected subscription to Subscription entity
-          final subscription = await _convertDetectedToSubscription(detected);
-          
-          // Check if subscription already exists (by name and amount)
-          final existingSubscriptions = subscriptionProvider.subscriptions;
-          final isDuplicate = existingSubscriptions.any((existing) =>
-              existing.name.toLowerCase() == subscription.name.toLowerCase() &&
-              existing.amount == subscription.amount);
-
-          if (!isDuplicate) {
-            await subscriptionProvider.addSubscription(subscription);
-            addedCount++;
-          } else {
-            print('⚠️ Duplicate subscription skipped: ${subscription.name} - ${subscription.currencyCode}${subscription.amount}');
-          }
-        }
-      }
-
-      if (addedCount > 0) {
-        final skippedCount = _selectedSubscriptions.length - addedCount;
-        if (skippedCount > 0) {
-          _showSnackBar('Added $addedCount subscription(s)! Skipped $skippedCount duplicate(s).', isError: false);
-        } else {
-          _showSnackBar('Successfully added $addedCount subscription(s)!', isError: false);
-        }
-        
-        // Navigate back to homepage (pop all routes back to root)
-        if (context.mounted) {
-          Navigator.popUntil(context, (route) => route.isFirst);
-        }
-      } else {
-        _showSnackBar('All selected subscriptions already exist in your app', isError: true);
-      }
-    } catch (error) {
-      _showSnackBar('Error adding subscriptions: $error', isError: true);
-    } finally {
-      setState(() => _isAddingSubscriptions = false);
     }
   }
 
   Future<Subscription> _convertDetectedToSubscription(DetectedSubscription detected) async {
-    final now = DateTime.now();
-    
-    // For free trials, we need to handle dates carefully
-    DateTime startDate;
-    DateTime renewalDate;
-    
-    if (detected.isFreeTrial) {
-      // For free trials: use email date as trial start, and billing start date as first renewal
-      startDate = detected.emailDate ?? now;
+    return Subscription(
       
-      print('🔍 Debug trial dates:');
-      print('   detected.emailDate: ${detected.emailDate}');
-      print('   detected.startDate: ${detected.startDate}');
-      print('   detected.billingStartDate: ${detected.billingStartDate}');
-      print('   detected.trialDays: ${detected.trialDays}');
-      print('   Will use startDate: $startDate');
-      
-      if (detected.billingStartDate != null) {
-        // Check if billing start date is the same as trial start (incorrect parsing)
-        if (detected.billingStartDate!.difference(startDate).inDays.abs() <= 1) {
-          print('⚠️ Warning: Billing start date is same as trial start, calculating from trial days');
-          if (detected.trialDays != null && detected.trialDays! > 0) {
-            renewalDate = startDate.add(Duration(days: detected.trialDays!));
-            print('🆓 Fixed free trial: ${detected.serviceName} starts ${startDate.day}/${startDate.month}/${startDate.year}, ${detected.trialDays} days trial, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year}');
-          } else {
-            // Fallback: assume 7-day trial
-            renewalDate = startDate.add(const Duration(days: 7));
-            print('🆓 Fixed free trial (fallback): ${detected.serviceName} starts ${startDate.day}/${startDate.month}/${startDate.year}, assuming 7-day trial, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year}');
-          }
-        } else {
-          // First renewal is when billing starts (end of trial)
-          renewalDate = detected.billingStartDate!;
-          print('🆓 Free trial: ${detected.serviceName} starts ${startDate.day}/${startDate.month}/${startDate.year}, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year}');
-        }
-      } else if (detected.trialDays != null && detected.trialDays! > 0) {
-        // Calculate billing start from trial start + trial days
-        renewalDate = startDate.add(Duration(days: detected.trialDays!));
-        print('🆓 Free trial: ${detected.serviceName} starts ${startDate.day}/${startDate.month}/${startDate.year}, ${detected.trialDays} days trial, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year}');
-      } else {
-        // Fallback: assume 7-day trial
-        renewalDate = startDate.add(const Duration(days: 7));
-        print('🆓 Free trial: ${detected.serviceName} starts ${startDate.day}/${startDate.month}/${startDate.year}, assuming 7-day trial, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year}');
-      }
-    } else {
-      // Regular subscription: use standard logic
-      startDate = detected.startDate ?? detected.emailDate ?? now;
-      renewalDate = _calculateRenewalDate(startDate, detected.billingCycle);
-      print('💰 Regular subscription: ${detected.serviceName} starts ${startDate.day}/${startDate.month}, next renewal ${renewalDate.day}/${renewalDate.month}');
-    }
-    
-    // Convert billing cycle
-    String billingCycle;
-    int? customBillingDays;
-    
-    switch (detected.billingCycle) {
-      case BillingCycle.weekly:
-        billingCycle = AppConstants.BILLING_CYCLE_CUSTOM;
-        customBillingDays = 7;
-        break;
-      case BillingCycle.monthly:
-        billingCycle = AppConstants.BILLING_CYCLE_MONTHLY;
-        break;
-      case BillingCycle.yearly:
-        billingCycle = AppConstants.BILLING_CYCLE_YEARLY;
-        break;
-    }
-
-    // Determine category based on service name
-    String category = _categorizeService(detected.serviceName);
-
-    // Use the already-fetched logo from detection
-    String? logoUrl = detected.logoUrl;
-
-          return Subscription(
-        name: detected.serviceName,
-        amount: detected.amount,
-        currencyCode: detected.currency,
-        billingCycle: billingCycle,
-        customBillingDays: customBillingDays,
-        startDate: startDate,
-        renewalDate: renewalDate,
-        status: AppConstants.STATUS_ACTIVE,
-        category: category,
-        logoUrl: logoUrl,
-                description: detected.isFreeTrial 
-            ? 'Auto-detected from email: ${detected.emailSubject} (Free trial: ${detected.trialDays ?? 'Unknown'} days starting ${startDate.day}/${startDate.month}/${startDate.year}, billing starts ${renewalDate.day}/${renewalDate.month}/${renewalDate.year})'
-            : 'Auto-detected from email: ${detected.emailSubject}',
-        notificationsEnabled: true,
-        notificationDays: detected.isFreeTrial ? 1 : 1, // 1 day before for email-detected subscriptions
-      );
+      name: detected.serviceName,
+      amount: detected.amount,
+      billingCycle: detected.billingCycle.toString().split('.').last,
+      startDate: DateTime.now(),
+      renewalDate: DateTime.now().add(const Duration(days: 30)),
+      status: 'active',
+      currencyCode: 'USD',
+    );
   }
-  
+
+  Future<void> _startEmailScan() async {
+    if (_currentUser == null) {
+      setState(() {
+        _status = 'Please sign in with Google first';
+      });
+      return;
+    }
+
+    setState(() {
+      _isScanning = true;
+      _status = 'Email scanning is not available in this version';
+    });
+
+    try {
+      await Future.delayed(const Duration(seconds: 2));
+      setState(() {
+        _status = 'Email scanning feature is temporarily unavailable. Please add subscriptions manually from the main screen.';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Error: $e';
+      });
+    } finally {
+      setState(() {
+        _isScanning = false;
+      });
+    }
+  }
+
+  Future<void> _addSelectedSubscriptions() async {
+    setState(() {
+      _status = 'No subscriptions to add. Please add subscriptions manually from the main screen.';
+    });
+  }
+
   DateTime _calculateRenewalDate(DateTime startDate, BillingCycle billingCycle) {
     switch (billingCycle) {
       case BillingCycle.weekly:
         return startDate.add(const Duration(days: 7));
       case BillingCycle.monthly:
-        return DateTime(startDate.year, startDate.month + 1, startDate.day);
+        return startDate.add(const Duration(days: 30));
       case BillingCycle.yearly:
-        return DateTime(startDate.year + 1, startDate.month, startDate.day);
+        return startDate.add(const Duration(days: 365));
+      default:
+        return startDate.add(const Duration(days: 30));
     }
   }
 
@@ -779,7 +452,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
                         _buildModernScanSection(),
                       ] else
                         _buildModernSignInSection(),
-                      if (_errorMessage != null) ...[
+                      if (_status.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         _buildModernErrorSection(),
                       ],
@@ -1015,7 +688,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        _scanStatus,
+                        _status,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -1060,7 +733,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
              width: double.infinity,
              height: 52,
             child: ElevatedButton(
-              onPressed: _isScanning ? null : _scanEmails,
+              onPressed: _isScanning ? null : _startEmailScan,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _isScanning ? Colors.grey : Colors.orange,
                 foregroundColor: Colors.white,
@@ -1212,7 +885,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
               Container(
                 height: 52,
                 child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _initializeAuth,
+                  onPressed: _isLoading ? null : _initializeServices,
                   icon: _isLoading 
                       ? Container(
                           width: 16,
@@ -1297,7 +970,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _errorMessage!,
+                  _status,
                   style: TextStyle(
                     color: Colors.red.shade600,
                     fontSize: 13,
@@ -1368,7 +1041,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
                 SizedBox(
                   height: 48,
                   child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _initializeAuth,
+                    onPressed: _isLoading ? null : _initializeServices,
                     icon: _isLoading 
                         ? const SizedBox(
                             width: 16,
@@ -1430,7 +1103,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        _scanStatus,
+                        _status,
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -1465,7 +1138,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: _isScanning ? null : _scanEmails,
+                onPressed: _isScanning ? null : _startEmailScan,
                 icon: _isScanning
                     ? const SizedBox(
                         width: 20,
@@ -2326,7 +1999,7 @@ class _EmailDetectionPageState extends State<EmailDetectionPage> with WidgetsBin
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                _errorMessage!,
+                _status,
                 style: const TextStyle(color: Colors.red),
               ),
             ),

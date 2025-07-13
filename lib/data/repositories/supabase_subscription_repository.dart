@@ -23,25 +23,25 @@ class SupabaseSubscriptionRepository {
           .from('subscriptions')
           .select()
           .eq('user_id', user.id)
-          .eq('is_active', true);
+          .eq('status', 'active');
       
       final subscriptions = <Subscription>[];
       for (final data in response) {
         try {
           // Convert Supabase data to Subscription entity
           final subscription = Subscription(
-            id: data['id'] ?? '',
-            name: data['name'] ?? '',
-            amount: (data['price'] ?? 0.0).toDouble(),
-            billingCycle: data['billing_cycle'] ?? 'monthly',
-            startDate: DateTime.parse(data['created_at'] ?? DateTime.now().toIso8601String()),
-            renewalDate: DateTime.parse(data['next_payment_date'] ?? DateTime.now().toIso8601String()),
-            status: data['is_active'] == true ? 'active' : 'paused',
-            description: data['description'],
-            website: data['website'],
-            logoUrl: data['logo_url'],
-            category: data['category'],
-            currencyCode: data['currency'] ?? 'USD',
+            id: (data['id'] as String?) ?? '',
+            name: (data['name'] as String?) ?? '',
+            amount: ((data['price'] as num?) ?? 0.0).toDouble(),
+            billingCycle: (data['billing_cycle'] as String?) ?? 'monthly',
+            startDate: DateTime.parse((data['start_date'] as String?) ?? DateTime.now().toIso8601String()),
+            renewalDate: DateTime.parse((data['next_billing_date'] as String?) ?? DateTime.now().toIso8601String()),
+            status: (data['status'] as String?) ?? 'active',
+            description: data['description'] as String?,
+            website: data['website'] as String?,
+            logoUrl: data['logo_url'] as String?,
+            category: data['category'] as String?,
+            currencyCode: (data['currency_code'] as String?) ?? 'USD',
           );
           subscriptions.add(subscription);
         } catch (e) {
@@ -70,25 +70,25 @@ class SupabaseSubscriptionRepository {
           .from('subscriptions')
           .select()
           .eq('user_id', user.id)
-          .eq('is_active', false);
+          .eq('status', 'paused');
       
       final subscriptions = <Subscription>[];
       for (final data in response) {
         try {
           // Convert Supabase data to Subscription entity
           final subscription = Subscription(
-            id: data['id'] ?? '',
-            name: data['name'] ?? '',
-            amount: (data['price'] ?? 0.0).toDouble(),
-            billingCycle: data['billing_cycle'] ?? 'monthly',
-            startDate: DateTime.parse(data['created_at'] ?? DateTime.now().toIso8601String()),
-            renewalDate: DateTime.parse(data['next_payment_date'] ?? DateTime.now().toIso8601String()),
+            id: (data['id'] as String?) ?? '',
+            name: (data['name'] as String?) ?? '',
+            amount: ((data['price'] as num?) ?? 0.0).toDouble(),
+            billingCycle: (data['billing_cycle'] as String?) ?? 'monthly',
+            startDate: DateTime.parse((data['start_date'] as String?) ?? DateTime.now().toIso8601String()),
+            renewalDate: DateTime.parse((data['next_billing_date'] as String?) ?? DateTime.now().toIso8601String()),
             status: 'paused',
-            description: data['description'],
-            website: data['website'],
-            logoUrl: data['logo_url'],
-            category: data['category'],
-            currencyCode: data['currency'] ?? 'USD',
+            description: data['description'] as String?,
+            website: data['website'] as String?,
+            logoUrl: data['logo_url'] as String?,
+            category: data['category'] as String?,
+            currencyCode: (data['currency_code'] as String?) ?? 'USD',
           );
           subscriptions.add(subscription);
         } catch (e) {
@@ -123,13 +123,15 @@ class SupabaseSubscriptionRepository {
         'user_id': user.id,
         'name': subscription.name,
         'price': subscription.amount,
-        'currency': subscription.currencyCode,
+        'currency_code': subscription.currencyCode,
         'billing_cycle': subscription.billingCycle,
-        'next_payment_date': subscription.renewalDate.toIso8601String(),
+        'next_billing_date': subscription.renewalDate.toIso8601String(),
         'category': subscription.category,
         'logo_url': subscription.logoUrl,
-        'is_active': subscription.status == 'active',
-        'created_at': subscription.startDate.toIso8601String(),
+        'status': subscription.status,
+        'description': subscription.description,
+        'website': subscription.website,
+        'start_date': subscription.startDate.toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };
       
@@ -166,18 +168,18 @@ class SupabaseSubscriptionRepository {
       
       if (response != null) {
         return Subscription(
-          id: response['id'] ?? '',
-          name: response['name'] ?? '',
-          amount: (response['price'] ?? 0.0).toDouble(),
-          billingCycle: response['billing_cycle'] ?? 'monthly',
-          startDate: DateTime.parse(response['created_at'] ?? DateTime.now().toIso8601String()),
-          renewalDate: DateTime.parse(response['next_payment_date'] ?? DateTime.now().toIso8601String()),
-          status: response['is_active'] == true ? 'active' : 'paused',
-          description: response['description'],
-          website: response['website'],
-          logoUrl: response['logo_url'],
-          category: response['category'],
-          currencyCode: response['currency'] ?? 'USD',
+          id: (response['id'] as String?) ?? '',
+          name: (response['name'] as String?) ?? '',
+          amount: ((response['price'] as num?) ?? 0.0).toDouble(),
+          billingCycle: (response['billing_cycle'] as String?) ?? 'monthly',
+          startDate: DateTime.parse((response['start_date'] as String?) ?? DateTime.now().toIso8601String()),
+          renewalDate: DateTime.parse((response['next_billing_date'] as String?) ?? DateTime.now().toIso8601String()),
+          status: (response['status'] as String?) ?? 'active',
+          description: response['description'] as String?,
+          website: response['website'] as String?,
+          logoUrl: response['logo_url'] as String?,
+          category: response['category'] as String?,
+          currencyCode: (response['currency_code'] as String?) ?? 'USD',
         );
       }
       
@@ -227,12 +229,14 @@ class SupabaseSubscriptionRepository {
       final subscriptionData = {
         'name': subscription.name,
         'price': subscription.amount,
-        'currency': subscription.currencyCode,
+        'currency_code': subscription.currencyCode,
         'billing_cycle': subscription.billingCycle,
-        'next_payment_date': subscription.renewalDate.toIso8601String(),
+        'next_billing_date': subscription.renewalDate.toIso8601String(),
         'category': subscription.category,
         'logo_url': subscription.logoUrl,
-        'is_active': subscription.status == 'active',
+        'status': subscription.status,
+        'description': subscription.description,
+        'website': subscription.website,
         'updated_at': DateTime.now().toIso8601String(),
       };
       
@@ -266,6 +270,26 @@ class SupabaseSubscriptionRepository {
       print('✅ Deleted subscription from Supabase: $id');
     } catch (e) {
       print('❌ Error deleting subscription from Supabase: $e');
+      rethrow;
+    }
+  }
+  
+  /// Clear all subscriptions from Supabase for the current user
+  Future<void> clearAllSubscriptions() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        throw Exception('No authenticated user for Supabase clear');
+      }
+      
+      await _supabase
+          .from('subscriptions')
+          .delete()
+          .eq('user_id', user.id);
+      
+      print('✅ Cleared all subscriptions from Supabase');
+    } catch (e) {
+      print('❌ Error clearing all subscriptions from Supabase: $e');
       rethrow;
     }
   }

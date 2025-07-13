@@ -60,18 +60,14 @@ dependencies:
   url_launcher: ^6.3.1
   shared_preferences: ^2.2.2
   uuid: ^4.3.3
+  package_info_plus: ^8.0.0
   
   # Authentication & Email API
   google_sign_in: ^6.2.2
   googleapis: ^13.2.0
   http: ^1.2.0
   
-  # Firebase for cloud sync
-  firebase_core: ^3.13.1
-  firebase_auth: ^5.5.4
-  cloud_firestore: ^5.6.8
-  
-  # Supabase for new backend
+  # Supabase for backend
   supabase_flutter: ^2.6.0
   
   shorebird_code_push: ^2.0.4

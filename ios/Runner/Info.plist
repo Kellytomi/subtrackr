@@ -52,7 +52,15 @@
 			<string>REVERSED_CLIENT_ID</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.752788778229-t063i6qt715bt57nuougslgnfe9q5b84</string>
+				<string>com.googleusercontent.apps.466119548770-v9f4gpvdfpk42neqv75ngdho8r93d68l</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.kelvin.subtrackr.v2</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.kelvin.subtrackr.v2</string>
 			</array>
 		</dict>
 	</array>

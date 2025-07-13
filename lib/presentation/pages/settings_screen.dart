@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
@@ -8,8 +9,9 @@ import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/presentation/providers/subscription_provider.dart';
 import 'package:subtrackr/presentation/providers/theme_provider.dart';
 import 'package:subtrackr/core/utils/tips_helper.dart';
-import 'package:subtrackr/data/services/auth_service.dart';
-import 'package:subtrackr/data/services/cloud_sync_service.dart';
+import 'package:subtrackr/data/services/supabase_cloud_sync_service.dart';
+import 'package:subtrackr/data/services/supabase_auth_service.dart';
+import 'package:subtrackr/data/repositories/dual_subscription_repository.dart';
 
 
 class SettingsScreen extends StatefulWidget {
@@ -524,7 +526,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
         final isSignedIn = snapshot.hasData && snapshot.data!['email'] != null;
-        final isCloudSyncEnabled = snapshot.hasData && snapshot.data!['isFirebaseSignedIn'] == 'true';
+        final isCloudSyncEnabled = snapshot.hasData && snapshot.data!['isSupabaseSignedIn'] == 'true';
         
         return Container(
           padding: const EdgeInsets.all(20),
@@ -578,13 +580,35 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          isSignedIn ? snapshot.data!['name']! : 'Guest User',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                isSignedIn ? snapshot.data!['name']! : 'Guest User',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                            if (isSignedIn) ...[
+                              IconButton(
+                                onPressed: () => _showEditNameDialog(snapshot.data!['name']!),
+                                icon: Icon(
+                                  Icons.edit,
+                                  size: 18,
+                                  color: colorScheme.primary,
+                                ),
+                                tooltip: 'Edit Name',
+                                style: IconButton.styleFrom(
+                                  backgroundColor: colorScheme.primary.withOpacity(0.1),
+                                  padding: const EdgeInsets.all(4),
+                                  minimumSize: const Size(32, 32),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -827,7 +851,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
 
   Future<void> _signOut() async {
     try {
-      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+      final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
       final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
       
       // Stop real-time sync
@@ -872,45 +896,50 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
 
   Future<Map<String, String>?> _getUserInfo() async {
     try {
-      final authService = AuthService();
-      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+      final authService = SupabaseAuthService();
+      final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
       final googleUser = authService.currentUser;
-      final firebaseUser = cloudSyncService.currentFirebaseUser;
+      final supabaseUser = cloudSyncService.currentUser;
       
-      // Check Google user first, then fall back to Firebase user
+      // Check Google user first, then fall back to Supabase user
       if (googleUser != null) {
+        // Prioritize manually set 'full_name' over Google's 'name' to preserve user edits
+        final manualName = googleUser.userMetadata?['full_name']?.toString();
+        final googleName = googleUser.userMetadata?['name']?.toString();
+        final fallbackName = googleUser.email?.split('@')[0] ?? 'User';
+        
         final result = <String, String>{
-          'name': googleUser.displayName ?? 'User',
+          'name': manualName ?? googleName ?? fallbackName,
           'email': googleUser.email ?? '',
-          'isGoogleSignedIn': 'true',
-          'isFirebaseSignedIn': cloudSyncService.isUserSignedIn.toString(),
+          'photoUrl': googleUser.userMetadata?['avatar_url']?.toString() ?? '',
+          'isSupabaseSignedIn': 'true',
         };
-        if (googleUser.photoUrl != null) {
-          result['photoUrl'] = googleUser.photoUrl!;
-        }
         return result;
-      } else if (firebaseUser != null) {
-        // Firebase user exists but Google user is null (due to type cast error)
+      } else if (supabaseUser != null) {
+        // Supabase user exists but Google user is null
+        final manualName = supabaseUser.userMetadata?['full_name']?.toString();
+        final googleName = supabaseUser.userMetadata?['name']?.toString();
+        final fallbackName = supabaseUser.email?.split('@')[0] ?? 'User';
+        
         final result = <String, String>{
-          'name': firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'User',
-          'email': firebaseUser.email ?? '',
-          'isGoogleSignedIn': 'false', // Google sign-in had issues but auth worked
-          'isFirebaseSignedIn': 'true',
+          'name': manualName ?? googleName ?? fallbackName,
+          'email': supabaseUser.email ?? '',
+          'photoUrl': supabaseUser.userMetadata?['avatar_url']?.toString() ?? '',
+          'isSupabaseSignedIn': 'true',
         };
-        if (firebaseUser.photoURL != null) {
-          result['photoUrl'] = firebaseUser.photoURL!;
-        }
         return result;
       }
+      
+      return null;
     } catch (e) {
-      debugPrint('Error getting user info: $e');
+      print('Error getting user info: $e');
+      return null;
     }
-    return null;
   }
 
   Future<void> _signInWithGoogle() async {
     try {
-      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+      final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
       
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1634,7 +1663,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     });
 
     try {
-      final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+      final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
       final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
       
       if (!cloudSyncService.isUserSignedIn) {
@@ -1697,44 +1726,19 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   }
 
   Future<void> _clearCloudData() async {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'Clear Cloud Data',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
-          ),
-        ),
-        content: const Text(
-          'This will permanently delete all your subscription data from cloud storage. Your local data will remain unchanged.\n\nThis action cannot be undone.',
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Clear Cloud Data'),
+        content: const Text('This will permanently delete all your subscription data from the cloud. This action cannot be undone.'),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context, false);
-            },
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: colorScheme.primary),
-            ),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, true);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Clear Data'),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Clear'),
           ),
         ],
       ),
@@ -1742,57 +1746,24 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     
     if (result == true) {
       try {
-        final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+        final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
+        final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
         
         if (!cloudSyncService.isUserSignedIn) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.warning, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text('Please sign in with Google first'),
-                ],
-              ),
-              backgroundColor: Colors.orange,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          );
+          _showSnackBar('Please sign in to clear cloud data');
           return;
         }
         
-        await cloudSyncService.clearCloudData();
+        // Clear all subscriptions from cloud using the repository
+        final repository = Provider.of<DualSubscriptionRepository>(context, listen: false);
+        await repository.clearAllSubscriptions();
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.cloud_off, color: Colors.white),
-                const SizedBox(width: 8),
-                Text('Cloud data cleared successfully'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        // Also clear local subscriptions
+        await subscriptionProvider.deleteAllSubscriptions();
+        
+        _showSnackBar('Cloud data cleared successfully');
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 8),
-                Text('Failed to clear cloud data: $e'),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        _showSnackBar('Error clearing cloud data: $e');
       }
     }
   }
@@ -1843,7 +1814,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     
     if (result == true) {
       try {
-        final cloudSyncService = Provider.of<CloudSyncService>(context, listen: false);
+        final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
         final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
         
         if (!cloudSyncService.isUserSignedIn) {
@@ -1864,8 +1835,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           return;
         }
         
-        // Download subscriptions from cloud
-        final cloudSubscriptions = await cloudSyncService.downloadSubscriptions();
+        // Get subscriptions from cloud using the repository
+        final repository = Provider.of<DualSubscriptionRepository>(context, listen: false);
+        final cloudSubscriptions = await repository.getAllSubscriptions();
         
         // Replace local data with cloud data
         await subscriptionProvider.restoreFromBackup(cloudSubscriptions);
@@ -2285,6 +2257,71 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
+  Future<void> _showEditNameDialog(String currentName) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => _EditNameDialog(currentName: currentName),
+    );
+
+    if (result != null && result != currentName) {
+      // Update the name in Supabase
+      await _updateUserName(result);
+    }
+  }
+
+  Future<void> _updateUserName(String newName) async {
+    try {
+      print('🔄 Updating user name to: $newName');
+      
+      // Update user metadata in Supabase (only full_name to avoid conflicts with Google Sign-In)
+      final response = await Supabase.instance.client.auth.updateUser(
+        UserAttributes(
+          data: {'full_name': newName},
+        ),
+      );
+
+      if (response.user != null) {
+        print('✅ User name updated successfully in Supabase');
+        if (mounted) {
+          setState(() {}); // Trigger rebuild to update the name in the UI
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Name updated to $newName'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to update user profile');
+      }
+    } catch (e) {
+      print('❌ Error updating user name: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating name: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
 
 }
 
@@ -2527,6 +2564,91 @@ class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> with Si
         ],
         ),
       ),
+    );
+  }
+}
+
+class _EditNameDialog extends StatefulWidget {
+  final String currentName;
+
+  const _EditNameDialog({required this.currentName});
+
+  @override
+  State<_EditNameDialog> createState() => _EditNameDialogState();
+}
+
+class _EditNameDialogState extends State<_EditNameDialog> {
+  late final TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.currentName);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return AlertDialog(
+      title: Text(
+        'Edit Name',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: isDark ? Colors.white : Colors.black,
+        ),
+      ),
+      content: TextField(
+        controller: _nameController,
+        decoration: InputDecoration(
+          hintText: 'Enter your name',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: colorScheme.primary,
+              width: 1.5,
+            ),
+          ),
+          filled: true,
+          fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        ),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, null),
+          child: Text(
+            'Cancel',
+            style: TextStyle(color: colorScheme.primary),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _nameController.text),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: colorScheme.primary,
+            foregroundColor: colorScheme.onPrimary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 } 

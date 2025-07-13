@@ -1086,7 +1086,6 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
       
       // Create new subscription (always set to active)
       final subscription = Subscription(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: name,
         amount: amount,
         description: description.isNotEmpty ? description : null,

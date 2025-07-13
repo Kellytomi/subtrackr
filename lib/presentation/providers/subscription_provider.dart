@@ -1,43 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/date_utils.dart';
-import 'package:subtrackr/data/repositories/subscription_repository.dart';
+import 'package:subtrackr/data/repositories/dual_subscription_repository.dart';
 import 'package:subtrackr/data/repositories/price_change_repository.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/data/services/price_history_service.dart';
-import 'package:subtrackr/data/services/cloud_sync_service.dart';
+import 'package:subtrackr/data/services/supabase_cloud_sync_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
 import 'package:subtrackr/domain/entities/price_change.dart';
 
 class SubscriptionProvider extends ChangeNotifier {
-  final SubscriptionRepository _repository;
+  final DualSubscriptionRepository _repository;
   final PriceChangeRepository _priceChangeRepository;
   final NotificationService _notificationService;
   final SettingsService _settingsService;
   final PriceHistoryService _priceHistoryService;
-  final CloudSyncService _cloudSyncService;
+  final SupabaseCloudSyncService _supabaseCloudSyncService;
   
   List<Subscription> _subscriptions = [];
   bool _isLoading = false;
   String? _error;
   
   SubscriptionProvider({
-    required SubscriptionRepository repository,
+    required DualSubscriptionRepository repository,
     required PriceChangeRepository priceChangeRepository,
     required NotificationService notificationService,
     required SettingsService settingsService,
-    required CloudSyncService cloudSyncService,
+    required SupabaseCloudSyncService supabaseCloudSyncService,
   })  : _repository = repository,
         _priceChangeRepository = priceChangeRepository,
         _notificationService = notificationService,
         _settingsService = settingsService,
         _priceHistoryService = PriceHistoryService(),
-        _cloudSyncService = cloudSyncService {
-    // Set up real-time sync callback
-    _cloudSyncService.onSubscriptionsUpdated = _handleRealTimeUpdate;
-    
-    // Start real-time sync if user is signed in
+        _supabaseCloudSyncService = supabaseCloudSyncService {
+    // Initialize real-time sync
     _initializeRealTimeSync();
   }
   
@@ -152,22 +149,43 @@ class SubscriptionProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      var loadedSubscriptions = _repository.getAllSubscriptions();
+      var loadedSubscriptions = await _repository.getAllSubscriptions();
       
       // Try to sync with cloud if user is signed in
-      if (_cloudSyncService.isUserSignedIn) {
+      if (_supabaseCloudSyncService.isUserSignedIn) {
         try {
-          loadedSubscriptions = await _cloudSyncService.syncSubscriptions(loadedSubscriptions);
+          print('🔄 Attempting to get cloud subscriptions...');
+          // Get cloud subscriptions
+          final cloudSubscriptions = await _repository.getCloudSubscriptions();
+          print('☁️ Retrieved ${cloudSubscriptions.length} cloud subscriptions');
+          print('📱 Have ${loadedSubscriptions.length} local subscriptions');
           
-          // Update local repository with synced data
-          await _repository.clearAllSubscriptions();
-          for (final subscription in loadedSubscriptions) {
-            await _repository.addSubscription(subscription);
+          // If cloud sync fails due to schema issues, preserve local data
+          if (cloudSubscriptions.isEmpty && loadedSubscriptions.isNotEmpty) {
+            print('⚠️ No cloud subscriptions found but have local data - preserving local subscriptions');
+            // Don't merge, just keep local data
+          } else {
+            // Merge local and cloud subscriptions (avoid duplicates by name)
+            final mergedSubscriptions = <Subscription>[];
+            final cloudNames = cloudSubscriptions.map((s) => s.name.toLowerCase()).toSet();
+            
+            // Add all cloud subscriptions
+            mergedSubscriptions.addAll(cloudSubscriptions);
+            
+            // Add local subscriptions that don't exist in cloud
+            for (final localSub in loadedSubscriptions) {
+              if (!cloudNames.contains(localSub.name.toLowerCase())) {
+                mergedSubscriptions.add(localSub);
+                print('➕ Adding local subscription to merge: ${localSub.name}');
+              }
+            }
+            
+            loadedSubscriptions = mergedSubscriptions;
+            print('✅ Cloud sync completed successfully - merged ${mergedSubscriptions.length} subscriptions');
           }
-          
-          print('✅ Cloud sync completed successfully');
         } catch (e) {
           print('⚠️ Cloud sync failed, using local data: $e');
+          print('📱 Preserving ${loadedSubscriptions.length} local subscriptions');
           // Continue with local data if cloud sync fails
         }
       }
@@ -201,13 +219,18 @@ class SubscriptionProvider extends ChangeNotifier {
   // Add a new subscription
   Future<void> addSubscription(Subscription subscription) async {
     try {
+      final isSignedIn = _supabaseCloudSyncService.isUserSignedIn;
+      final currentUser = _supabaseCloudSyncService.currentUser;
+      
+      print('🔍 Adding subscription - Auth check: isSignedIn=$isSignedIn, user=${currentUser?.email ?? 'null'}');
+      
+      // DualSubscriptionRepository already handles both local and cloud storage
       await _repository.addSubscription(subscription);
       _subscriptions = [..._subscriptions, subscription];
       _sortSubscriptions(_subscriptions);
       notifyListeners();
       
-      // Auto backup to cloud if enabled and signed in
-      await _cloudSyncService.autoBackupSubscription(subscription);
+      // No need for additional auto backup - DualSubscriptionRepository already handles cloud sync
       
       // Schedule notification if active
       if (subscription.status == AppConstants.STATUS_ACTIVE) {
@@ -222,6 +245,7 @@ class SubscriptionProvider extends ChangeNotifier {
   // Update a subscription
   Future<void> updateSubscription(Subscription subscription) async {
     try {
+      // DualSubscriptionRepository already handles both local and cloud storage
       await _repository.updateSubscription(subscription);
       _subscriptions = _subscriptions.map((s) => 
         s.id == subscription.id ? subscription : s
@@ -229,8 +253,7 @@ class SubscriptionProvider extends ChangeNotifier {
       _sortSubscriptions(_subscriptions);
       notifyListeners();
       
-      // Auto backup to cloud if enabled and signed in
-      await _cloudSyncService.autoBackupSubscription(subscription);
+      // No need for additional auto backup - DualSubscriptionRepository already handles cloud sync
       
       // Update notification if active
       if (subscription.status == AppConstants.STATUS_ACTIVE) {
@@ -247,11 +270,11 @@ class SubscriptionProvider extends ChangeNotifier {
   // Delete a subscription
   Future<void> deleteSubscription(String id) async {
     try {
+      // DualSubscriptionRepository already handles both local and cloud storage
       await _repository.deleteSubscription(id);
       await _notificationService.cancelNotification(id.hashCode);
       
-      // Auto backup deletion to cloud if enabled and signed in
-      await _cloudSyncService.autoBackupDeleteSubscription(id);
+      // No need for additional auto backup - DualSubscriptionRepository already handles cloud sync
       
       _subscriptions = _subscriptions.where((s) => s.id != id).toList();
       notifyListeners();
@@ -278,10 +301,10 @@ class SubscriptionProvider extends ChangeNotifier {
         renewalDate: nextRenewalDate,
       );
       
+      // DualSubscriptionRepository already handles both local and cloud storage
       await _repository.updateSubscription(updatedSubscription);
       
-      // Auto backup to cloud if enabled and signed in
-      await _cloudSyncService.autoBackupSubscription(updatedSubscription);
+      // No need for additional auto backup - DualSubscriptionRepository already handles cloud sync
       
       await loadSubscriptions(); // Reload to ensure proper state update
       
@@ -304,11 +327,11 @@ class SubscriptionProvider extends ChangeNotifier {
         status: AppConstants.STATUS_PAUSED,
       );
       
+      // DualSubscriptionRepository already handles both local and cloud storage
       await _repository.updateSubscription(updatedSubscription);
       await _notificationService.cancelNotification(id.hashCode);
       
-      // Auto backup to cloud if enabled and signed in
-      await _cloudSyncService.autoBackupSubscription(updatedSubscription);
+      // No need for additional auto backup - DualSubscriptionRepository already handles cloud sync
       
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
@@ -328,11 +351,11 @@ class SubscriptionProvider extends ChangeNotifier {
         status: AppConstants.STATUS_ACTIVE,
       );
       
+      // DualSubscriptionRepository already handles both local and cloud storage
       await _repository.updateSubscription(updatedSubscription);
       _scheduleNotification(updatedSubscription);
       
-      // Auto backup to cloud if enabled and signed in
-      await _cloudSyncService.autoBackupSubscription(updatedSubscription);
+      // No need for additional auto backup - DualSubscriptionRepository already handles cloud sync
       
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
@@ -352,11 +375,11 @@ class SubscriptionProvider extends ChangeNotifier {
         status: AppConstants.STATUS_CANCELLED,
       );
       
+      // DualSubscriptionRepository already handles both local and cloud storage
       await _repository.updateSubscription(updatedSubscription);
       await _notificationService.cancelNotification(id.hashCode);
       
-      // Auto backup to cloud if enabled and signed in
-      await _cloudSyncService.autoBackupSubscription(updatedSubscription);
+      // No need for additional auto backup - DualSubscriptionRepository already handles cloud sync
       
       await loadSubscriptions(); // Reload to ensure proper state update
     } catch (e) {
@@ -680,9 +703,19 @@ class SubscriptionProvider extends ChangeNotifier {
     // Add a small delay to ensure all services are properly initialized
     await Future.delayed(const Duration(milliseconds: 100));
     
-    if (_cloudSyncService.isUserSignedIn) {
+    final isSignedIn = _supabaseCloudSyncService.isUserSignedIn;
+    final currentUser = _supabaseCloudSyncService.currentUser;
+    
+    print('🔍 Auth check: isSignedIn=$isSignedIn, user=${currentUser?.email ?? 'null'}');
+    
+    if (isSignedIn && currentUser != null) {
       print('✅ User is signed in, starting real-time sync');
-      await _cloudSyncService.startSync();
+      
+      // Set up callback for real-time updates
+      _supabaseCloudSyncService.setRealTimeUpdateCallback(_handleRealTimeUpdate);
+      
+      // Start the real-time subscription
+      await _supabaseCloudSyncService.startSync();
     } else {
       print('❌ User not signed in, skipping real-time sync');
     }
@@ -699,53 +732,103 @@ class SubscriptionProvider extends ChangeNotifier {
     }
     
     try {
-      // Update local repository with cloud data
-      await _repository.clearAllSubscriptions();
-      for (final subscription in cloudSubscriptions) {
-        await _repository.addSubscription(subscription);
-      }
-      
-      // Update in-memory subscriptions
-      _subscriptions = cloudSubscriptions;
+      // For real-time updates, trust the cloud data completely
+      // This ensures deletions, additions, and updates all work properly
+      _subscriptions = List.from(cloudSubscriptions);
       _sortSubscriptions(_subscriptions);
+      
+      // IMPORTANT: Also sync real-time changes to local storage
+      // This prevents deleted subscriptions from coming back during sign-in sync
+      if (_supabaseCloudSyncService.isUserSignedIn) {
+        await _syncRealTimeChangesToLocalStorage(cloudSubscriptions);
+      }
       
       // Reschedule all notifications to match new data
       await rescheduleAllNotifications();
       
       notifyListeners();
-      print('✅ Real-time update applied successfully');
+      print('✅ Real-time update applied successfully - now showing ${_subscriptions.length} subscriptions');
     } catch (e) {
       print('❌ Error applying real-time update: $e');
+    }
+  }
+  
+  /// Sync real-time changes to local storage to keep them in sync
+  Future<void> _syncRealTimeChangesToLocalStorage(List<Subscription> cloudSubscriptions) async {
+    try {
+      print('🔄 Syncing real-time changes to local storage...');
+      
+      // Get current local subscriptions
+      final localActiveSubscriptions = await _repository.getActiveSubscriptions();
+      final localPausedSubscriptions = await _repository.getPausedSubscriptions();
+      final localSubscriptions = [...localActiveSubscriptions, ...localPausedSubscriptions];
+      
+      // Remove local subscriptions that no longer exist in cloud (deletions)
+      final cloudSubscriptionNames = cloudSubscriptions.map((s) => s.name.toLowerCase()).toSet();
+      for (final localSub in localSubscriptions) {
+        if (!cloudSubscriptionNames.contains(localSub.name.toLowerCase())) {
+          await _repository.deleteSubscription(localSub.id);
+          print('🗑️ Removed from local storage: ${localSub.name}');
+        }
+      }
+      
+      // Add cloud subscriptions that don't exist locally (additions)
+      final localSubscriptionNames = localSubscriptions.map((s) => s.name.toLowerCase()).toSet();
+      for (final cloudSub in cloudSubscriptions) {
+        if (!localSubscriptionNames.contains(cloudSub.name.toLowerCase())) {
+          await _repository.addSubscription(cloudSub);
+          print('✅ Added to local storage: ${cloudSub.name}');
+        }
+      }
+      
+      print('✅ Real-time changes synced to local storage');
+    } catch (e) {
+      print('❌ Failed to sync real-time changes to local storage: $e');
+      // Don't fail the whole real-time update if local storage sync fails
     }
   }
 
   /// Start real-time sync (call this after user signs in)
   Future<void> startRealTimeSync() async {
     print('🔄 Starting real-time sync...');
-    await _cloudSyncService.startSync();
+    
+    // Set up callback for real-time updates
+    _supabaseCloudSyncService.setRealTimeUpdateCallback(_handleRealTimeUpdate);
+    
+    // Start the real-time subscription
+    await _supabaseCloudSyncService.startSync();
     print('✅ Real-time sync started');
   }
 
   /// Stop real-time sync (call this when user signs out)
   void stopRealTimeSync() {
     print('⏹️ Stopping real-time sync...');
-    _cloudSyncService.stopSync();
+    _supabaseCloudSyncService.stopSync();
     print('✅ Real-time sync stopped');
   }
 
   /// Restore subscriptions from cloud backup
   Future<void> restoreFromBackup(List<Subscription> backupSubscriptions) async {
     try {
-      // Clear all local subscriptions
-      await _repository.clearAllSubscriptions();
+      // Get current local subscriptions
+      final localSubscriptions = await _repository.getAllSubscriptions();
       
-      // Add all backup subscriptions to local storage
-      for (final subscription in backupSubscriptions) {
-        await _repository.addSubscription(subscription);
+      // Merge backup subscriptions with local ones (avoid duplicates by name)
+      final mergedSubscriptions = <Subscription>[];
+      final backupNames = backupSubscriptions.map((s) => s.name.toLowerCase()).toSet();
+      
+      // Add all backup subscriptions
+      mergedSubscriptions.addAll(backupSubscriptions);
+      
+      // Add local subscriptions that don't exist in backup
+      for (final localSub in localSubscriptions) {
+        if (!backupNames.contains(localSub.name.toLowerCase())) {
+          mergedSubscriptions.add(localSub);
+        }
       }
       
       // Update in-memory list
-      _subscriptions = backupSubscriptions;
+      _subscriptions = mergedSubscriptions;
       _sortSubscriptions(_subscriptions);
       
       // Reschedule all notifications

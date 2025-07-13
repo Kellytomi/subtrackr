@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/theme/app_theme.dart';
 import 'package:subtrackr/core/config/supabase_config.dart';
@@ -10,10 +9,15 @@ import 'package:subtrackr/core/config/supabase_config.dart';
 import 'package:subtrackr/presentation/widgets/app_wrapper.dart';
 import 'package:subtrackr/data/repositories/subscription_repository.dart';
 import 'package:subtrackr/data/repositories/price_change_repository.dart';
+import 'package:subtrackr/data/repositories/local_subscription_repository.dart';
+import 'package:subtrackr/data/repositories/supabase_subscription_repository.dart';
+import 'package:subtrackr/data/repositories/dual_subscription_repository.dart';
+import 'package:subtrackr/data/services/supabase_auth_service.dart';
+import 'package:subtrackr/data/services/supabase_cloud_sync_service.dart';
+import 'package:subtrackr/data/services/auto_sync_service.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
-import 'package:subtrackr/data/services/cloud_sync_service.dart';
 import 'package:subtrackr/presentation/providers/subscription_provider.dart';
 import 'package:subtrackr/presentation/providers/theme_provider.dart';
 import 'package:subtrackr/presentation/pages/add_subscription_screen.dart';
@@ -30,39 +34,8 @@ import 'package:subtrackr/presentation/pages/email_detection_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase with error handling (legacy - keeping for backward compatibility)
-  try {
-    await Firebase.initializeApp();
-    print('✅ Firebase initialized successfully');
-  } catch (e) {
-    print('❌ Firebase initialization failed: $e');
-    // Continue without Firebase - app should still work with local data
-  }
-  
   // Initialize Supabase
-  try {
-    await SupabaseConfig.initialize();
-    print('✅ Supabase initialized successfully');
-  } catch (e) {
-    print('❌ Supabase initialization failed: $e');
-    // Continue without Supabase - app should still work with local data
-  }
-  
-  // Set initial system UI overlay style (will be updated by ThemeProvider)
-  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarBrightness: Brightness.light, // iOS: dark icons for light background
-    statusBarIconBrightness: Brightness.dark, // Android: dark icons for light background
-    systemNavigationBarColor: AppTheme.lightTheme.scaffoldBackgroundColor, // Match light theme background
-    systemNavigationBarIconBrightness: Brightness.dark, // Dark icons for light nav bar
-    systemNavigationBarDividerColor: Colors.transparent,
-  ));
-  
-  // Set preferred orientations
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  await SupabaseConfig.initialize();
   
   // Initialize Hive
   await Hive.initFlutter();
@@ -76,19 +49,42 @@ void main() async {
   
   final logoService = LogoService();
   
-  final subscriptionRepository = SubscriptionRepository();
-  await subscriptionRepository.init();
-  
+  // Initialize repositories
   final priceChangeRepository = PriceChangeRepository();
   await priceChangeRepository.init();
   
+  // Initialize Supabase-based services
+  final supabaseAuthService = SupabaseAuthService();
+  final localSubscriptionRepository = LocalSubscriptionRepository();
+  final supabaseSubscriptionRepository = SupabaseSubscriptionRepository();
+  final dualSubscriptionRepository = DualSubscriptionRepository(
+    localRepository: localSubscriptionRepository,
+    supabaseRepository: supabaseSubscriptionRepository,
+    authService: supabaseAuthService,
+  );
+  
+  final autoSyncService = AutoSyncService(
+    localRepository: localSubscriptionRepository,
+    supabaseRepository: supabaseSubscriptionRepository,
+  );
+  
+  final supabaseCloudSyncService = SupabaseCloudSyncService(
+    authService: supabaseAuthService,
+    autoSyncService: autoSyncService,
+    repository: dualSubscriptionRepository,
+  );
+  
+  // Initialize repositories
+  await localSubscriptionRepository.init();
+  await supabaseSubscriptionRepository.init();
+  await dualSubscriptionRepository.init();
+  
   // Initialize cloud sync service
-  final cloudSyncService = CloudSyncService();
   try {
-    await cloudSyncService.initialize();
-    print('✅ CloudSyncService initialized successfully');
+    await supabaseCloudSyncService.initialize();
+    print('✅ SupabaseCloudSyncService initialized successfully');
   } catch (e) {
-    print('⚠️ CloudSyncService initialization failed: $e');
+    print('⚠️ SupabaseCloudSyncService initialization failed: $e');
     // Continue without cloud sync - app should still work
   }
   
@@ -101,13 +97,30 @@ void main() async {
           ? AppConstants.CURRENCY_SELECTION_ROUTE 
           : AppConstants.HOME_ROUTE;
   
+  // Set initial system UI overlay style
+  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarBrightness: Brightness.light,
+    statusBarIconBrightness: Brightness.dark,
+    systemNavigationBarColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+    systemNavigationBarIconBrightness: Brightness.dark,
+    systemNavigationBarDividerColor: Colors.transparent,
+  ));
+  
+  // Set preferred orientations
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  
   runApp(MyApp(
     settingsService: settingsService,
     notificationService: notificationService,
     logoService: logoService,
-    subscriptionRepository: subscriptionRepository,
+    subscriptionRepository: dualSubscriptionRepository,
     priceChangeRepository: priceChangeRepository,
-    cloudSyncService: cloudSyncService,
+    supabaseCloudSyncService: supabaseCloudSyncService,
+    supabaseAuthService: supabaseAuthService,
     initialRoute: initialRoute,
   ));
 }
@@ -116,9 +129,10 @@ class MyApp extends StatelessWidget {
   final SettingsService settingsService;
   final NotificationService notificationService;
   final LogoService logoService;
-  final SubscriptionRepository subscriptionRepository;
+  final DualSubscriptionRepository subscriptionRepository;
   final PriceChangeRepository priceChangeRepository;
-  final CloudSyncService cloudSyncService;
+  final SupabaseCloudSyncService supabaseCloudSyncService;
+  final SupabaseAuthService supabaseAuthService;
   final String initialRoute;
   
   const MyApp({
@@ -128,7 +142,8 @@ class MyApp extends StatelessWidget {
     required this.logoService,
     required this.subscriptionRepository,
     required this.priceChangeRepository,
-    required this.cloudSyncService,
+    required this.supabaseCloudSyncService,
+    required this.supabaseAuthService,
     required this.initialRoute,
   });
 
@@ -139,7 +154,8 @@ class MyApp extends StatelessWidget {
         Provider<SettingsService>.value(value: settingsService),
         Provider<NotificationService>.value(value: notificationService),
         Provider<LogoService>.value(value: logoService),
-        Provider<CloudSyncService>.value(value: cloudSyncService),
+        Provider<SupabaseCloudSyncService>.value(value: supabaseCloudSyncService),
+        Provider<SupabaseAuthService>.value(value: supabaseAuthService),
         ChangeNotifierProvider(
           create: (_) {
             final provider = ThemeProvider(
@@ -154,7 +170,7 @@ class MyApp extends StatelessWidget {
             priceChangeRepository: priceChangeRepository,
             notificationService: notificationService,
             settingsService: settingsService,
-            cloudSyncService: cloudSyncService,
+            supabaseCloudSyncService: supabaseCloudSyncService,
           )..loadSubscriptions(),
         ),
       ],

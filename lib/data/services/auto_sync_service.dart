@@ -35,7 +35,7 @@ class AutoSyncService {
     _syncCompletionController = null;
   }
   
-  /// Automatically sync local subscriptions to cloud when user signs in
+  /// Automatically sync data when user signs in (cloud-authoritative approach)
   Future<void> autoSyncOnSignIn() async {
     if (_isSyncing) {
       print('⏳ Auto-sync already in progress, skipping...');
@@ -52,51 +52,29 @@ class AutoSyncService {
       _isSyncing = true;
       print('🔄 Starting auto-sync for user: ${user.email}');
       
-      // Get all local subscriptions
-      final localSubscriptions = await _localRepository.getActiveSubscriptions();
-      print('📱 Found ${localSubscriptions.length} local subscriptions to sync');
+      // Get cloud subscriptions first (authoritative source)
+      final cloudActiveSubscriptions = await _supabaseRepository.getActiveSubscriptions();
+      final cloudPausedSubscriptions = await _supabaseRepository.getPausedSubscriptions();
+      final cloudSubscriptions = [...cloudActiveSubscriptions, ...cloudPausedSubscriptions];
+      print('☁️ Found ${cloudSubscriptions.length} cloud subscriptions');
       
-      if (localSubscriptions.isEmpty) {
-        print('✅ No local subscriptions to sync');
-        _completeSyncProcess();
-        return;
-      }
+      // Get local subscriptions
+      final localActiveSubscriptions = await _localRepository.getActiveSubscriptions();
+      final localPausedSubscriptions = await _localRepository.getPausedSubscriptions();
+      final localSubscriptions = [...localActiveSubscriptions, ...localPausedSubscriptions];
+      print('📱 Found ${localSubscriptions.length} local subscriptions');
       
-      // Get existing cloud subscriptions to avoid duplicates
-      final cloudSubscriptions = await _supabaseRepository.getActiveSubscriptions();
-      final cloudSubscriptionNames = cloudSubscriptions.map((s) => s.name.toLowerCase()).toSet();
-      
-      // Filter out subscriptions that already exist in cloud (by name)
-      final subscriptionsToSync = localSubscriptions.where((localSub) {
-        return !cloudSubscriptionNames.contains(localSub.name.toLowerCase());
-      }).toList();
-      
-      print('☁️ ${subscriptionsToSync.length} new subscriptions to upload to cloud');
-      
-      // Upload new subscriptions to cloud
-      for (final subscription in subscriptionsToSync) {
-        try {
-          // Create new subscription with user_id for cloud storage
-          final cloudSubscription = Subscription(
-            id: subscription.id, // Keep original ID for consistency
-            name: subscription.name,
-            price: subscription.price,
-            currency: subscription.currency,
-            billingCycle: subscription.billingCycle,
-            nextPaymentDate: subscription.nextPaymentDate,
-            category: subscription.category,
-            logoUrl: subscription.logoUrl,
-            isActive: subscription.isActive,
-            createdAt: subscription.createdAt,
-            updatedAt: DateTime.now(),
-          );
-          
-          await _supabaseRepository.addSubscription(cloudSubscription);
-          print('✅ Synced subscription: ${subscription.name}');
-        } catch (e) {
-          print('❌ Failed to sync subscription ${subscription.name}: $e');
-          // Continue with other subscriptions even if one fails
-        }
+      if (cloudSubscriptions.isNotEmpty) {
+        // Cloud has data - treat cloud as authoritative and sync local to match
+        print('☁️ Cloud has data - syncing local storage to match cloud (cloud-authoritative)');
+        await _syncLocalToMatchCloud(cloudSubscriptions, localSubscriptions);
+      } else if (localSubscriptions.isNotEmpty) {
+        // Cloud is empty but local has data - upload local to cloud (first sign-in scenario)
+        print('📱 Cloud is empty but local has data - uploading local subscriptions to cloud');
+        await _uploadLocalToCloud(localSubscriptions);
+      } else {
+        // Both are empty - nothing to sync
+        print('✅ Both cloud and local are empty - nothing to sync');
       }
       
       print('🎉 Auto-sync completed successfully');
@@ -105,6 +83,51 @@ class AutoSyncService {
     } catch (e) {
       print('❌ Auto-sync failed: $e');
       _completeSyncProcess();
+    }
+  }
+  
+  /// Sync local storage to match cloud data (cloud-authoritative)
+  Future<void> _syncLocalToMatchCloud(List<Subscription> cloudSubscriptions, List<Subscription> localSubscriptions) async {
+    try {
+      // Step 1: Remove local subscriptions that don't exist in cloud
+      final cloudSubscriptionNames = cloudSubscriptions.map((s) => s.name.toLowerCase()).toSet();
+      for (final localSub in localSubscriptions) {
+        if (!cloudSubscriptionNames.contains(localSub.name.toLowerCase())) {
+          await _localRepository.deleteSubscription(localSub.id);
+          print('🗑️ Removed from local: ${localSub.name}');
+        }
+      }
+      
+      // Step 2: Add cloud subscriptions that don't exist locally
+      final localSubscriptionNames = localSubscriptions.map((s) => s.name.toLowerCase()).toSet();
+      for (final cloudSub in cloudSubscriptions) {
+        if (!localSubscriptionNames.contains(cloudSub.name.toLowerCase())) {
+          await _localRepository.addSubscription(cloudSub);
+          print('✅ Added to local: ${cloudSub.name}');
+        }
+      }
+      
+      print('✅ Local storage synced to match cloud');
+    } catch (e) {
+      print('❌ Failed to sync local to match cloud: $e');
+    }
+  }
+  
+  /// Upload local subscriptions to cloud (first sign-in scenario)
+  Future<void> _uploadLocalToCloud(List<Subscription> localSubscriptions) async {
+    try {
+      for (final subscription in localSubscriptions) {
+        try {
+          await _supabaseRepository.addSubscription(subscription);
+          print('✅ Uploaded to cloud: ${subscription.name}');
+        } catch (e) {
+          print('❌ Failed to upload ${subscription.name} to cloud: $e');
+          // Continue with other subscriptions even if one fails
+        }
+      }
+      print('✅ Local subscriptions uploaded to cloud');
+    } catch (e) {
+      print('❌ Failed to upload local subscriptions to cloud: $e');
     }
   }
   
@@ -119,27 +142,50 @@ class AutoSyncService {
       
       print('📥 Syncing cloud subscriptions to local storage before sign-out');
       
-      // Get all cloud subscriptions
-      final cloudSubscriptions = await _supabaseRepository.getActiveSubscriptions();
+      // Get all cloud subscriptions (active + paused)
+      final cloudActiveSubscriptions = await _supabaseRepository.getActiveSubscriptions();
+      final cloudPausedSubscriptions = await _supabaseRepository.getPausedSubscriptions();
+      final cloudSubscriptions = [...cloudActiveSubscriptions, ...cloudPausedSubscriptions];
       print('☁️ Found ${cloudSubscriptions.length} cloud subscriptions');
       
-      // Get current local subscriptions
-      final localSubscriptions = await _localRepository.getActiveSubscriptions();
-      final localSubscriptionNames = localSubscriptions.map((s) => s.name.toLowerCase()).toSet();
+      // Get current local subscriptions (active + paused)
+      final localActiveSubscriptions = await _localRepository.getActiveSubscriptions();
+      final localPausedSubscriptions = await _localRepository.getPausedSubscriptions();
+      final localSubscriptions = [...localActiveSubscriptions, ...localPausedSubscriptions];
+      print('📱 Found ${localSubscriptions.length} local subscriptions');
       
-      // Add cloud subscriptions that don't exist locally
-      for (final cloudSub in cloudSubscriptions) {
-        if (!localSubscriptionNames.contains(cloudSub.name.toLowerCase())) {
+      // REPLACE local storage with cloud data (proper sync)
+      // Step 1: Remove all local subscriptions that don't exist in cloud
+      final cloudSubscriptionNames = cloudSubscriptions.map((s) => s.name.toLowerCase()).toSet();
+      for (final localSub in localSubscriptions) {
+        if (!cloudSubscriptionNames.contains(localSub.name.toLowerCase())) {
           try {
-            await _localRepository.addSubscription(cloudSub);
-            print('✅ Saved to local: ${cloudSub.name}');
+            await _localRepository.deleteSubscription(localSub.id);
+            print('🗑️ Removed from local: ${localSub.name}');
           } catch (e) {
-            print('❌ Failed to save ${cloudSub.name} locally: $e');
+            print('❌ Failed to remove ${localSub.name} from local: $e');
           }
         }
       }
       
-      print('✅ Cloud-to-local sync completed');
+      // Step 2: Add cloud subscriptions that don't exist locally (get fresh local list after deletions)
+      final updatedLocalActiveSubscriptions = await _localRepository.getActiveSubscriptions();
+      final updatedLocalPausedSubscriptions = await _localRepository.getPausedSubscriptions();
+      final updatedLocalSubscriptions = [...updatedLocalActiveSubscriptions, ...updatedLocalPausedSubscriptions];
+      final updatedLocalSubscriptionNames = updatedLocalSubscriptions.map((s) => s.name.toLowerCase()).toSet();
+      
+      for (final cloudSub in cloudSubscriptions) {
+        if (!updatedLocalSubscriptionNames.contains(cloudSub.name.toLowerCase())) {
+          try {
+            await _localRepository.addSubscription(cloudSub);
+            print('✅ Added to local: ${cloudSub.name}');
+          } catch (e) {
+            print('❌ Failed to add ${cloudSub.name} to local: $e');
+          }
+        }
+      }
+      
+      print('✅ Cloud-to-local sync completed - local storage now matches cloud');
       
     } catch (e) {
       print('❌ Cloud-to-local sync failed: $e');
@@ -153,6 +199,24 @@ class AutoSyncService {
     print('✅ Auto-sync process completed');
   }
   
+  /// Clear local data when switching users for privacy protection
+  Future<void> clearLocalDataForUserSwitch() async {
+    try {
+      print('🗑️ Clearing all local subscriptions...');
+      final localSubscriptions = await _localRepository.getActiveSubscriptions();
+      
+      for (final subscription in localSubscriptions) {
+        await _localRepository.deleteSubscription(subscription.id);
+        print('🗑️ Cleared local subscription: ${subscription.name}');
+      }
+      
+      print('✅ All local data cleared for user switch');
+    } catch (e) {
+      print('❌ Error clearing local data: $e');
+      rethrow;
+    }
+  }
+
   /// Clean up resources
   void dispose() {
     stopSyncCompletionListener();
