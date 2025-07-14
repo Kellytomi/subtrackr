@@ -58,7 +58,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
     _hasCheckedForUpdates = true;
     
     try {
-      await _updateManager.checkForUpdatesOnStartup(context);
+      await _updateManager.checkForUpdatesOnStartupWithDialog(context);
     } catch (e) {
       debugPrint('Error checking for updates on startup: $e');
     }

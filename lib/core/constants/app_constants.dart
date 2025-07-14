@@ -8,6 +8,10 @@ class AppConstants {
   
   /// The version number of the application
   static const String APP_VERSION = '1.0.0';
+  
+  /// OneSignal App ID for promotional push notifications
+  /// Get from: https://app.onesignal.com/ -> App Settings -> Keys & IDs
+  static const String ONESIGNAL_APP_ID = '16a85cc9-6fb3-4990-a922-479d2ad77ea1';
 
   // Navigation routes
   /// Route for the main layout screen

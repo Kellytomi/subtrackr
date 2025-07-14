@@ -64,8 +64,9 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 23
         targetSdk = 34
-        versionCode = 7
-        versionName = "1.0.5"
+        // Version info is automatically read from pubspec.yaml by Flutter
+        versionCode = flutter.versionCode?.toInt() ?: 1
+        versionName = flutter.versionName ?: "1.0.0"
         multiDexEnabled = true
     }
 

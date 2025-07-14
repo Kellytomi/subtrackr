@@ -17,6 +17,7 @@ import 'package:subtrackr/data/services/supabase_cloud_sync_service.dart';
 import 'package:subtrackr/data/services/auto_sync_service.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
+import 'package:subtrackr/data/services/onesignal_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/presentation/providers/subscription_provider.dart';
 import 'package:subtrackr/presentation/providers/theme_provider.dart';
@@ -46,6 +47,9 @@ void main() async {
   
   final notificationService = NotificationService();
   await notificationService.init();
+  
+  // Initialize OneSignal for promotional push notifications
+  await OneSignalService.initialize(appId: AppConstants.ONESIGNAL_APP_ID);
   
   final logoService = LogoService();
   

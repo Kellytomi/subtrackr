@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
+import 'package:subtrackr/presentation/providers/theme_provider.dart';
 
 /// App header widget displayed at the top of the home screen
 class AppHeader extends StatelessWidget {
@@ -11,12 +13,14 @@ class AppHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDarkMode = themeProvider.isDarkMode;
     
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
       width: double.infinity,
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: isDarkMode ? const Color(0xFF0F0F0F) : const Color(0xFFF8F9FA),
         border: Border(
           bottom: BorderSide(
             color: colorScheme.outline.withOpacity(0.1),
@@ -37,7 +41,7 @@ class AppHeader extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
-                        color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
+                        color: isDarkMode ? Colors.white : Colors.black,
                       ),
                     ),
                   ],
@@ -47,7 +51,7 @@ class AppHeader extends StatelessWidget {
                   'Track your subscriptions',
                   style: TextStyle(
                     fontSize: 16,
-                    color: theme.brightness == Brightness.dark 
+                    color: isDarkMode 
                         ? Colors.white.withOpacity(0.7) 
                         : Colors.black.withOpacity(0.7),
                   ),
@@ -59,12 +63,12 @@ class AppHeader extends StatelessWidget {
             IconButton(
               icon: Icon(
                 Icons.search,
-                color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
+                color: isDarkMode ? Colors.white : Colors.black,
               ),
               onPressed: onSearchPressed,
               tooltip: 'Search',
               style: IconButton.styleFrom(
-                backgroundColor: (theme.brightness == Brightness.dark ? Colors.white : Colors.black).withOpacity(0.05),
+                backgroundColor: (isDarkMode ? Colors.white : Colors.black).withOpacity(0.05),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

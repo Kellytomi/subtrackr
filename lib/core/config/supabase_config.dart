@@ -2,9 +2,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Supabase configuration and initialization
 class SupabaseConfig {
-  // Supabase project credentials
-  static const String supabaseUrl = 'https://gjrksrgifgkcumcypvdo.supabase.co';
-  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqcmtzcmdpZmdrY3VtY3lwdmRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1ODM2MTEsImV4cCI6MjA2NzE1OTYxMX0.3-rBAa4GQJnZEUzzU-FiIZqTnBSjd9iBXd8SB7O0vls';
+  // Supabase project credentials - using environment variables for better security
+  static const String supabaseUrl = String.fromEnvironment(
+    'SUPABASE_URL',
+    defaultValue: 'https://gjrksrgifgkcumcypvdo.supabase.co',
+  );
+  static const String supabaseAnonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY', 
+    defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqcmtzcmdpZmdrY3VtY3lwdmRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1ODM2MTEsImV4cCI6MjA2NzE1OTYxMX0.3-rBAa4GQJnZEUzzU-FiIZqTnBSjd9iBXd8SB7O0vls',
+  );
   
   /// Initialize Supabase client
   static Future<void> initialize() async {

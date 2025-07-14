@@ -19,13 +19,26 @@ class UpdateManager {
   bool _isCheckingForUpdate = false;
   bool _isDownloadingUpdate = false;
 
+  /// Gets the current update status
+  Future<UpdateStatus> getUpdateStatus() async {
+    try {
+      debugPrint('🔍 Checking update status...');
+      final status = await _updater.checkForUpdate();
+      debugPrint('🔍 Current update status: $status');
+      return status;
+    } catch (e) {
+      debugPrint('❌ Error getting update status: $e');
+      return UpdateStatus.unavailable;
+    }
+  }
+
   /// Checks if the device supports Shorebird updates
   Future<bool> isUpdateAvailable() async {
     try {
       debugPrint('🔍 Checking for Shorebird updates...');
       final status = await _updater.checkForUpdate();
       debugPrint('🔍 Update status: $status');
-      final hasUpdate = status == UpdateStatus.outdated;
+      final hasUpdate = status == UpdateStatus.outdated || status == UpdateStatus.restartRequired;
       debugPrint('🔍 Has update available: $hasUpdate');
       return hasUpdate;
     } catch (e) {
@@ -172,6 +185,183 @@ class UpdateManager {
     } finally {
       _isCheckingForUpdate = false;
     }
+  }
+
+  /// Auto-update flow with prominent dialog and auto-restart
+  Future<void> checkForUpdatesOnStartupWithDialog(BuildContext context) async {
+    if (_isCheckingForUpdate) return;
+
+    _isCheckingForUpdate = true;
+
+    try {
+      // Wait for app to initialize
+      await Future.delayed(const Duration(seconds: 2));
+      
+      if (!context.mounted) return;
+
+      final status = await getUpdateStatus();
+      
+      if (status == UpdateStatus.restartRequired) {
+        _showAutoRestartDialog(context);
+      } else if (status == UpdateStatus.outdated) {
+        _showAutoUpdateDialog(context);
+      }
+      // If no updates, don't show anything (silent)
+    } catch (e) {
+      debugPrint('Auto-update check failed: $e');
+    } finally {
+      _isCheckingForUpdate = false;
+    }
+  }
+
+  /// Shows dialog for auto-update with progress and auto-restart
+  void _showAutoUpdateDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            bool isDownloading = false;
+            String statusText = 'A new update is available!';
+            
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              title: Row(
+                children: [
+                  Icon(Icons.system_update, color: Theme.of(context).primaryColor),
+                  const SizedBox(width: 8),
+                  const Text('Update Available'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('SubTrackr has a new update with improvements and bug fixes.'),
+                  const SizedBox(height: 16),
+                  if (isDownloading) ...[
+                    Text(statusText),
+                    const SizedBox(height: 12),
+                    const LinearProgressIndicator(),
+                    const SizedBox(height: 8),
+                    const Text('Please wait...', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ] else
+                    const Text('Tap "Update Now" to download and apply the update.'),
+                ],
+              ),
+              actions: [
+                if (!isDownloading)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Later'),
+                  ),
+                ElevatedButton(
+                  onPressed: isDownloading ? null : () async {
+                    setDialogState(() {
+                      isDownloading = true;
+                      statusText = 'Downloading update...';
+                    });
+                    
+                    try {
+                      await _updater.update();
+                      
+                      if (context.mounted) {
+                        setDialogState(() {
+                          statusText = 'Update downloaded! Restarting app...';
+                        });
+                        
+                        // Wait a moment to show the message
+                        await Future.delayed(const Duration(seconds: 1));
+                        
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                          _restartApp();
+                        }
+                      }
+                    } catch (e) {
+                      debugPrint('Auto-update failed: $e');
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                        _showSnackBar(
+                          context,
+                          'Update failed. Please try again later.',
+                          backgroundColor: Colors.red,
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: isDownloading 
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text('Update Now'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Shows dialog when restart is required (patch already downloaded)
+  void _showAutoRestartDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Row(
+            children: [
+              Icon(Icons.restart_alt, color: Colors.orange),
+              const SizedBox(width: 8),
+              const Text('Update Ready'),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('SubTrackr has been updated! The app needs to restart to apply the latest changes.'),
+              SizedBox(height: 16),
+              Text('This will only take a moment.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Later'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _restartApp();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Restart Now'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   /// Shows a dismissible notification banner for updates

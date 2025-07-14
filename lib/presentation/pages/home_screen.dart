@@ -98,8 +98,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
     final settingsService = Provider.of<SettingsService>(context, listen: false);
     final defaultCurrencyCode = settingsService.getCurrencyCode() ?? AppConstants.DEFAULT_CURRENCY_CODE;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDarkMode = themeProvider.isDarkMode;
     
     return Scaffold(
+      backgroundColor: isDarkMode ? const Color(0xFF0F0F0F) : const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Column(
           children: [

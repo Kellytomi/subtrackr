@@ -13,8 +13,12 @@ import 'package:subtrackr/core/utils/tips_helper.dart';
 import 'package:subtrackr/data/services/supabase_cloud_sync_service.dart';
 import 'package:subtrackr/data/services/supabase_auth_service.dart';
 import 'package:subtrackr/data/repositories/dual_subscription_repository.dart';
+import 'package:subtrackr/data/services/onesignal_service.dart';
 import 'package:subtrackr/core/utils/update_manager.dart';
 import 'package:restart_app/restart_app.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shorebird_code_push/shorebird_code_push.dart';
 
 
 class SettingsScreen extends StatefulWidget {
@@ -336,9 +340,15 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                           children: [
                             _buildSettingTile(
                               icon: Icons.notifications_active,
-                              title: 'Test Notification',
-                              subtitle: 'Send a test notification',
+                              title: 'Test Local Notification',
+                              subtitle: 'Send a test subscription reminder',
                               onTap: () => _sendTestNotification(5),
+                            ),
+                            _buildSettingTile(
+                              icon: Icons.campaign_outlined,
+                              title: 'Test Push Notification',
+                              subtitle: 'Get OneSignal Player ID for testing',
+                              onTap: _testOneSignalNotification,
                             ),
                       ],
                     ),
@@ -703,31 +713,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildQuickActions() {
-    final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-    
-    return Row(
-            children: [
-        Expanded(
-          child: _buildQuickActionCard(
-            icon: Icons.update,
-            label: 'Check Updates',
-            color: Colors.blue,
-            onTap: _checkForUpdates,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-          child: _buildQuickActionCard(
-            icon: Icons.sync,
-            label: 'Sync Now',
-            color: Colors.green,
-            onTap: _syncWithCloud,
-                ),
-              ),
-            ],
-    );
+    Widget _buildQuickActions() {
+    // Both buttons moved to their respective sections - Quick Actions no longer needed
+    return const SizedBox.shrink();
   }
 
   Widget _buildQuickActionCard({
@@ -758,7 +746,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   ],
                 ),
         child: Column(
-              children: [
+            children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -778,9 +766,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+                    ),
+                  ],
+                ),
         ),
       );
   }
@@ -1448,6 +1436,23 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 ),
               ),
             ),
+            // Debug button for testing auto-update functionality
+            if (kDebugMode) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _debugAutoUpdate,
+                  icon: const Icon(Icons.bug_report, size: 18),
+                  label: const Text('Debug Auto-Update'),
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         actions: [
@@ -1908,6 +1913,118 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
+  Future<void> _testOneSignalNotification() async {
+    try {
+      final userId = await OneSignalService.getUserId();
+      final hasPermission = await OneSignalService.hasPermission();
+      
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
+            children: [
+              Icon(Icons.campaign, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('OneSignal Test Info'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Permission: ${hasPermission ? "✅ Granted" : "❌ Denied"}'),
+              const SizedBox(height: 8),
+              const Text('Player ID:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              SelectableText(
+                userId ?? 'Not available',
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'To test push notifications:\n'
+                '1. Copy the Player ID above\n'
+                '2. Go to OneSignal dashboard\n'
+                '3. Send test message to this Player ID',
+                style: TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (userId != null) {
+                  Clipboard.setData(ClipboardData(text: userId));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Player ID copied to clipboard')),
+                  );
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Copy ID'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('OneSignal test failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _debugAutoUpdate() async {
+    try {
+      final updateManager = UpdateManager();
+      
+      // Test the auto-update flow manually
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
+            children: [
+              Icon(Icons.bug_report, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Debug Auto-Update'),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Testing auto-update flow...'),
+            ],
+          ),
+        ),
+      );
+
+      // Call the same method that runs on app startup
+      await updateManager.checkForUpdatesOnStartupWithDialog(context);
+      
+      if (mounted) Navigator.of(context).pop();
+      
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Debug auto-update failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _resetAppTips() async {
     final result = await showDialog<bool>(
       context: context,
@@ -2171,11 +2288,13 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
 
     try {
-      final hasUpdate = await updateManager.isUpdateAvailable();
+      final status = await updateManager.getUpdateStatus();
       
       if (mounted) Navigator.of(context).pop();
       
-      if (hasUpdate) {
+      if (status == UpdateStatus.restartRequired) {
+        _showRestartRequiredDialog();
+      } else if (status == UpdateStatus.outdated) {
         _showUpdateAvailableDialog();
       } else {
         _showNoUpdatesDialog();
@@ -2402,12 +2521,60 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         ),
-      ),
+              ),
               child: const Text('Restart Now'),
-                            ),
-                          ],
-                        );
-                      },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showRestartRequiredDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
+        children: [
+              Icon(Icons.restart_alt, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Update Ready'),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+              Text('A patch has been downloaded and is ready to apply!'),
+              SizedBox(height: 16),
+              Text('The app needs to restart to apply the latest updates.'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Later'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Restart.restartApp();
+              },
+                  style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Restart Now'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
