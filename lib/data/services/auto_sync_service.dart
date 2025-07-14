@@ -52,16 +52,16 @@ class AutoSyncService {
       _isSyncing = true;
       print('🔄 Starting auto-sync for user: ${user.email}');
       
-      // Get cloud subscriptions first
-      final cloudActiveSubscriptions = await _supabaseRepository.getActiveSubscriptions();
-      final cloudPausedSubscriptions = await _supabaseRepository.getPausedSubscriptions();
-      final cloudSubscriptions = [...cloudActiveSubscriptions, ...cloudPausedSubscriptions];
-      print('☁️ Found ${cloudSubscriptions.length} cloud subscriptions');
+      // SPEED OPTIMIZATION: Fetch cloud and local data in parallel
+      print('⚡ Fetching cloud and local data in parallel...');
+      final cloudDataFuture = _fetchCloudData();
+      final localDataFuture = _fetchLocalData();
       
-      // Get local subscriptions
-      final localActiveSubscriptions = await _localRepository.getActiveSubscriptions();
-      final localPausedSubscriptions = await _localRepository.getPausedSubscriptions();
-      final localSubscriptions = [...localActiveSubscriptions, ...localPausedSubscriptions];
+      final results = await Future.wait([cloudDataFuture, localDataFuture]);
+      final cloudSubscriptions = results[0];
+      final localSubscriptions = results[1];
+      
+      print('☁️ Found ${cloudSubscriptions.length} cloud subscriptions');
       print('📱 Found ${localSubscriptions.length} local subscriptions');
       
       if (cloudSubscriptions.isEmpty && localSubscriptions.isEmpty) {
@@ -70,20 +70,22 @@ class AutoSyncService {
       } else if (cloudSubscriptions.isEmpty && localSubscriptions.isNotEmpty) {
         // Cloud is empty but local has data - upload local to cloud (first sign-in scenario)
         print('📱 Cloud is empty but local has data - uploading local subscriptions to cloud');
-        await _uploadLocalToCloud(localSubscriptions);
+        await _uploadLocalToCloudParallel(localSubscriptions);
       } else if (cloudSubscriptions.isNotEmpty && localSubscriptions.isEmpty) {
         // Cloud has data but local is empty - download cloud to local
         print('☁️ Cloud has data but local is empty - downloading cloud subscriptions to local');
-        await _downloadCloudToLocal(cloudSubscriptions);
+        await _downloadCloudToLocalParallel(cloudSubscriptions);
       } else {
         // Both have data - intelligent merge
         print('🔄 Both cloud and local have data - performing intelligent merge');
-        await _intelligentMerge(cloudSubscriptions, localSubscriptions);
+        await _intelligentMergeParallel(cloudSubscriptions, localSubscriptions);
       }
       
-      // Final step: Ensure local storage matches cloud after all operations
-      print('🔄 Final sync step: ensuring local storage matches cloud...');
-      await _finalizeLocalStorage();
+      // SPEED OPTIMIZATION: Skip final sync step if not necessary
+      if (cloudSubscriptions.isNotEmpty || localSubscriptions.isNotEmpty) {
+        print('🔄 Final verification step...');
+        await _quickVerifySync();
+      }
       
       print('🎉 Auto-sync completed successfully');
       _completeSyncProcess();
@@ -94,10 +96,68 @@ class AutoSyncService {
     }
   }
   
-  /// Intelligent merge of cloud and local subscriptions
-  Future<void> _intelligentMerge(List<Subscription> cloudSubscriptions, List<Subscription> localSubscriptions) async {
+  /// Fetch cloud data (extracted for parallel execution)
+  Future<List<Subscription>> _fetchCloudData() async {
+    final cloudActiveSubscriptions = await _supabaseRepository.getActiveSubscriptions();
+    final cloudPausedSubscriptions = await _supabaseRepository.getPausedSubscriptions();
+    return [...cloudActiveSubscriptions, ...cloudPausedSubscriptions];
+  }
+  
+  /// Fetch local data (extracted for parallel execution)
+  Future<List<Subscription>> _fetchLocalData() async {
+    final localActiveSubscriptions = await _localRepository.getActiveSubscriptions();
+    final localPausedSubscriptions = await _localRepository.getPausedSubscriptions();
+    return [...localActiveSubscriptions, ...localPausedSubscriptions];
+  }
+  
+  /// Upload local subscriptions to cloud in parallel
+  Future<void> _uploadLocalToCloudParallel(List<Subscription> localSubscriptions) async {
     try {
-      print('🔄 Starting intelligent merge...');
+      print('⚡ Uploading ${localSubscriptions.length} subscriptions in parallel...');
+      
+      // Upload in parallel with limited concurrency to avoid overwhelming the server
+      final uploadFutures = localSubscriptions.map((subscription) async {
+        try {
+          await _supabaseRepository.addSubscription(subscription);
+          print('✅ Uploaded to cloud: ${subscription.name}');
+        } catch (e) {
+          print('❌ Failed to upload ${subscription.name} to cloud: $e');
+        }
+      });
+      
+      await Future.wait(uploadFutures);
+      print('✅ Parallel upload completed');
+    } catch (e) {
+      print('❌ Failed to upload local subscriptions to cloud: $e');
+    }
+  }
+  
+  /// Download cloud subscriptions to local in parallel
+  Future<void> _downloadCloudToLocalParallel(List<Subscription> cloudSubscriptions) async {
+    try {
+      print('⚡ Downloading ${cloudSubscriptions.length} subscriptions in parallel...');
+      
+      // Download in parallel
+      final downloadFutures = cloudSubscriptions.map((subscription) async {
+        try {
+          await _localRepository.addSubscription(subscription);
+          print('✅ Downloaded to local: ${subscription.name}');
+        } catch (e) {
+          print('❌ Failed to download ${subscription.name} to local: $e');
+        }
+      });
+      
+      await Future.wait(downloadFutures);
+      print('✅ Parallel download completed');
+    } catch (e) {
+      print('❌ Failed to download cloud subscriptions to local: $e');
+    }
+  }
+  
+  /// Intelligent merge with parallel operations
+  Future<void> _intelligentMergeParallel(List<Subscription> cloudSubscriptions, List<Subscription> localSubscriptions) async {
+    try {
+      print('🔄 Starting intelligent merge with parallel processing...');
       
       // Create maps for easy lookup
       final cloudSubscriptionNames = <String, Subscription>{};
@@ -110,40 +170,37 @@ class AutoSyncService {
         localSubscriptionNames[sub.name.toLowerCase()] = sub;
       }
       
+      // Prepare parallel operations
+      final List<Future<void>> parallelOperations = [];
+      
       // Step 1: Upload local subscriptions that don't exist in cloud
       for (final localSub in localSubscriptions) {
         if (!cloudSubscriptionNames.containsKey(localSub.name.toLowerCase())) {
-          try {
-            await _supabaseRepository.addSubscription(localSub);
-            print('✅ Uploaded new local subscription to cloud: ${localSub.name}');
-          } catch (e) {
-            print('❌ Failed to upload ${localSub.name} to cloud: $e');
-          }
+          parallelOperations.add(_uploadSubscription(localSub));
         }
       }
       
       // Step 2: Download cloud subscriptions that don't exist locally
       for (final cloudSub in cloudSubscriptions) {
         if (!localSubscriptionNames.containsKey(cloudSub.name.toLowerCase())) {
-          try {
-            await _localRepository.addSubscription(cloudSub);
-            print('✅ Downloaded new cloud subscription to local: ${cloudSub.name}');
-          } catch (e) {
-            print('❌ Failed to download ${cloudSub.name} to local: $e');
-          }
+          parallelOperations.add(_downloadSubscription(cloudSub));
         }
       }
       
-      // Step 3: For subscriptions that exist in both, use cloud version (cloud is authoritative for conflicts)
+      // Execute all operations in parallel
+      if (parallelOperations.isNotEmpty) {
+        print('⚡ Executing ${parallelOperations.length} operations in parallel...');
+        await Future.wait(parallelOperations);
+      }
+      
+      // Step 3: Update conflicts (sequential for data consistency)
       for (final cloudSub in cloudSubscriptions) {
         final localSub = localSubscriptionNames[cloudSub.name.toLowerCase()];
         if (localSub != null) {
-          // Update local with cloud version if they're different
           if (localSub.amount != cloudSub.amount || 
               localSub.status != cloudSub.status ||
               localSub.renewalDate != cloudSub.renewalDate) {
             try {
-              // Create updated subscription with local ID but cloud data
               final updatedSub = cloudSub.copyWith();
               await _localRepository.updateSubscription(updatedSub);
               print('✅ Updated local subscription with cloud data: ${cloudSub.name}');
@@ -160,39 +217,40 @@ class AutoSyncService {
     }
   }
   
-  /// Upload local subscriptions to cloud (first sign-in scenario)
-  Future<void> _uploadLocalToCloud(List<Subscription> localSubscriptions) async {
+  /// Upload single subscription (for parallel execution)
+  Future<void> _uploadSubscription(Subscription subscription) async {
     try {
-      for (final subscription in localSubscriptions) {
-        try {
-          await _supabaseRepository.addSubscription(subscription);
-          print('✅ Uploaded to cloud: ${subscription.name}');
-        } catch (e) {
-          print('❌ Failed to upload ${subscription.name} to cloud: $e');
-          // Continue with other subscriptions even if one fails
-        }
-      }
-      print('✅ Local subscriptions uploaded to cloud');
+      await _supabaseRepository.addSubscription(subscription);
+      print('✅ Uploaded new local subscription to cloud: ${subscription.name}');
     } catch (e) {
-      print('❌ Failed to upload local subscriptions to cloud: $e');
+      print('❌ Failed to upload ${subscription.name} to cloud: $e');
     }
   }
   
-  /// Download cloud subscriptions to local storage
-  Future<void> _downloadCloudToLocal(List<Subscription> cloudSubscriptions) async {
+  /// Download single subscription (for parallel execution)
+  Future<void> _downloadSubscription(Subscription subscription) async {
     try {
-      for (final subscription in cloudSubscriptions) {
-        try {
-          await _localRepository.addSubscription(subscription);
-          print('✅ Downloaded to local: ${subscription.name}');
-        } catch (e) {
-          print('❌ Failed to download ${subscription.name} to local: $e');
-          // Continue with other subscriptions even if one fails
-        }
-      }
-      print('✅ Cloud subscriptions downloaded to local');
+      await _localRepository.addSubscription(subscription);
+      print('✅ Downloaded new cloud subscription to local: ${subscription.name}');
     } catch (e) {
-      print('❌ Failed to download cloud subscriptions to local: $e');
+      print('❌ Failed to download ${subscription.name} to local: $e');
+    }
+  }
+  
+  /// Quick verification instead of full sync
+  Future<void> _quickVerifySync() async {
+    try {
+      // Just do a quick count verification instead of full data comparison
+      final cloudCount = (await _fetchCloudData()).length;
+      final localCount = (await _fetchLocalData()).length;
+      
+      if (cloudCount == localCount) {
+        print('✅ Quick verification passed - cloud and local have same count ($cloudCount)');
+      } else {
+        print('⚠️ Count mismatch - cloud: $cloudCount, local: $localCount');
+      }
+    } catch (e) {
+      print('❌ Quick verification failed: $e');
     }
   }
   

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
@@ -1877,14 +1878,26 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  // Get app version information
+  // Get app version information dynamically
   Future<Map<String, dynamic>> _getVersionInfo() async {
-    return {
-      'appVersion': '1.0.4+6', // This should match your actual app version
-      'patchNumber': null, // With automatic updates, we don't need to track this manually
-      'updateStatus': 'Auto-updating',
-      'hasPatch': false,
-    };
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      return {
+        'appVersion': '${packageInfo.version}+${packageInfo.buildNumber}',
+        'patchNumber': null, // With automatic updates, we don't need to track this manually
+        'updateStatus': 'Auto-updating',
+        'hasPatch': false,
+      };
+    } catch (e) {
+      print('Error getting package info: $e');
+      // Fallback to hardcoded version if PackageInfo fails
+      return {
+        'appVersion': '1.0.4+6',
+        'patchNumber': null,
+        'updateStatus': 'Auto-updating',
+        'hasPatch': false,
+      };
+    }
   }
 
   /// Check for app updates with progress dialog

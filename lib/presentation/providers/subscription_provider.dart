@@ -149,50 +149,78 @@ class SubscriptionProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      // If user is signed in, trigger manual sync to ensure data is synced
+      // SPEED OPTIMIZATION: Load local data first for immediate display
+      print('📱 Loading local subscriptions for immediate display...');
+      var localSubscriptions = await _repository.getAllSubscriptions();
+      
+      // Show local data immediately
+      if (localSubscriptions.isNotEmpty) {
+        _subscriptions = localSubscriptions;
+        _sortSubscriptions(_subscriptions);
+        _isLoading = false;
+        notifyListeners(); // Update UI with local data immediately
+        print('⚡ Displayed ${localSubscriptions.length} local subscriptions immediately');
+      }
+      
+      // If user is signed in, sync in background without blocking UI
       if (_supabaseCloudSyncService.isUserSignedIn) {
-        print('🔄 User is signed in, triggering manual sync...');
+        print('🔄 User is signed in, performing background sync...');
         
-        try {
-          // Trigger manual sync to ensure local and cloud data are properly merged
-          await _supabaseCloudSyncService.manualSync();
-          print('✅ Manual sync completed');
-        } catch (e) {
-          print('⚠️ Manual sync failed, continuing with normal load: $e');
-        }
-        
-        // Small delay to ensure sync is fully complete
-        await Future.delayed(const Duration(milliseconds: 200));
-      }
-      
-      // Now load subscriptions from the appropriate source
-      var loadedSubscriptions = await _repository.getAllSubscriptions();
-      print('📊 Loaded ${loadedSubscriptions.length} subscriptions');
-      
-      _sortSubscriptions(loadedSubscriptions);
-      
-      // Ensure each subscription has a valid currency code
-      for (int i = 0; i < loadedSubscriptions.length; i++) {
-        final subscription = loadedSubscriptions[i];
-        if (subscription.currencyCode.isEmpty) {
-          // If currency code is empty, use the default currency code
-          final updatedSubscription = subscription.copyWith(
-            currencyCode: _settingsService.getCurrencyCode() ?? AppConstants.DEFAULT_CURRENCY_CODE,
-          );
-          loadedSubscriptions[i] = updatedSubscription;
-          await _repository.updateSubscription(updatedSubscription);
+        // Don't block UI - sync in background
+        _performBackgroundSync();
+      } else {
+        // User not signed in, ensure we have local data displayed
+        if (localSubscriptions.isEmpty) {
+          _isLoading = false;
+          notifyListeners();
         }
       }
       
-      _subscriptions = loadedSubscriptions;
-      _isLoading = false;
-      _error = null;
-      notifyListeners();
     } catch (e) {
       _isLoading = false;
       _error = AppConstants.ERROR_LOADING_SUBSCRIPTIONS;
       notifyListeners();
       print('❌ Error loading subscriptions: $e');
+    }
+  }
+  
+  /// Perform background sync without blocking the UI
+  Future<void> _performBackgroundSync() async {
+    try {
+      print('🔄 Starting background sync...');
+      
+      // Trigger manual sync to ensure data consistency
+      await _supabaseCloudSyncService.manualSync();
+      
+      // Small delay to ensure sync is complete
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // Reload data after sync (this will show any new data from cloud)
+      print('🔄 Reloading data after background sync...');
+      var syncedSubscriptions = await _repository.getAllSubscriptions();
+      
+      // Ensure each subscription has a valid currency code
+      for (int i = 0; i < syncedSubscriptions.length; i++) {
+        final subscription = syncedSubscriptions[i];
+        if (subscription.currencyCode.isEmpty) {
+          final updatedSubscription = subscription.copyWith(
+            currencyCode: _settingsService.getCurrencyCode() ?? AppConstants.DEFAULT_CURRENCY_CODE,
+          );
+          syncedSubscriptions[i] = updatedSubscription;
+          await _repository.updateSubscription(updatedSubscription);
+        }
+      }
+      
+      // Update UI with synced data
+      _subscriptions = syncedSubscriptions;
+      _sortSubscriptions(_subscriptions);
+      notifyListeners();
+      
+      print('✅ Background sync completed - UI updated with ${_subscriptions.length} subscriptions');
+      
+    } catch (e) {
+      print('⚠️ Background sync failed, keeping local data: $e');
+      // Don't update error state since user already has local data displayed
     }
   }
   
