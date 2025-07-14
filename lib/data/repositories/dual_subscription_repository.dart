@@ -78,9 +78,12 @@ class DualSubscriptionRepository {
       return [];
     }
     
-    final activeSubscriptions = await _supabaseRepository.getActiveSubscriptions();
-    final pausedSubscriptions = await _supabaseRepository.getPausedSubscriptions();
-    return [...activeSubscriptions, ...pausedSubscriptions];
+    // Get cloud subscriptions in parallel for better performance
+    final results = await Future.wait([
+      _supabaseRepository.getActiveSubscriptions(),
+      _supabaseRepository.getPausedSubscriptions(),
+    ]);
+    return [...results[0], ...results[1]];
   }
   
   /// Get all paused subscriptions from the appropriate source
@@ -101,14 +104,19 @@ class DualSubscriptionRepository {
     }
   }
   
-  /// Clear all subscriptions from the appropriate storage
+  /// Clear all subscriptions from both local and cloud storage
   Future<void> clearAllSubscriptions() async {
     if (_authService.isAuthenticated) {
-      // Clear from cloud storage
-      await _supabaseRepository.clearAllSubscriptions();
+      // For authenticated users, clear from both cloud and local in parallel
+      await Future.wait([
+        _supabaseRepository.clearAllSubscriptions(),
+        _localRepository.clearAllSubscriptions(),
+      ]);
+      print('✅ Cleared all subscriptions from both cloud and local');
     } else {
-      // Clear from local storage
+      // For guest users, only clear from local storage
       await _localRepository.clearAllSubscriptions();
+      print('✅ Cleared all subscriptions from local storage');
     }
   }
   
@@ -186,12 +194,19 @@ class DualSubscriptionRepository {
     }
   }
   
-  /// Delete a subscription from the appropriate storage
+  /// Delete a subscription from both local and cloud storage
   Future<void> deleteSubscription(String id) async {
     if (_authService.isAuthenticated) {
-      await _supabaseRepository.deleteSubscription(id);
+      // For authenticated users, delete from both cloud and local in parallel
+      await Future.wait([
+        _supabaseRepository.deleteSubscription(id),
+        _localRepository.deleteSubscription(id),
+      ]);
+      print('✅ Deleted subscription from both cloud and local: $id');
     } else {
+      // For guest users, only delete from local storage
       await _localRepository.deleteSubscription(id);
+      print('✅ Deleted subscription from local storage: $id');
     }
   }
   

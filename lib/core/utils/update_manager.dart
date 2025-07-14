@@ -136,13 +136,76 @@ class UpdateManager {
   /// Automatically check for updates on app startup
   Future<void> checkForUpdatesOnStartup(BuildContext context) async {
     // Wait a bit for the app to fully initialize
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 3));
     
     if (!context.mounted) return;
     
     await checkForUpdatesWithUI(
       context: context,
       showNoUpdateMessage: false,
+    );
+  }
+
+  /// Check for updates silently and show a dismissible notification
+  Future<void> checkForUpdatesBackground(BuildContext context) async {
+    if (_isCheckingForUpdate) return;
+
+    _isCheckingForUpdate = true;
+
+    try {
+      final hasUpdate = await isUpdateAvailable();
+      
+      if (!context.mounted) return;
+
+      if (hasUpdate) {
+        _showUpdateNotificationBanner(context);
+      }
+    } catch (e) {
+      debugPrint('Background update check failed: $e');
+    } finally {
+      _isCheckingForUpdate = false;
+    }
+  }
+
+  /// Shows a dismissible notification banner for updates
+  void _showUpdateNotificationBanner(BuildContext context) {
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      MaterialBanner(
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        content: Row(
+          children: [
+            Icon(
+              Icons.new_releases,
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'New patch available! Tap to update.',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            onPressed: () => _hideCurrentBanner(context),
+            icon: const Icon(Icons.close, size: 18),
+            tooltip: 'Dismiss',
+          ),
+          TextButton(
+            onPressed: () {
+              _hideCurrentBanner(context);
+              downloadUpdate(context);
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
     );
   }
 

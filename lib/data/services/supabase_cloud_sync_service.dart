@@ -222,6 +222,28 @@ class SupabaseCloudSyncService {
     }
   }
   
+  /// Delete user account and all associated data
+  Future<void> deleteAccount() async {
+    try {
+      print('🔄 Starting account deletion...');
+      
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+      
+      // Delete user account from Supabase (this will cascade delete all subscriptions)
+      await _authService.deleteAccount();
+      
+      // Clear local data as well since account is deleted
+      await _autoSyncService.clearLocalDataForUserSwitch();
+      
+      print('✅ Account deletion completed');
+    } catch (e) {
+      print('❌ Account deletion error: $e');
+      rethrow;
+    }
+  }
+  
   /// Get current user information
   Map<String, dynamic>? get userProfile => _authService.userProfile;
   

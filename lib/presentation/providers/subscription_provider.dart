@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/date_utils.dart';
@@ -20,6 +21,7 @@ class SubscriptionProvider extends ChangeNotifier {
   
   List<Subscription> _subscriptions = [];
   bool _isLoading = false;
+  bool _isBackgroundSyncing = false; // New: Track background sync status
   String? _error;
   
   SubscriptionProvider({
@@ -41,6 +43,7 @@ class SubscriptionProvider extends ChangeNotifier {
   // Getters
   List<Subscription> get subscriptions => _subscriptions;
   bool get isLoading => _isLoading;
+  bool get isBackgroundSyncing => _isBackgroundSyncing; // New: Expose background sync status
   String? get error => _error;
   
   // Get active subscriptions
@@ -187,10 +190,22 @@ class SubscriptionProvider extends ChangeNotifier {
   /// Perform background sync without blocking the UI
   Future<void> _performBackgroundSync() async {
     try {
+      // Check if already syncing to prevent multiple concurrent syncs
+      if (_isBackgroundSyncing) {
+        print('⏸️ Background sync already in progress, skipping...');
+        return;
+      }
+      
+      _isBackgroundSyncing = true;
+      notifyListeners(); // Update UI to show sync indicator
+      
       print('🔄 Starting background sync...');
       
-      // Trigger manual sync to ensure data consistency
-      await _supabaseCloudSyncService.manualSync();
+      // Add timeout to prevent indefinite syncing
+      await Future.any([
+        _supabaseCloudSyncService.manualSync(),
+        Future.delayed(const Duration(seconds: 30), () => throw TimeoutException('Sync timeout')),
+      ]);
       
       // Small delay to ensure sync is complete
       await Future.delayed(const Duration(milliseconds: 100));
@@ -214,13 +229,16 @@ class SubscriptionProvider extends ChangeNotifier {
       // Update UI with synced data
       _subscriptions = syncedSubscriptions;
       _sortSubscriptions(_subscriptions);
-      notifyListeners();
       
       print('✅ Background sync completed - UI updated with ${_subscriptions.length} subscriptions');
       
     } catch (e) {
       print('⚠️ Background sync failed, keeping local data: $e');
       // Don't update error state since user already has local data displayed
+    } finally {
+      _isBackgroundSyncing = false;
+      print('🔄 Background sync finished - hiding sync indicator');
+      notifyListeners(); // Update UI to hide sync indicator
     }
   }
   
@@ -232,18 +250,27 @@ class SubscriptionProvider extends ChangeNotifier {
       
       print('🔍 Adding subscription - Auth check: isSignedIn=$isSignedIn, user=${currentUser?.email ?? 'null'}');
       
-      // DualSubscriptionRepository already handles both local and cloud storage
-      await _repository.addSubscription(subscription);
-      _subscriptions = [..._subscriptions, subscription];
-      _sortSubscriptions(_subscriptions);
-      notifyListeners();
+      // Optimistically add to UI first with proper sorting to prevent visual delay
+      final updatedSubscriptions = [..._subscriptions, subscription];
+      _sortSubscriptions(updatedSubscriptions);
+      _subscriptions = updatedSubscriptions;
+      notifyListeners(); // Update UI immediately with sorted list
       
-      // No need for additional auto backup - DualSubscriptionRepository already handles cloud sync
-      
-      // Schedule notification if active
-      if (subscription.status == AppConstants.STATUS_ACTIVE) {
-        _scheduleNotification(subscription);
+      try {
+        // DualSubscriptionRepository already handles both local and cloud storage
+        await _repository.addSubscription(subscription);
+        
+        // Schedule notification if active
+        if (subscription.status == AppConstants.STATUS_ACTIVE) {
+          _scheduleNotification(subscription);
+        }
+      } catch (repositoryError) {
+        // If repository operation fails, remove from UI
+        _subscriptions = _subscriptions.where((s) => s.id != subscription.id).toList();
+        notifyListeners();
+        throw repositoryError;
       }
+      
     } catch (e) {
       _error = AppConstants.ERROR_ADDING_SUBSCRIPTION;
       notifyListeners();
@@ -278,17 +305,30 @@ class SubscriptionProvider extends ChangeNotifier {
   // Delete a subscription
   Future<void> deleteSubscription(String id) async {
     try {
-      // DualSubscriptionRepository already handles both local and cloud storage
-      await _repository.deleteSubscription(id);
-      await _notificationService.cancelNotification(id.hashCode);
-      
-      // No need for additional auto backup - DualSubscriptionRepository already handles cloud sync
-      
+      // Optimistically remove from UI first for immediate feedback
+      final originalSubscriptions = List<Subscription>.from(_subscriptions);
       _subscriptions = _subscriptions.where((s) => s.id != id).toList();
-      notifyListeners();
+      notifyListeners(); // Update UI immediately
+      
+      try {
+        // Perform deletion and notification cancellation in parallel
+        await Future.wait([
+          _repository.deleteSubscription(id),
+          _notificationService.cancelNotification(id.hashCode),
+        ]);
+        
+        print('✅ Successfully deleted subscription: $id');
+      } catch (repositoryError) {
+        // If deletion fails, restore the subscription to UI
+        _subscriptions = originalSubscriptions;
+        notifyListeners();
+        throw repositoryError;
+      }
+      
     } catch (e) {
       _error = AppConstants.ERROR_DELETING_SUBSCRIPTION;
       notifyListeners();
+      print('❌ Error deleting subscription: $e');
     }
   }
   
@@ -606,6 +646,15 @@ class SubscriptionProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+  
+  // Debug method to check sync status
+  void debugSyncStatus() {
+    print('🔍 DEBUG: Sync Status:');
+    print('🔍 _isLoading: $_isLoading');
+    print('🔍 _isBackgroundSyncing: $_isBackgroundSyncing');
+    print('🔍 User signed in: ${_supabaseCloudSyncService.isUserSignedIn}');
+    print('🔍 Subscriptions count: ${_subscriptions.length}');
   }
   
   // Delete all subscriptions

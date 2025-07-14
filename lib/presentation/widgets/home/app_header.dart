@@ -30,13 +30,17 @@ class AppHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  AppConstants.APP_NAME,
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      AppConstants.APP_NAME,
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(

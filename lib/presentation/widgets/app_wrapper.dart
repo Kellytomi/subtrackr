@@ -29,10 +29,9 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     
     // Check for updates after the widget is built
-    // Temporarily disabled to debug crash issues
-    // WidgetsBinding.instance.addPostFrameCallback((_) {
-    //   _checkForUpdatesOnStartup();
-    // });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForUpdatesOnStartup();
+    });
   }
 
   @override
@@ -70,10 +69,8 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
     if (!mounted) return;
     
     try {
-      await _updateManager.checkForUpdatesWithUI(
-        context: context,
-        showNoUpdateMessage: false,
-      );
+      // Show updates as dismissible notifications when resuming
+      await _updateManager.checkForUpdatesBackground(context);
     } catch (e) {
       debugPrint('Error checking for updates on resume: $e');
     }

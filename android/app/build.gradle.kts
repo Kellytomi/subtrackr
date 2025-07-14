@@ -5,6 +5,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     // Firebase plugins for cloud sync
     id("com.google.gms.google-services")
+    // Firebase App Distribution for testing builds
+    id("com.google.firebase.appdistribution")
 }
 
 import java.util.Properties
@@ -95,11 +97,23 @@ android {
                     )
                 }
             }
+            
+            // Firebase App Distribution configuration
+            configure<com.google.firebase.appdistribution.gradle.AppDistributionExtension> {
+                releaseNotes = "New release for testing"
+                groups = "Testers"  // You can create this group in Firebase Console
+            }
         }
         debug {
             // For debug builds, disable both resource and code shrinking
             isMinifyEnabled = false
             isShrinkResources = false
+            
+            // Firebase App Distribution configuration
+            configure<com.google.firebase.appdistribution.gradle.AppDistributionExtension> {
+                releaseNotes = "Debug build for testing"
+                groups = "Int-testers"
+            }
         }
     }
 

@@ -4,6 +4,7 @@ import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/color_extensions.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/core/widgets/empty_state.dart';
+import 'package:subtrackr/core/widgets/modern_spinner.dart';
 import 'package:subtrackr/core/widgets/subscription_card.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
@@ -216,43 +217,81 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildSubscriptionList(List<Subscription> subscriptions, String defaultCurrencyCode) {
-    if (subscriptions.isEmpty) {
-      return const EmptyState(
-        icon: Icons.subscriptions,
-        title: 'No Subscriptions',
-        message: 'Add your first subscription to get started',
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        await Provider.of<SubscriptionProvider>(context, listen: false).loadSubscriptions();
-      },
-      child: ListView.builder(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        itemCount: subscriptions.length,
-        itemBuilder: (context, index) {
-          final subscription = subscriptions[index];
-          return Padding(
-            key: ValueKey('subscription_item_${subscription.id}'),
-            padding: const EdgeInsets.only(bottom: 1.0),
-            child: SubscriptionCard(
-              key: ValueKey('subscription_card_${subscription.id}'),
-              subscription: subscription,
-              defaultCurrencySymbol: CurrencyUtils.getCurrencyByCode(defaultCurrencyCode)?.symbol ?? '\$',
-              onTap: () => _navigateToSubscriptionDetails(subscription),
-              onEdit: () => _navigateToEditSubscription(subscription),
-              onDelete: () => _showDeleteConfirmation(subscription),
-              onPause: () => _pauseSubscription(subscription),
-              onResume: () => _resumeSubscription(subscription),
-              onCancel: () => _cancelSubscription(subscription),
-              onMarkAsPaid: () => _markSubscriptionAsPaid(subscription),
+    return Consumer<SubscriptionProvider>(
+      builder: (context, subscriptionProvider, child) {
+        // Show loading state only when initially loading and no data yet
+        if (subscriptionProvider.isLoading && subscriptions.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ModernSpinner(
+                  size: 48,
+                  type: SpinnerType.pulse,
+                  color: Theme.of(context).colorScheme.primary,
+                  duration: const Duration(milliseconds: 1500),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Loading your subscriptions...',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'This should only take a moment',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
             ),
           );
-        },
-      ),
+        }
+        
+        if (subscriptions.isEmpty) {
+          return const EmptyState(
+            icon: Icons.subscriptions,
+            title: 'No Subscriptions',
+            message: 'Add your first subscription to get started',
+          );
+        }
+
+                 return RefreshIndicator(
+          onRefresh: () async {
+            await Provider.of<SubscriptionProvider>(context, listen: false).loadSubscriptions();
+          },
+          child: ListView.builder(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            itemCount: subscriptions.length,
+            itemBuilder: (context, index) {
+              final subscription = subscriptions[index];
+              return Padding(
+                key: ValueKey('subscription_item_${subscription.id}'),
+                padding: const EdgeInsets.only(bottom: 1.0),
+                child: SubscriptionCard(
+                  key: ValueKey('subscription_card_${subscription.id}'),
+                  subscription: subscription,
+                  defaultCurrencySymbol: CurrencyUtils.getCurrencyByCode(defaultCurrencyCode)?.symbol ?? '\$',
+                  onTap: () => _navigateToSubscriptionDetails(subscription),
+                  onEdit: () => _navigateToEditSubscription(subscription),
+                  onDelete: () => _showDeleteConfirmation(subscription),
+                  onPause: () => _pauseSubscription(subscription),
+                  onResume: () => _resumeSubscription(subscription),
+                  onCancel: () => _cancelSubscription(subscription),
+                  onMarkAsPaid: () => _markSubscriptionAsPaid(subscription),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 

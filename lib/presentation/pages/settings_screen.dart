@@ -13,6 +13,8 @@ import 'package:subtrackr/core/utils/tips_helper.dart';
 import 'package:subtrackr/data/services/supabase_cloud_sync_service.dart';
 import 'package:subtrackr/data/services/supabase_auth_service.dart';
 import 'package:subtrackr/data/repositories/dual_subscription_repository.dart';
+import 'package:subtrackr/core/utils/update_manager.dart';
+import 'package:restart_app/restart_app.dart';
 
 
 class SettingsScreen extends StatefulWidget {
@@ -463,11 +465,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       color: Colors.red,
                       children: [
                         _buildModernTile(
-                          title: 'Clear Cloud Data',
-                          subtitle: 'Remove all data from cloud storage',
-                          icon: Icons.cloud_off_rounded,
+                          title: 'Delete Account & Data',
+                          subtitle: 'Permanently delete account and all data',
+                          icon: Icons.person_remove_rounded,
                           iconColor: Colors.red,
-                          onTap: _clearCloudData,
+                          onTap: _deleteAccountAndData,
                           trailing: Icon(
                             Icons.warning_rounded,
                             color: Colors.red,
@@ -1728,20 +1730,47 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  Future<void> _clearCloudData() async {
+  Future<void> _deleteAccountAndData() async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear Cloud Data'),
-        content: const Text('This will permanently delete all your subscription data from the cloud. This action cannot be undone.'),
+        title: Text(
+          'Delete Account & Data',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.red,
+          ),
+        ),
+        content: const Text(
+          '⚠️ This will permanently:\n\n'
+          '• Delete your account\n'
+          '• Remove ALL subscription data from cloud\n'
+          '• Clear ALL local data\n'
+          '• Sign you out from this device\n\n'
+          '⚠️ IMPORTANT: Other devices may remain signed in until you manually sign out or the session expires.\n\n'
+          'This action cannot be undone!',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: colorScheme.primary),
+            ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Delete Everything'),
           ),
         ],
       ),
@@ -1753,20 +1782,74 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
         
         if (!cloudSyncService.isUserSignedIn) {
-          _showSnackBar('Please sign in to clear cloud data');
+          _showSnackBar('Please sign in to delete account');
           return;
         }
         
-        // Clear all subscriptions from cloud using the repository
-        final repository = Provider.of<DualSubscriptionRepository>(context, listen: false);
-        await repository.clearAllSubscriptions();
+        // Show loading indicator
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Deleting account and all data...'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 10),
+          ),
+        );
         
-        // Also clear local subscriptions
-        await subscriptionProvider.deleteAllSubscriptions();
+        // Stop real-time sync
+        subscriptionProvider.stopRealTimeSync();
         
-        _showSnackBar('Cloud data cleared successfully');
+        // Delete account and all associated data
+        await cloudSyncService.deleteAccount();
+        
+        // Clear the loading snackbar
+        ScaffoldMessenger.of(context).clearSnackBars();
+        
+        if (mounted) {
+          // Force UI rebuild to reflect signed-out state
+          setState(() {});
+          
+          // Wait a moment for the auth state to propagate
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('Account and all data deleted successfully. You have been signed out from this device. Remember to sign out from other devices manually.'),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                duration: Duration(seconds: 5),
+              ),
+            );
+          }
+        }
+        
       } catch (e) {
-        _showSnackBar('Error clearing cloud data: $e');
+        ScaffoldMessenger.of(context).clearSnackBars();
+        _showSnackBar('Error deleting account: $e');
       }
     }
   }
@@ -1878,30 +1961,37 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  // Get app version information dynamically
+  // Get app version information dynamically with Shorebird patch info
   Future<Map<String, dynamic>> _getVersionInfo() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
+      final updateManager = UpdateManager();
+      final patchInfo = await updateManager.getPatchInfo();
+      
       return {
         'appVersion': '${packageInfo.version}+${packageInfo.buildNumber}',
-        'patchNumber': null, // With automatic updates, we don't need to track this manually
-        'updateStatus': 'Auto-updating',
-        'hasPatch': false,
+        'patchNumber': patchInfo['patchNumber'],
+        'updateStatus': (patchInfo['hasPatch'] as bool?) == true ? 'Patched' : 'Base Version',
+        'hasPatch': (patchInfo['hasPatch'] as bool?) ?? false,
+        'hasUpdate': (patchInfo['hasUpdate'] as bool?) ?? false,
       };
     } catch (e) {
-      print('Error getting package info: $e');
-      // Fallback to hardcoded version if PackageInfo fails
+      print('Error getting version info: $e');
+      // Fallback to hardcoded version if everything fails
       return {
-        'appVersion': '1.0.4+6',
+        'appVersion': '1.0.5+7',
         'patchNumber': null,
-        'updateStatus': 'Auto-updating',
+        'updateStatus': 'Unknown',
         'hasPatch': false,
+        'hasUpdate': false,
       };
     }
   }
 
-  /// Check for app updates with progress dialog
+  /// Check for app updates using Shorebird
   Future<void> _checkForUpdates() async {
+    final updateManager = UpdateManager();
+    
     // Show initial checking dialog
     showDialog(
       context: context,
@@ -1920,7 +2010,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             children: [
               const CircularProgressIndicator(),
               const SizedBox(height: 16),
-              const Text('Checking for available updates...'),
+              const Text('Checking for available patches...'),
             ],
           ),
         );
@@ -1928,17 +2018,15 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
 
     try {
-      // Simulate checking for updates (replace with actual update check logic)
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // Simulate update availability check
-      final hasUpdate = false; // Replace with actual check
+      // Check for Shorebird updates
+      final hasUpdate = await updateManager.isUpdateAvailable();
+      final patchInfo = await updateManager.getPatchInfo();
       
       // Close checking dialog
-      Navigator.of(context).pop();
+      if (mounted) Navigator.of(context).pop();
       
       if (hasUpdate) {
-        // Show update available dialog with download progress
+        // Show update available dialog
         _showUpdateAvailableDialog();
       } else {
         // Show no updates available
@@ -1946,14 +2034,14 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       }
     } catch (error) {
       // Close checking dialog
-      Navigator.of(context).pop();
+      if (mounted) Navigator.of(context).pop();
       
       // Show error dialog
       _showUpdateErrorDialog(error.toString());
     }
   }
 
-  /// Show update available dialog with download progress
+  /// Show update available dialog with Shorebird download
   void _showUpdateAvailableDialog() {
     showDialog(
       context: context,
@@ -1961,7 +2049,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            double downloadProgress = 0.0;
             bool isDownloading = false;
             
             return AlertDialog(
@@ -1969,25 +2056,23 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 children: [
                   Icon(Icons.new_releases, color: Colors.green),
                   const SizedBox(width: 8),
-                  const Text('Update Available'),
+                  const Text('Patch Available'),
                 ],
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('A new version of SubTrackr is available!'),
-                  const SizedBox(height: 8),
-                  const Text('Version 1.0.5+7', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('A new patch for SubTrackr is available!'),
                   const SizedBox(height: 16),
                   if (isDownloading) ...[
-                    const Text('Downloading update...'),
+                    const Text('Downloading patch...'),
                     const SizedBox(height: 8),
-                    LinearProgressIndicator(value: downloadProgress),
+                    const LinearProgressIndicator(),
                     const SizedBox(height: 8),
-                    Text('${(downloadProgress * 100).toInt()}% complete'),
+                    const Text('This may take a moment'),
                   ] else
-                    const Text('Tap "Update Now" to download and install the latest version.'),
+                    const Text('Tap "Update Now" to download and apply the patch instantly.'),
                 ],
               ),
               actions: [
@@ -2000,20 +2085,20 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   onPressed: isDownloading ? null : () async {
                     setDialogState(() {
                       isDownloading = true;
-                      downloadProgress = 0.0;
                     });
                     
-                    // Simulate download progress
-                    for (int i = 0; i <= 100; i += 10) {
-                      await Future.delayed(const Duration(milliseconds: 300));
-                      setDialogState(() {
-                        downloadProgress = i / 100;
-                      });
+                    try {
+                      final updateManager = UpdateManager();
+                      await updateManager.downloadUpdate(context);
+                      
+                      // Close dialog and show completion
+                      if (mounted) Navigator.of(context).pop();
+                      _showUpdateCompleteDialog();
+                    } catch (e) {
+                      // Close dialog and show error
+                      if (mounted) Navigator.of(context).pop();
+                      _showUpdateErrorDialog('Failed to download patch: $e');
                     }
-                    
-                    // Close dialog and show completion
-                    Navigator.of(context).pop();
-                    _showUpdateCompleteDialog();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
@@ -2051,7 +2136,40 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               const Text('Up to Date'),
             ],
           ),
-          content: const Text('You are using the latest version of SubTrackr!'),
+          content: FutureBuilder<Map<String, dynamic>>(
+            future: _getVersionInfo(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Text('Checking version info...');
+              }
+              
+              final versionData = snapshot.data ?? {};
+              final hasPatch = (versionData['hasPatch'] as bool?) ?? false;
+              final patchNumber = versionData['patchNumber'];
+              
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('You are using the latest version of SubTrackr!'),
+                  const SizedBox(height: 8),
+                  if (hasPatch && patchNumber != null)
+                    Text(
+                      'Current patch: #$patchNumber',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    )
+                  else
+                    const Text(
+                      'Base version (no patches applied)',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                ],
+              );
+            },
+          ),
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -2092,33 +2210,41 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   void _showUpdateCompleteDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           title: Row(
             children: [
               Icon(Icons.download_done, color: Colors.green),
               const SizedBox(width: 8),
-              const Text('Update Complete'),
+              const Text('Patch Applied'),
             ],
           ),
-          content: const Text('SubTrackr has been updated successfully! The app will restart to apply changes.'),
+          content: const Text('SubTrackr has been patched successfully! Restart the app to see the latest changes.'),
           actions: [
-            ElevatedButton(
+            TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                // In a real app, you would trigger an app restart here
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Update complete! Restart the app to see changes.'),
+                    content: Text('Patch applied! Restart manually when convenient.'),
                     backgroundColor: Colors.green,
                   ),
                 );
+              },
+              child: const Text('Later'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Restart the app using restart_app plugin
+                Restart.restartApp();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Restart App'),
+              child: const Text('Restart Now'),
             ),
           ],
         );
@@ -2184,9 +2310,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         }
                         
                         final versionData = snapshot.data ?? {};
-                        final appVersion = versionData['appVersion'] ?? '1.0.4+6';
+                        final appVersion = versionData['appVersion'] ?? '1.0.5+7';
                         final patchNumber = versionData['patchNumber'] as int?;
                         final updateStatus = versionData['updateStatus'] ?? 'Unknown';
+                        final hasPatch = (versionData['hasPatch'] as bool?) ?? false;
+                        final hasUpdate = (versionData['hasUpdate'] as bool?) ?? false;
                         
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2198,33 +2326,52 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                 color: colorScheme.onSurface.withOpacity(0.7),
                               ),
                             ),
+                            if (hasPatch && patchNumber != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Patch #$patchNumber applied',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.green.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 2),
                             Row(
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.1),
+                                    color: hasUpdate 
+                                        ? Colors.orange.withOpacity(0.1)
+                                        : Colors.green.withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
-                                      color: Colors.green.withOpacity(0.3),
+                                      color: hasUpdate 
+                                          ? Colors.orange.withOpacity(0.3)
+                                          : Colors.green.withOpacity(0.3),
                                       width: 0.5,
                                     ),
                                   ),
                                   child: Text(
-                                    'Auto-updating enabled',
+                                    hasUpdate ? 'Update available' : 'Up to date',
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Colors.green.shade700,
+                                      color: hasUpdate 
+                                          ? Colors.orange.shade700
+                                          : Colors.green.shade700,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 6),
                                 Icon(
-                                  Icons.auto_fix_high,
+                                  hasUpdate ? Icons.update : Icons.check_circle,
                                   size: 12,
-                                  color: Colors.green.shade600,
+                                  color: hasUpdate 
+                                      ? Colors.orange.shade600
+                                      : Colors.green.shade600,
                                 ),
                               ],
                             ),

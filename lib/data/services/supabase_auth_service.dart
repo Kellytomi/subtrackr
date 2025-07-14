@@ -184,15 +184,83 @@ class SupabaseAuthService {
     try {
       print('🔄 Signing out from Supabase...');
       
-      // Sign out from Google
-      await _googleSignIn.signOut();
-      
-      // Sign out from Supabase
-      await _supabase.auth.signOut();
+      // Sign out from Google and Supabase in parallel
+      await Future.wait([
+        _googleSignIn.signOut(),
+        _supabase.auth.signOut(),
+      ]);
       
       print('✅ Successfully signed out from Supabase');
     } catch (e) {
       print('❌ Error during Supabase sign-out: $e');
+      rethrow;
+    }
+  }
+  
+  /// Delete user account and all associated data
+  /// This will sign out the user from ALL devices
+  Future<void> deleteAccount() async {
+    try {
+      print('🔄 Starting account deletion process...');
+      
+      final user = currentUser;
+      if (user == null) {
+        throw Exception('No user to delete');
+      }
+      
+      final userId = user.id;
+      print('🔄 Deleting account for user: $userId');
+      
+      // Step 1: Delete the user account (this will try to invalidate sessions in SQL)
+      print('🔄 Step 1: Deleting user account and data...');
+      final response = await _supabase.rpc('delete_user');
+      
+      print('🔍 Delete response: $response');
+      
+      // Check if deletion was successful
+      if (response == null || response['success'] != true) {
+        throw Exception('Failed to delete user account: ${response?['message'] ?? 'Unknown error'}');
+      }
+      
+      print('✅ User account deleted from Supabase');
+      print('✅ ${response['subscriptions_deleted']} subscriptions deleted');
+      
+      // Step 2: Attempt global sign-out to invalidate remaining sessions on other devices
+      // Even though the account is deleted, this may help invalidate any cached tokens
+      print('🔄 Step 2: Attempting global sign-out to invalidate any remaining sessions...');
+      try {
+        await _supabase.auth.signOut(scope: SignOutScope.global);
+        print('✅ Global sign-out completed - should invalidate sessions on other devices');
+      } catch (e) {
+        print('⚠️ Global sign-out failed (expected after account deletion): $e');
+        print('ℹ️ Account deletion should have invalidated sessions already');
+      }
+      
+      // Step 3: Local cleanup
+      print('🔄 Step 3: Performing local cleanup...');
+      
+      // Sign out from Google
+      try {
+        await _googleSignIn.signOut();
+        print('✅ Google sign-out completed');
+      } catch (e) {
+        print('⚠️ Google sign out warning: $e');
+      }
+      
+      // Ensure local Supabase session is cleared
+      try {
+        await _supabase.auth.signOut(scope: SignOutScope.local);
+        print('✅ Local Supabase session cleared');
+      } catch (e) {
+        print('⚠️ Local sign-out warning (expected after account deletion): $e');
+      }
+      
+      print('✅ Account deletion process completed successfully');
+      print('ℹ️ Note: Other devices may remain signed in until their tokens expire');
+      print('ℹ️ Users should manually sign out from other devices if needed');
+      
+    } catch (e) {
+      print('❌ Error during account deletion: $e');
       rethrow;
     }
   }

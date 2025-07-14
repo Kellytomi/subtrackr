@@ -261,13 +261,18 @@ class SupabaseSubscriptionRepository {
         throw Exception('No authenticated user for Supabase delete');
       }
       
-      await _supabase
+      final response = await _supabase
           .from('subscriptions')
           .delete()
           .eq('user_id', user.id)
-          .eq('id', id);
+          .eq('id', id)
+          .select(); // Get the deleted row to confirm it existed
       
-      print('✅ Deleted subscription from Supabase: $id');
+      if (response.isEmpty) {
+        print('⚠️ No subscription found to delete with ID: $id (may have been already deleted)');
+      } else {
+        print('✅ Deleted subscription from Supabase: $id');
+      }
     } catch (e) {
       print('❌ Error deleting subscription from Supabase: $e');
       rethrow;
