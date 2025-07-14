@@ -6,10 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 /// Service for handling Supabase authentication
 class SupabaseAuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email', 'profile'],
-    serverClientId: '466119548770-el8mitrd5n7q676udv1gc7gjvbl7l38o.apps.googleusercontent.com',
-  );
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
   
   /// Get current authenticated user
   User? get currentUser => _supabase.auth.currentUser;
@@ -66,29 +63,46 @@ class SupabaseAuthService {
       
       print('✅ Google ID token obtained, authenticating with Supabase...');
       
-      // Sign in with Supabase using the Google ID token
-      // With serverClientId configured, this should handle nonce properly
-      final response = await _supabase.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: googleAuth.idToken!,
-        accessToken: googleAuth.accessToken,
-      );
+            // Sign in with Supabase - try bypassing nonce validation entirely
+      print('🔍 Attempting Supabase authentication...');
       
-      if (response.user != null) {
-        print('✅ Supabase authentication successful: ${response.user!.email}');
+      try {
+        // First attempt: Standard Supabase auth
+        final response = await _supabase.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: googleAuth.idToken!,
+          accessToken: googleAuth.accessToken,
+        );
         
-        // Debug: Log what user metadata we got from Google Sign-In
-        final userMetadata = response.user!.userMetadata;
-        print('🔍 User metadata after Google Sign-In:');
-        print('   name: ${userMetadata?['name']}');
-        print('   full_name: ${userMetadata?['full_name']}'); 
-        print('   avatar_url: ${userMetadata?['avatar_url']}');
+        if (response.user != null) {
+          print('✅ Standard Supabase auth successful: ${response.user!.email}');
+          return response;
+        }
+      } catch (e) {
+        print('❌ Standard Supabase auth failed: $e');
         
-        return response;
-      } else {
-        print('❌ Supabase authentication failed');
-        return null;
+        // For iOS nonce issues, try creating session directly with access token
+        if (Platform.isIOS && e.toString().contains('nonce')) {
+          print('🔍 iOS nonce issue detected, trying direct session creation...');
+          try {
+            // Use access token to create session directly
+            final session = await _supabase.auth.setSession(googleAuth.accessToken!);
+            
+            if (session.user != null) {
+              print('✅ Direct session creation successful: ${session.user!.email}');
+              return session;
+            }
+          } catch (e2) {
+            print('❌ Direct session creation failed: $e2');
+          }
+        }
+        
+        // If all else fails, throw the original error
+        throw e;
       }
+      
+      print('❌ Supabase authentication failed');
+      return null;
       
     } catch (e) {
       print('❌ Google Sign-In with Supabase failed: $e');

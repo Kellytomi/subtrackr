@@ -149,46 +149,25 @@ class SubscriptionProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      var loadedSubscriptions = await _repository.getAllSubscriptions();
-      
-      // Try to sync with cloud if user is signed in
+      // If user is signed in, trigger manual sync to ensure data is synced
       if (_supabaseCloudSyncService.isUserSignedIn) {
+        print('🔄 User is signed in, triggering manual sync...');
+        
         try {
-          print('🔄 Attempting to get cloud subscriptions...');
-          // Get cloud subscriptions
-          final cloudSubscriptions = await _repository.getCloudSubscriptions();
-          print('☁️ Retrieved ${cloudSubscriptions.length} cloud subscriptions');
-          print('📱 Have ${loadedSubscriptions.length} local subscriptions');
-          
-          // If cloud sync fails due to schema issues, preserve local data
-          if (cloudSubscriptions.isEmpty && loadedSubscriptions.isNotEmpty) {
-            print('⚠️ No cloud subscriptions found but have local data - preserving local subscriptions');
-            // Don't merge, just keep local data
-          } else {
-            // Merge local and cloud subscriptions (avoid duplicates by name)
-            final mergedSubscriptions = <Subscription>[];
-            final cloudNames = cloudSubscriptions.map((s) => s.name.toLowerCase()).toSet();
-            
-            // Add all cloud subscriptions
-            mergedSubscriptions.addAll(cloudSubscriptions);
-            
-            // Add local subscriptions that don't exist in cloud
-            for (final localSub in loadedSubscriptions) {
-              if (!cloudNames.contains(localSub.name.toLowerCase())) {
-                mergedSubscriptions.add(localSub);
-                print('➕ Adding local subscription to merge: ${localSub.name}');
-              }
-            }
-            
-            loadedSubscriptions = mergedSubscriptions;
-            print('✅ Cloud sync completed successfully - merged ${mergedSubscriptions.length} subscriptions');
-          }
+          // Trigger manual sync to ensure local and cloud data are properly merged
+          await _supabaseCloudSyncService.manualSync();
+          print('✅ Manual sync completed');
         } catch (e) {
-          print('⚠️ Cloud sync failed, using local data: $e');
-          print('📱 Preserving ${loadedSubscriptions.length} local subscriptions');
-          // Continue with local data if cloud sync fails
+          print('⚠️ Manual sync failed, continuing with normal load: $e');
         }
+        
+        // Small delay to ensure sync is fully complete
+        await Future.delayed(const Duration(milliseconds: 200));
       }
+      
+      // Now load subscriptions from the appropriate source
+      var loadedSubscriptions = await _repository.getAllSubscriptions();
+      print('📊 Loaded ${loadedSubscriptions.length} subscriptions');
       
       _sortSubscriptions(loadedSubscriptions);
       
@@ -213,6 +192,7 @@ class SubscriptionProvider extends ChangeNotifier {
       _isLoading = false;
       _error = AppConstants.ERROR_LOADING_SUBSCRIPTIONS;
       notifyListeners();
+      print('❌ Error loading subscriptions: $e');
     }
   }
   

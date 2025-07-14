@@ -34,6 +34,9 @@ class SupabaseCloudSyncService {
   Future<void> initialize() async {
     print('🔄 Initializing SupabaseCloudSyncService...');
     
+    // Start sync completion listener
+    _autoSyncService.startSyncCompletionListener();
+    
     // Listen to auth state changes
     _authSubscription = _authService.onAuthStateChange.listen((authState) {
       _handleAuthStateChange(authState);

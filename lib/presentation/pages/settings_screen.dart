@@ -976,38 +976,40 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       if (success) {
         print('✅ Signed in successfully and linked to Firebase');
         
-        // Start real-time sync for the newly signed-in user
-        final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-        await subscriptionProvider.startRealTimeSync();
-        
-        // Reload subscriptions to get latest cloud data
-        await subscriptionProvider.loadSubscriptions();
-        
-        // Wait a moment for all services to update their state
-        await Future.delayed(const Duration(milliseconds: 500));
-        
         if (mounted) {
-          setState(() {}); // Trigger rebuild
+          // Start real-time sync for the newly signed-in user
+          final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+          await subscriptionProvider.startRealTimeSync();
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.cloud_done, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Successfully connected! Real-time sync is now active.',
-                      style: TextStyle(color: Colors.white),
+          // Reload subscriptions to get latest cloud data
+          await subscriptionProvider.loadSubscriptions();
+          
+          // Wait a moment for all services to update their state
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          if (mounted) {
+            setState(() {}); // Trigger rebuild
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.cloud_done, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Successfully connected! Real-time sync is now active.',
+                        style: TextStyle(color: Colors.white),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          );
+            );
+          }
         }
       } else {
         print('❌ Sign in was cancelled or failed');
