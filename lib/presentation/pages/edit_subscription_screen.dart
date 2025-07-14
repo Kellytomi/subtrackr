@@ -28,7 +28,6 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
   
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
   
   String _billingCycle = AppConstants.BILLING_CYCLE_MONTHLY;
   DateTime _startDate = DateTime.now();
@@ -41,7 +40,6 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
   String? _logoUrl;
   String _status = AppConstants.STATUS_ACTIVE;
   
-  // Add a list to store logo suggestions
   List<LogoSuggestion> _logoSuggestions = [];
   bool _showLogoSuggestions = false;
   Timer? _debounceTimer;
@@ -50,48 +48,33 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
   bool _isLoading = true;
   bool _hasChanges = false;
 
-  final List<String> _categories = [
-    'Entertainment',
-    'Productivity',
-    'Utilities',
-    'Health & Fitness',
-    'Food & Drink',
-    'Shopping',
-    'Other',
+  final List<Map<String, dynamic>> _categories = [
+    {'name': 'Entertainment', 'icon': Icons.movie_outlined, 'color': const Color(0xFF6366F1)},
+    {'name': 'Productivity', 'icon': Icons.work_outline, 'color': const Color(0xFF06B6D4)},
+    {'name': 'Utilities', 'icon': Icons.build_outlined, 'color': const Color(0xFF10B981)},
+    {'name': 'Health & Fitness', 'icon': Icons.fitness_center_outlined, 'color': const Color(0xFFF59E0B)},
+    {'name': 'Food & Drink', 'icon': Icons.restaurant_outlined, 'color': const Color(0xFFEF4444)},
+    {'name': 'Shopping', 'icon': Icons.shopping_bag_outlined, 'color': const Color(0xFF8B5CF6)},
+    {'name': 'Other', 'icon': Icons.category_outlined, 'color': const Color(0xFF6B7280)},
   ];
 
   @override
   void initState() {
     super.initState();
     
-    // Setup animations
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 800),
     );
     
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeInOut,
-      ),
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
     );
     
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeInOut,
-      ),
-    );
-    
-    // Add listeners to update logo
     _websiteController.addListener(_updateLogoFromWebsite);
     _nameController.addListener(_updateLogoFromName);
     
-    // Wait for the widget to be fully built before loading data
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSubscription();
     });
@@ -113,7 +96,7 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
   }
 
   void _updateLogoFromWebsite() {
-    if (_logoUrl != null) return; // Already have a logo
+    if (_logoUrl != null) return;
     
     final logoService = Provider.of<LogoService>(context, listen: false);
     final logoUrl = logoService.getLogoUrl(_websiteController.text);
@@ -125,10 +108,8 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
   }
   
   void _updateLogoFromName() {
-    // Cancel previous debounce timer
     _debounceTimer?.cancel();
     
-    // Always hide suggestions if name is empty
     if (_nameController.text.isEmpty) {
       setState(() {
         _logoSuggestions = [];
@@ -137,7 +118,6 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       return;
     }
     
-    // If a logo has already been selected, don't show suggestions
     if (_logoUrl != null) {
       setState(() {
         _showLogoSuggestions = false;
@@ -145,7 +125,6 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       return;
     }
     
-    // Light debounce to feel real-time while avoiding excessive requests
     _debounceTimer = Timer(const Duration(milliseconds: 150), () {
       _fetchLogoSuggestions(_nameController.text);
     });
@@ -156,9 +135,8 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
     
     final logoService = Provider.of<LogoService>(context, listen: false);
     
-    // Get logo suggestions asynchronously with retry logic
     _getLogoSuggestionsWithRetry(logoService, query, 3).then((suggestions) {
-      if (mounted && _nameController.text == query) { // Check if query is still current
+      if (mounted && _nameController.text == query) {
         setState(() {
           _logoSuggestions = suggestions;
           _showLogoSuggestions = suggestions.isNotEmpty;
@@ -181,10 +159,8 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       } catch (error) {
         debugPrint('Logo suggestions attempt ${i + 1} failed: $error');
         if (i == retries - 1) {
-          // Last attempt failed, return empty list
           debugPrint('All logo suggestion attempts failed for query: $query');
         } else {
-          // Shorter wait before retrying for faster recovery
           await Future.delayed(Duration(milliseconds: 200 * (i + 1)));
         }
       }
@@ -193,7 +169,6 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
   }
   
   void _loadSubscription() {
-    // Get the subscription ID from the route arguments
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final subscriptionId = args?['id'] as String?;
     
@@ -205,10 +180,8 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       return;
     }
     
-    // Get the subscription from the provider
     final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
     
-    // Find the subscription
     Subscription? foundSubscription;
     try {
       foundSubscription = subscriptionProvider.subscriptions.firstWhere(
@@ -226,7 +199,6 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       return;
     }
     
-    // Set subscription data to form fields
     _subscription = foundSubscription;
     
     _nameController.text = _subscription!.name;
@@ -243,15 +215,12 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
     _notificationDays = _subscription!.notificationDays;
     _status = _subscription!.status;
     
-    // Set currency symbol
     _currencySymbol = CurrencyUtils.getCurrencyByCode(_currencyCode)?.symbol;
     
-    // Set loading state to false
     setState(() {
       _isLoading = false;
     });
     
-    // Start animations
     _animationController.forward();
   }
   
@@ -267,73 +236,12 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
     });
   }
   
-  // Method to select a new currency
   void _selectCurrency() async {
-    // Show currency selection dialog
     final selectedCurrency = await showModalBottomSheet<Currency?>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        maxChildSize: 0.9,
-        minChildSize: 0.5,
-        builder: (_, controller) => Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  children: [
-                    Text(
-                      'Select Currency',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(),
-              Expanded(
-                child: ListView.builder(
-                  controller: controller,
-                  itemCount: CurrencyUtils.getAllCurrencies().length,
-                  itemBuilder: (context, index) {
-                    final currency = CurrencyUtils.getAllCurrencies()[index];
-                    return ListTile(
-                      leading: Text(
-                        currency.flag,
-                        style: const TextStyle(fontSize: 24),
-                      ),
-                      title: Text(currency.name),
-                      subtitle: Text(currency.code),
-                      trailing: _currencyCode == currency.code
-                          ? Icon(
-                              Icons.check_circle,
-                              color: Theme.of(context).colorScheme.primary,
-                            )
-                          : null,
-                      onTap: () => Navigator.pop(context, currency),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (context) => _buildCurrencySelector(),
     );
     
     if (selectedCurrency != null) {
@@ -344,8 +252,114 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       });
     }
   }
+
+  Widget _buildCurrencySelector() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      maxChildSize: 0.9,
+      minChildSize: 0.5,
+      builder: (_, controller) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurface.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                children: [
+                  Text(
+                    'Select Currency',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // Currency list
+            Expanded(
+              child: ListView.builder(
+                controller: controller,
+                itemCount: CurrencyUtils.getAllCurrencies().length,
+                itemBuilder: (context, index) {
+                  final currency = CurrencyUtils.getAllCurrencies()[index];
+                  final isSelected = _currencyCode == currency.code;
+                  
+                  return InkWell(
+                    onTap: () => Navigator.pop(context, currency),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? theme.colorScheme.primary.withOpacity(0.1)
+                            : Colors.transparent,
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            currency.flag,
+                            style: const TextStyle(fontSize: 24),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  currency.name,
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                  ),
+                                ),
+                                Text(
+                                  '${currency.code} • ${currency.symbol}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(
+                              Icons.check_circle,
+                              color: theme.colorScheme.primary,
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   
-  // Method to select a logo from suggestions
   void _selectLogo(String logoUrl) {
     setState(() {
       _logoUrl = logoUrl;
@@ -357,14 +371,13 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final isDarkMode = theme.brightness == Brightness.dark;
     
-    // Get currency information
     final currency = CurrencyUtils.getCurrencyByCode(_currencyCode) ?? 
         CurrencyUtils.getAllCurrencies().first;
 
     return Scaffold(
+      backgroundColor: isDarkMode ? const Color(0xFF0F0F0F) : const Color(0xFFF8F9FA),
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -372,641 +385,131 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
                 key: _formKey,
                 onWillPop: _onWillPop,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Custom header with back button
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    // Modern header
+                    Container(
+                      padding: const EdgeInsets.all(24),
                       child: Row(
                         children: [
                           IconButton(
                             icon: Icon(
-                              Icons.arrow_back, 
-                              color: isDark ? Colors.white : Colors.black
+                              Icons.arrow_back,
+                              color: theme.colorScheme.onSurface,
                             ),
                             onPressed: () => _confirmExit(),
-                            tooltip: 'Back',
                             style: IconButton.styleFrom(
-                              backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                              backgroundColor: theme.colorScheme.surface,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                           ),
                           const SizedBox(width: 16),
-                          Text(
-                            'Edit Subscription',
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : Colors.black,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Edit Subscription',
+                                      style: theme.textTheme.headlineMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: -0.5,
+                                      ),
+                                    ),
+                                    if (_hasChanges) ...[
+                                      const SizedBox(width: 12),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.primary.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          'Unsaved',
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: theme.colorScheme.primary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Update your subscription details',
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          if (_hasChanges) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),
-                    
-                    const SizedBox(height: 24),
                     
                     // Form content
                     Expanded(
                       child: FadeTransition(
                         opacity: _fadeAnimation,
-                        child: SlideTransition(
-                          position: _slideAnimation,
-                          child: ListView(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            children: [
-                              // Logo preview
-                              Center(
-                                child: Column(
-                                  children: [
-                                    if (_logoUrl != null)
-                                      Container(
-                                        width: 100,
-                                        height: 100,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(20),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: colorScheme.primary.withOpacity(0.2),
-                                              blurRadius: 10,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ],
-                                        ),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(20),
-                                          child: Hero(
-                                            tag: 'no_hero_animation_edit',
-                                            flightShuttleBuilder: (_, __, ___, ____, _____) => 
-                                              const SizedBox.shrink(),
-                                            child: Image.network(
-                                              _logoUrl!,
-                                              key: const ValueKey('edit_subscription_logo_image'),
-                                              fit: BoxFit.contain,
-                                              errorBuilder: (context, error, stackTrace) {
-                                                final logoService = Provider.of<LogoService>(context, listen: false);
-                                                return Container(
-                                                  color: colorScheme.primary,
-                                                  child: Icon(
-                                                    logoService.getFallbackIcon(_nameController.text),
-                                                    color: Colors.white,
-                                                    size: 40,
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        if (_logoUrl != null)
-                                          OutlinedButton.icon(
-                                            onPressed: () {
-                                              setState(() {
-                                                _logoUrl = null;
-                                                _hasChanges = true;
-                                                // Trigger suggestions to reappear when logo is removed
-                                                _updateLogoFromName();
-                                              });
-                                            },
-                                            icon: const Icon(Icons.delete_outline),
-                                            label: const Text('Remove Logo'),
-                                            style: OutlinedButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(12),
-                                              ),
-                                              side: BorderSide(color: colorScheme.primary),
-                                            ),
-                                          )
-                                        else
-                                          OutlinedButton.icon(
-                                            onPressed: _searchForLogo,
-                                            icon: const Icon(Icons.image_search),
-                                            label: const Text('Find Logo'),
-                                            style: OutlinedButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(12),
-                                              ),
-                                              side: BorderSide(color: colorScheme.primary),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 24),
-                              
-                              // Name field
-                              TextFormField(
-                                controller: _nameController,
-                                decoration: InputDecoration(
-                                  labelText: 'Name',
-                                  hintText: 'e.g. Netflix, Spotify',
-                                  prefixIcon: const Icon(Icons.text_fields_rounded),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  filled: true,
-                                  fillColor: theme.colorScheme.surface,
-                                ),
-                                textCapitalization: TextCapitalization.words,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter a name';
-                                  }
-                                  return null;
-                                },
-                                onChanged: (value) {
-                                  setState(() {
-                                    _hasChanges = true;
-                                    // Force refresh to show suggestions while typing
-                                  });
-                                },
-                              ),
-                              
-                              // Show logo suggestions immediately after name field if available
-                              if (_showLogoSuggestions && _logoSuggestions.isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Suggested Logos',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    if (_logoSuggestions.length > 4)
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.swipe_left,
-                                            size: 16,
-                                            color: colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Swipe to see more',
-                                            style: theme.textTheme.bodySmall?.copyWith(
-                                              color: colorScheme.primary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                SizedBox(
-                                  height: 100,
-                                  child: ListView.builder(
-                                    scrollDirection: Axis.horizontal,
-                                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                                    itemCount: _logoSuggestions.length,
-                                    itemBuilder: (context, index) {
-                                      final suggestion = _logoSuggestions[index];
-                                      final isFirst = index == 0;
-                                      final isLast = index == _logoSuggestions.length - 1;
-                                      
-                                      return Padding(
-                                        padding: EdgeInsets.only(
-                                          left: isFirst ? 0 : 6,
-                                          right: isLast ? 0 : 6,
-                                        ),
-                                        child: Column(
-                                          children: [
-                                            GestureDetector(
-                                              onTap: () => _selectLogo(suggestion.logoUrl),
-                                              child: Container(
-                                                width: 60,
-                                                height: 60,
-                                                decoration: BoxDecoration(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  border: Border.all(
-                                                    color: colorScheme.outline.withOpacity(0.3),
-                                                  ),
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: colorScheme.shadow.withOpacity(0.1),
-                                                      blurRadius: 4,
-                                                      offset: const Offset(0, 2),
-                                                    ),
-                                                  ],
-                                                ),
-                                                child: ClipRRect(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  child: Hero(
-                                                    tag: 'no_hero_animation_suggestion_edit_${suggestion.name}_$index',
-                                                    flightShuttleBuilder: (_, __, ___, ____, _____) => 
-                                                      const SizedBox.shrink(),
-                                                    child: Image.network(
-                                                      suggestion.logoUrl,
-                                                      key: ValueKey('edit_logo_suggestion_${suggestion.name}_$index'),
-                                                      fit: BoxFit.contain,
-                                                      loadingBuilder: (context, child, loadingProgress) {
-                                                        if (loadingProgress == null) return child;
-                                                        return Container(
-                                                          color: colorScheme.surface,
-                                                          child: Center(
-                                                            child: SizedBox(
-                                                              width: 20,
-                                                              height: 20,
-                                                              child: CircularProgressIndicator(
-                                                                strokeWidth: 2,
-                                                                value: loadingProgress.expectedTotalBytes != null
-                                                                    ? loadingProgress.cumulativeBytesLoaded /
-                                                                        loadingProgress.expectedTotalBytes!
-                                                                    : null,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
-                                                      errorBuilder: (context, error, stackTrace) {
-                                                        return Container(
-                                                          color: colorScheme.surface,
-                                                          child: Icon(
-                                                            Icons.image_not_supported,
-                                                            color: colorScheme.outline,
-                                                            size: 24,
-                                                          ),
-                                                        );
-                                                      },
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            SizedBox(
-                                              width: 60,
-                                              child: Text(
-                                                suggestion.name,
-                                                style: theme.textTheme.bodySmall,
-                                                overflow: TextOverflow.ellipsis,
-                                                textAlign: TextAlign.center,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ],
-                              
-                              const SizedBox(height: 16),
-                              
-                              // Amount and Currency
-                              Row(
-                                children: [
-                                  // Currency selector
-                                  InkWell(
-                                    onTap: _selectCurrency,
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Container(
-                                      height: 60,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: colorScheme.outline.withOpacity(0.5),
-                                        ),
-                                        color: theme.colorScheme.surface,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Text(
-                                            currency.flag,
-                                            style: const TextStyle(fontSize: 20),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            currency.code,
-                                            style: theme.textTheme.bodyLarge?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          const Icon(Icons.arrow_drop_down, size: 20),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  
-                                  const SizedBox(width: 12),
-                                  
-                                  // Amount field
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: _amountController,
-                                      decoration: InputDecoration(
-                                        labelText: 'Amount',
-                                        hintText: '9.99',
-                                        prefixText: '${currency.symbol} ',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        filled: true,
-                                        fillColor: theme.colorScheme.surface,
-                                      ),
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                      validator: (value) {
-                                        if (value == null || value.isEmpty) {
-                                          return 'Please enter an amount';
-                                        }
-                                        try {
-                                          final amount = double.parse(value.replaceAll(',', ''));
-                                          if (amount <= 0) {
-                                            return 'Amount must be greater than 0';
-                                          }
-                                        } catch (e) {
-                                          return 'Please enter a valid number';
-                                        }
-                                        return null;
-                                      },
-                                      onChanged: (value) {
-                                        setState(() {
-                                          _hasChanges = true;
-                                        });
-                                      },
-                                      inputFormatters: [
-                                        ThousandsSeparatorInputFormatter(),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              
-                              // Billing cycle dropdown
-                              _buildDropdownField(
-                                value: _billingCycle,
-                                label: 'Billing Cycle',
-                                icon: Icons.calendar_today_rounded,
-                                items: [
-                                  DropdownMenuItem(
-                                    value: AppConstants.BILLING_CYCLE_MONTHLY,
-                                    child: const Text('Monthly'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: AppConstants.BILLING_CYCLE_QUARTERLY,
-                                    child: const Text('Quarterly'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: AppConstants.BILLING_CYCLE_YEARLY,
-                                    child: const Text('Yearly'),
-                                  ),
-                                ],
-                                onChanged: (value) {
-                                  if (value != null) {
-                                    setState(() {
-                                      _billingCycle = value;
-                                      
-                                      // Recalculate renewal date based on new billing cycle
-                                      _renewalDate = AppDateUtils.calculateNextRenewalDate(
-                                        _startDate,
-                                        _billingCycle,
-                                        _subscription?.customBillingDays,
-                                        true, // We want to skip past dates when editing
-                                      );
-                                      
-                                      _hasChanges = true;
-                                    });
-                                  }
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              
-                              // Start date picker
-                              GestureDetector(
-                                onTap: () async {
-                                  final DateTime? selectedDate = await showDatePicker(
-                                    context: context,
-                                    initialDate: _startDate,
-                                    firstDate: DateTime(2000),
-                                    lastDate: DateTime(2100),
-                                  );
-                                  
-                                  if (selectedDate != null) {
-                                    setState(() {
-                                      _startDate = selectedDate;
-                                      
-                                      // Recalculate renewal date based on new start date
-                                      _renewalDate = AppDateUtils.calculateNextRenewalDate(
-                                        _startDate,
-                                        _billingCycle,
-                                        _subscription?.customBillingDays,
-                                        true, // We want to skip past dates when editing
-                                      );
-                                      
-                                      _hasChanges = true;
-                                    });
-                                  }
-                                },
-                                child: AbsorbPointer(
-                                  child: TextFormField(
-                                    decoration: InputDecoration(
-                                      labelText: 'Start Date',
-                                      prefixIcon: const Icon(Icons.date_range_rounded),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      filled: true,
-                                      fillColor: theme.colorScheme.surface,
-                                    ),
-                                    controller: TextEditingController(
-                                      text: AppDateUtils.formatDate(_startDate),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              
-                              // Category dropdown
-                              _buildDropdownField(
-                                value: _category,
-                                label: 'Category',
-                                icon: Icons.category_rounded,
-                                items: [
-                                  const DropdownMenuItem<String?>(
-                                    value: null,
-                                    child: Text('None'),
-                                  ),
-                                  ..._categories.map((category) {
-                                    return DropdownMenuItem<String?>(
-                                      value: category,
-                                      child: Text(category),
-                                    );
-                                  }).toList(),
-                                ],
-                                onChanged: (value) {
-                                  setState(() {
-                                    _category = value;
-                                    _hasChanges = true;
-                                  });
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              
-                              // Website field
-                              TextFormField(
-                                controller: _websiteController,
-                                decoration: InputDecoration(
-                                  labelText: 'Website',
-                                  hintText: 'e.g. netflix.com',
-                                  prefixIcon: const Icon(Icons.link_rounded),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  filled: true,
-                                  fillColor: theme.colorScheme.surface,
-                                ),
-                                keyboardType: TextInputType.url,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _hasChanges = true;
-                                  });
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              
-                              // Description field
-                              TextFormField(
-                                controller: _descriptionController,
-                                decoration: InputDecoration(
-                                  labelText: 'Description',
-                                  hintText: 'Add notes about this subscription',
-                                  prefixIcon: const Icon(Icons.description_rounded),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  filled: true,
-                                  fillColor: theme.colorScheme.surface,
-                                  alignLabelWithHint: true,
-                                ),
-                                maxLines: 3,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _hasChanges = true;
-                                  });
-                                },
-                              ),
-                              const SizedBox(height: 24),
-                              
-                              // Notifications section
-                              Card(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                elevation: 0,
-                                color: theme.colorScheme.surface,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(20),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.notifications_active_rounded,
-                                            color: colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Text(
-                                            'Renewal Notifications',
-                                            style: theme.textTheme.titleMedium?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          Switch(
-                                            value: _notificationsEnabled,
-                                            onChanged: (value) {
-                                              setState(() {
-                                                _notificationsEnabled = value;
-                                                _hasChanges = true;
-                                              });
-                                            },
-                                            activeColor: colorScheme.primary,
-                                          ),
-                                        ],
-                                      ),
-                                      if (_notificationsEnabled) ...[
-                                        const SizedBox(height: 16),
-                                        const Text('Notify me before renewal:'),
-                                        const SizedBox(height: 8),
-                                        Wrap(
-                                          spacing: 8,
-                                          children: [1, 2, 3, 5, 7].map((days) {
-                                            final isSelected = _notificationDays == days;
-                                            return FilterChip(
-                                              label: Text('$days days'),
-                                              selected: isSelected,
-                                              backgroundColor: theme.colorScheme.surface,
-                                              selectedColor: colorScheme.primary.withOpacity(0.2),
-                                              checkmarkColor: colorScheme.primary,
-                                              onSelected: (selected) {
-                                                setState(() {
-                                                  _notificationDays = days;
-                                                  _hasChanges = true;
-                                                });
-                                              },
-                                            );
-                                          }).toList(),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 36),
-                              
-                              // Save button
-                              SizedBox(
-                                width: double.infinity,
-                                height: 56,
-                                child: ElevatedButton(
-                                  onPressed: _updateSubscription,
-                                  style: ElevatedButton.styleFrom(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    backgroundColor: colorScheme.primary,
-                                    foregroundColor: colorScheme.onPrimary,
-                                  ),
-                                  child: const Text(
-                                    'Save Changes',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 24),
-                            ],
-                          ),
+                        child: ListView(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          children: [
+                            // Status selector
+                            _buildStatusSelector(),
+                            const SizedBox(height: 32),
+                            
+                            // Logo section
+                            _buildLogoSection(),
+                            const SizedBox(height: 32),
+                            
+                            // Basic info section
+                            _buildSectionTitle('Basic Information'),
+                            const SizedBox(height: 16),
+                            _buildNameField(),
+                            
+                            // Logo suggestions
+                            if (_showLogoSuggestions && _logoSuggestions.isNotEmpty)
+                              _buildLogoSuggestions(),
+                            
+                            const SizedBox(height: 16),
+                            _buildAmountAndCurrencyRow(),
+                            const SizedBox(height: 16),
+                            _buildBillingCycleField(),
+                            const SizedBox(height: 16),
+                            _buildCategorySelector(),
+                            
+                            const SizedBox(height: 32),
+                            
+                            // Date section
+                            _buildSectionTitle('Important Dates'),
+                            const SizedBox(height: 16),
+                            _buildDateFields(),
+                            
+                            const SizedBox(height: 32),
+                            
+                            // Additional info section
+                            _buildSectionTitle('Additional Information'),
+                            const SizedBox(height: 16),
+                            _buildWebsiteField(),
+                            const SizedBox(height: 16),
+                            _buildDescriptionField(),
+                            
+                            const SizedBox(height: 32),
+                            
+                            // Notifications section
+                            _buildNotificationSection(),
+                            
+                            const SizedBox(height: 40),
+                            
+                            // Action buttons
+                            _buildActionButtons(),
+                            
+                            const SizedBox(height: 40),
+                          ],
                         ),
                       ),
                     ),
@@ -1016,32 +519,1036 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       ),
     );
   }
-  
-  Widget _buildDropdownField<T>({
-    required T value,
-    required String label,
-    required IconData icon,
-    required List<DropdownMenuItem<T>> items,
-    required ValueChanged<T?> onChanged,
-  }) {
+
+  Widget _buildStatusSelector() {
     final theme = Theme.of(context);
     
-    return DropdownButtonFormField<T>(
-      value: value,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        filled: true,
-        fillColor: theme.colorScheme.surface,
+    final statusOptions = [
+      {'value': AppConstants.STATUS_ACTIVE, 'label': 'Active', 'icon': Icons.check_circle_outline, 'color': Colors.green},
+      {'value': AppConstants.STATUS_PAUSED, 'label': 'Paused', 'icon': Icons.pause_circle_outline, 'color': Colors.orange},
+      {'value': AppConstants.STATUS_CANCELLED, 'label': 'Cancelled', 'icon': Icons.cancel_outlined, 'color': Colors.red},
+    ];
+    
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
       ),
-      items: items,
-      onChanged: onChanged,
-      borderRadius: BorderRadius.circular(12),
-      dropdownColor: theme.colorScheme.surface,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded),
+      child: Row(
+        children: statusOptions.map((option) {
+          final isSelected = _status == option['value'];
+          final color = option['color'] as Color;
+          
+          return Expanded(
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _status = option['value'] as String;
+                  _hasChanges = true;
+                });
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: isSelected ? Border.all(color: color, width: 2) : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      option['icon'] as IconData,
+                      color: isSelected ? color : theme.colorScheme.onSurface.withOpacity(0.6),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      option['label'] as String,
+                      style: TextStyle(
+                        color: isSelected ? color : theme.colorScheme.onSurface.withOpacity(0.6),
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildLogoSection() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    return Center(
+      child: Column(
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: isDarkMode
+                      ? Colors.black.withOpacity(0.3)
+                      : Colors.black.withOpacity(0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: _logoUrl != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.network(
+                      _logoUrl!,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        final logoService = Provider.of<LogoService>(context, listen: false);
+                        return Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                theme.colorScheme.primary,
+                                theme.colorScheme.secondary,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Icon(
+                            logoService.getFallbackIcon(_nameController.text),
+                            color: Colors.white,
+                            size: 48,
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                : Center(
+                    child: Icon(
+                      Icons.add_photo_alternate_outlined,
+                      size: 48,
+                      color: theme.colorScheme.onSurface.withOpacity(0.3),
+                    ),
+                  ),
+          ),
+          if (_logoUrl != null) ...[
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _logoUrl = null;
+                  _hasChanges = true;
+                  _updateLogoFromName();
+                });
+              },
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: const Text('Remove Logo'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    final theme = Theme.of(context);
+    
+    return Text(
+      title,
+      style: theme.textTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: theme.colorScheme.onSurface.withOpacity(0.8),
+      ),
+    );
+  }
+
+  Widget _buildNameField() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: _nameController,
+        decoration: InputDecoration(
+          labelText: 'Subscription Name',
+          hintText: 'e.g. Netflix, Spotify',
+          prefixIcon: Icon(
+            Icons.subscriptions_outlined,
+            color: theme.colorScheme.primary,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(
+              color: theme.colorScheme.primary,
+              width: 2,
+            ),
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        textCapitalization: TextCapitalization.words,
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please enter a name';
+          }
+          return null;
+        },
+        onChanged: (value) {
+          setState(() {
+            _hasChanges = true;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildLogoSuggestions() {
+    final theme = Theme.of(context);
+    
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Suggested Logos',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.primary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 80,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _logoSuggestions.length,
+              itemBuilder: (context, index) {
+                final suggestion = _logoSuggestions[index];
+                
+                return Padding(
+                  padding: EdgeInsets.only(
+                    right: index < _logoSuggestions.length - 1 ? 12 : 0,
+                  ),
+                  child: InkWell(
+                    onTap: () => _selectLogo(suggestion.logoUrl),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 80,
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                suggestion.logoUrl,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Icon(
+                                    Icons.image_not_supported,
+                                    color: theme.colorScheme.outline,
+                                    size: 18,
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Flexible(
+                            child: Text(
+                              suggestion.name,
+                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAmountAndCurrencyRow() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final currency = CurrencyUtils.getCurrencyByCode(_currencyCode) ?? 
+        CurrencyUtils.getAllCurrencies().first;
+    
+    return Row(
+      children: [
+        // Currency selector
+        InkWell(
+          onTap: _selectCurrency,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: isDarkMode
+                      ? Colors.black.withOpacity(0.3)
+                      : Colors.black.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Text(
+                  currency.flag,
+                  style: const TextStyle(fontSize: 24),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '${currency.code} • ${currency.symbol}',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.expand_more,
+                  size: 20,
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        const SizedBox(width: 12),
+        
+        // Amount field
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: isDarkMode
+                      ? Colors.black.withOpacity(0.3)
+                      : Colors.black.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: TextFormField(
+              controller: _amountController,
+              decoration: InputDecoration(
+                labelText: 'Amount',
+                hintText: '0.00',
+                prefixText: '${currency.symbol} ',
+                prefixStyle: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.primary,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
+                filled: true,
+                fillColor: Colors.transparent,
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter an amount';
+                }
+                try {
+                  final amount = double.parse(value.replaceAll(',', ''));
+                  if (amount <= 0) {
+                    return 'Amount must be greater than 0';
+                  }
+                } catch (e) {
+                  return 'Please enter a valid number';
+                }
+                return null;
+              },
+              onChanged: (value) {
+                setState(() {
+                  _hasChanges = true;
+                });
+              },
+              inputFormatters: [
+                ThousandsSeparatorInputFormatter(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBillingCycleField() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    final billingOptions = [
+      {'value': AppConstants.BILLING_CYCLE_MONTHLY, 'label': 'Monthly', 'icon': Icons.calendar_view_month},
+      {'value': AppConstants.BILLING_CYCLE_QUARTERLY, 'label': 'Quarterly', 'icon': Icons.date_range},
+      {'value': AppConstants.BILLING_CYCLE_YEARLY, 'label': 'Yearly', 'icon': Icons.calendar_today},
+    ];
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: DropdownButtonFormField<String>(
+        value: _billingCycle,
+        decoration: InputDecoration(
+          labelText: 'Billing Cycle',
+          prefixIcon: Icon(
+            Icons.repeat,
+            color: theme.colorScheme.primary,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(
+              color: theme.colorScheme.primary,
+              width: 2,
+            ),
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        items: billingOptions.map((option) {
+          return DropdownMenuItem<String>(
+            value: option['value'] as String,
+            child: Row(
+              children: [
+                Icon(
+                  option['icon'] as IconData,
+                  size: 20,
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
+                const SizedBox(width: 12),
+                Text(option['label'] as String),
+              ],
+            ),
+          );
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) {
+            setState(() {
+              _billingCycle = value;
+              _renewalDate = AppDateUtils.calculateNextRenewalDate(
+                _startDate,
+                _billingCycle,
+                _subscription?.customBillingDays,
+                true,
+              );
+              _hasChanges = true;
+            });
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        dropdownColor: isDarkMode ? const Color(0xFF2D2D2D) : Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildCategorySelector() {
+    final theme = Theme.of(context);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Category',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurface.withOpacity(0.8),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: _categories.map((categoryData) {
+            final isSelected = _category == categoryData['name'];
+            
+            return InkWell(
+              onTap: () {
+                setState(() {
+                  _category = isSelected ? null : categoryData['name'] as String;
+                  _hasChanges = true;
+                });
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? (categoryData['color'] as Color).withOpacity(0.2)
+                      : theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected
+                        ? categoryData['color'] as Color
+                        : theme.colorScheme.outline.withOpacity(0.2),
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      categoryData['icon'] as IconData,
+                      size: 18,
+                      color: isSelected
+                          ? categoryData['color'] as Color
+                          : theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      categoryData['name'] as String,
+                      style: TextStyle(
+                        color: isSelected
+                            ? categoryData['color'] as Color
+                            : theme.colorScheme.onSurface,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateFields() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    return Column(
+      children: [
+        // Start date
+        GestureDetector(
+          onTap: () async {
+            final DateTime? selectedDate = await showDatePicker(
+              context: context,
+              initialDate: _startDate,
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2100),
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: Theme.of(context).colorScheme.copyWith(
+                      primary: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            
+            if (selectedDate != null) {
+              setState(() {
+                _startDate = selectedDate;
+                _renewalDate = AppDateUtils.calculateNextRenewalDate(
+                  _startDate,
+                  _billingCycle,
+                  _subscription?.customBillingDays,
+                  true,
+                );
+                _hasChanges = true;
+              });
+            }
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: isDarkMode
+                      ? Colors.black.withOpacity(0.3)
+                      : Colors.black.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: AbsorbPointer(
+              child: TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Start Date',
+                  hintText: 'When did you start this subscription?',
+                  prefixIcon: Icon(
+                    Icons.event_available,
+                    color: theme.colorScheme.primary,
+                  ),
+                  suffixIcon: Icon(
+                    Icons.calendar_today,
+                    size: 20,
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: Colors.transparent,
+                ),
+                controller: TextEditingController(
+                  text: AppDateUtils.formatDate(_startDate),
+                ),
+              ),
+            ),
+          ),
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Renewal date info
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: theme.colorScheme.primary.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Next Renewal',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    Text(
+                      AppDateUtils.formatDate(_renewalDate),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary.withOpacity(0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWebsiteField() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: _websiteController,
+        decoration: InputDecoration(
+          labelText: 'Website (Optional)',
+          hintText: 'e.g. netflix.com',
+          prefixIcon: const Icon(Icons.language),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(
+              color: theme.colorScheme.primary,
+              width: 2,
+            ),
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        keyboardType: TextInputType.url,
+        onChanged: (value) {
+          setState(() {
+            _hasChanges = true;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildDescriptionField() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: _descriptionController,
+        decoration: InputDecoration(
+          labelText: 'Notes (Optional)',
+          hintText: 'Add any notes about this subscription',
+          prefixIcon: const Icon(Icons.notes),
+          alignLabelWithHint: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(
+              color: theme.colorScheme.primary,
+              width: 2,
+            ),
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        maxLines: 3,
+        onChanged: (value) {
+          setState(() {
+            _hasChanges = true;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildNotificationSection() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDarkMode
+              ? [const Color(0xFF1E1E1E), const Color(0xFF2D2D2D)]
+              : [Colors.white, const Color(0xFFF8F9FA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.notifications_active_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Renewal Reminders',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Get notified before renewal',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _notificationsEnabled,
+                onChanged: (value) {
+                  setState(() {
+                    _notificationsEnabled = value;
+                    _hasChanges = true;
+                  });
+                },
+                activeColor: theme.colorScheme.primary,
+              ),
+            ],
+          ),
+          if (_notificationsEnabled) ...[
+            const SizedBox(height: 20),
+            Text(
+              'Notify me before renewal:',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [1, 2, 3, 5, 7].map((days) {
+                final isSelected = _notificationDays == days;
+                return FilterChip(
+                  label: Text('$days ${days == 1 ? 'day' : 'days'}'),
+                  selected: isSelected,
+                  backgroundColor: theme.colorScheme.surface,
+                  selectedColor: theme.colorScheme.primary.withOpacity(0.2),
+                  checkmarkColor: theme.colorScheme.primary,
+                  onSelected: (selected) {
+                    setState(() {
+                      _notificationDays = days;
+                      _hasChanges = true;
+                    });
+                  },
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outline.withOpacity(0.2),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    final theme = Theme.of(context);
+    
+    return Column(
+      children: [
+        // Save button
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: _hasChanges ? _updateSubscription : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: theme.colorScheme.primary.withOpacity(0.3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 0,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(_hasChanges ? Icons.save_outlined : Icons.check_circle_outline),
+                const SizedBox(width: 8),
+                Text(
+                  _hasChanges ? 'Save Changes' : 'No Changes',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Delete button
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: OutlinedButton(
+            onPressed: _confirmDelete,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red,
+              side: const BorderSide(color: Colors.red),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.delete_outline),
+                SizedBox(width: 8),
+                Text(
+                  'Delete Subscription',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
   
@@ -1075,6 +1582,9 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Discard'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
           ),
         ],
       ),
@@ -1087,31 +1597,67 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
     
     return false;
   }
+
+  Future<void> _confirmDelete() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Subscription?'),
+        content: Text('Are you sure you want to delete "${_subscription?.name}"? This action cannot be undone.'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+          ),
+        ],
+      ),
+    );
+    
+    if (result == true && _subscription != null) {
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      subscriptionProvider.deleteSubscription(_subscription!.id!);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Subscription deleted'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      
+      Navigator.pop(context);
+    }
+  }
   
   void _searchForLogo() {
     setState(() {
-      _logoUrl = null; // Reset logo to trigger search
+      _logoUrl = null;
       _hasChanges = true;
     });
     
-    // Try to find logo from name first
     if (_nameController.text.isNotEmpty) {
       final logoService = Provider.of<LogoService>(context, listen: false);
       
-      // Try exact name
       String? logoUrl = logoService.getLogoUrl(_nameController.text);
       
-      // If no logo found, try with common variations
       if (logoUrl == null) {
-        // Try with "premium" suffix
         logoUrl = logoService.getLogoUrl(_nameController.text + " premium");
         
-        // Try with "+" suffix
         if (logoUrl == null) {
           logoUrl = logoService.getLogoUrl(_nameController.text + "+");
         }
         
-        // Try with common prefixes
         if (logoUrl == null && !_nameController.text.toLowerCase().contains("apple")) {
           logoUrl = logoService.getLogoUrl("apple " + _nameController.text);
         }
@@ -1126,7 +1672,6 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       }
     }
     
-    // If no logo found and website is provided, try that
     if (_logoUrl == null && _websiteController.text.isNotEmpty) {
       final logoService = Provider.of<LogoService>(context, listen: false);
       final logoUrl = logoService.getLogoUrl(_websiteController.text);
@@ -1139,7 +1684,6 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       }
     }
     
-    // If still no logo, try with category if selected
     if (_logoUrl == null && _category != null) {
       final logoService = Provider.of<LogoService>(context, listen: false);
       final logoUrl = logoService.getLogoUrl(_nameController.text + " " + _category!);
@@ -1152,7 +1696,6 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       }
     }
     
-    // If all else fails, show a message
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('No logo found. Try a different name or website.')),
     );
@@ -1162,7 +1705,6 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
     if (_formKey.currentState!.validate() && _subscription != null) {
       final amount = double.parse(_amountController.text.replaceAll(',', ''));
       
-      // Create updated subscription
       final updatedSubscription = _subscription!.copyWith(
         name: _nameController.text,
         amount: amount,
@@ -1179,16 +1721,18 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
         status: _status,
       );
       
-      // Update subscription in provider
       final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
       subscriptionProvider.updateSubscription(updatedSubscription);
       
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppConstants.SUBSCRIPTION_UPDATED_SUCCESS)),
+        SnackBar(
+          content: const Text('Subscription updated successfully'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
       );
       
-      // Navigate back
       Navigator.pop(context);
     }
   }

@@ -15,32 +15,35 @@ class StatisticsScreen extends StatefulWidget {
   State<StatisticsScreen> createState() => _StatisticsScreenState();
 }
 
-class _StatisticsScreenState extends State<StatisticsScreen> {
+class _StatisticsScreenState extends State<StatisticsScreen> 
+    with TickerProviderStateMixin {
   String _selectedPeriod = 'This Month';
-  final TextEditingController _searchController = TextEditingController();
-  bool _showFilterOptions = false;
+  bool _showPeriodSelector = false;
   bool _showCurrencySelector = false;
   Currency? _selectedCurrency;
-  String _searchQuery = '';
   
-  // Date ranges for filtering
-  late DateTime _startDate;
-  late DateTime _endDate;
+  // Animation controllers
+  late AnimationController _chartAnimationController;
+  late Animation<double> _chartAnimation;
   
   @override
   void initState() {
     super.initState();
-    // Initialize date range to current month
-    _updateDateRange(_selectedPeriod);
     
-    // Initialize search controller listener
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text;
-      });
-    });
+    // Initialize animation controllers
+    _chartAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _chartAnimation = CurvedAnimation(
+      parent: _chartAnimationController,
+      curve: Curves.easeInOutCubic,
+    );
     
-    // Delay initialization to avoid build-time errors
+    // Start animations
+    _chartAnimationController.forward();
+    
+    // Initialize currency
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _initializeCurrency(context);
@@ -51,41 +54,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _chartAnimationController.dispose();
     super.dispose();
-  }
-
-  void _updateDateRange(String period) {
-    final now = DateTime.now();
-    
-    switch (period) {
-      case 'This Week':
-        // Start from the beginning of the current week (Monday)
-        final weekday = now.weekday;
-        _startDate = now.subtract(Duration(days: weekday - 1));
-        _startDate = DateTime(_startDate.year, _startDate.month, _startDate.day);
-        _endDate = _startDate.add(const Duration(days: 6));
-        break;
-      case 'This Month':
-        _startDate = DateTime(now.year, now.month, 1);
-        _endDate = DateTime(now.year, now.month + 1, 0);
-        break;
-      case 'Last Month':
-        _startDate = DateTime(now.year, now.month - 1, 1);
-        _endDate = DateTime(now.year, now.month, 0);
-        break;
-      case 'Last 6 months':
-        _startDate = DateTime(now.year, now.month - 5, 1);
-        _endDate = DateTime(now.year, now.month + 1, 0);
-        break;
-      case 'Last 12 months':
-        _startDate = DateTime(now.year - 1, now.month, 1);
-        _endDate = DateTime(now.year, now.month + 1, 0);
-        break;
-      default:
-        _startDate = DateTime(now.year, now.month, 1);
-        _endDate = DateTime(now.year, now.month + 1, 0);
-    }
   }
 
   void _initializeCurrency(BuildContext context) {
@@ -103,23 +73,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     _selectedCurrency ??= CurrencyUtils.getCurrencyByCode('USD');
   }
   
-  // Filter subscriptions based on selected period, currency, and search query
+  // Filter subscriptions based on selected currency
   List<Subscription> _getFilteredSubscriptions(List<Subscription> allSubscriptions) {
     return allSubscriptions.where((subscription) {
       // Filter by currency
       if (_selectedCurrency != null && subscription.currencyCode != _selectedCurrency!.code) {
         return false;
-      }
-      
-      // Filter by search query
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
-        final name = subscription.name.toLowerCase();
-        final category = subscription.category?.toLowerCase() ?? '';
-        
-        if (!name.contains(query) && !category.contains(query)) {
-          return false;
-        }
       }
       
       // Filter by status (only active subscriptions)
@@ -147,7 +106,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         case 'Last 6 months':
           total += subscription.monthlyCost * 6;
           break;
-        case 'Last 12 months':
+        case 'This Year':
           total += subscription.yearlyCost;
           break;
         default:
@@ -178,7 +137,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         case 'Last 6 months':
           categorySpending[category] = categorySpending[category]! + subscription.monthlyCost * 6;
           break;
-        case 'Last 12 months':
+        case 'This Year':
           categorySpending[category] = categorySpending[category]! + subscription.yearlyCost;
           break;
         default:
@@ -189,30 +148,27 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     return categorySpending;
   }
   
-  // Get color for category
-  Color _getCategoryColor(String category, int index) {
-    final colors = [
-      Colors.blue,
-      Colors.red,
-      Colors.green,
-      Colors.orange,
-      Colors.purple,
-      Colors.teal,
-      Colors.pink,
-      Colors.amber,
-      Colors.indigo,
-      Colors.cyan,
+  // Get modern solid colors for categories
+  Color _getCategoryColor(String category) {
+    const colorPalette = [
+      Color(0xFF667EEA), // Purple
+      Color(0xFF06BEB6), // Teal
+      Color(0xFFF093FB), // Pink
+      Color(0xFF4FACFE), // Blue
+      Color(0xFFFA709A), // Coral
+      Color(0xFF30CFD0), // Cyan
+      Color(0xFFA8EDEA), // Mint
+      Color(0xFFFF9A9E), // Peach
     ];
     
-    // Use a hash of the category name to get a consistent color
-    final hash = category.hashCode.abs() % colors.length;
-    return colors[hash];
+    final index = category.hashCode.abs() % colorPalette.length;
+    return colorPalette[index];
   }
   
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDarkMode = theme.brightness == Brightness.dark;
     
     // Ensure currency is initialized
     _selectedCurrency ??= CurrencyUtils.getCurrencyByCode('USD');
@@ -233,491 +189,508 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       ..sort((a, b) => categorySpending[b]!.compareTo(categorySpending[a]!));
 
     return Scaffold(
-      appBar: null,
+      backgroundColor: isDarkMode ? const Color(0xFF0F0F0F) : const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Stack(
           children: [
-            Column(
+            CustomScrollView(
+              slivers: [
+                // Header
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Custom header with back button
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                  child: Row(
                     children: [
                       Text(
                         'Expense Insights',
-                        style: theme.textTheme.headlineMedium?.copyWith(
+                          style: theme.textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: theme.brightness == Brightness.dark ? Colors.white : Colors.black,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Track your subscription spending',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacity(0.7),
                         ),
                       ),
                     ],
                   ),
                 ),
+                ),
                 
-                const SizedBox(height: 20),
-
+                // Main content
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      children: [
+                        // Total spending card
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: isDarkMode
+                                  ? [const Color(0xFF1E1E1E), const Color(0xFF2D2D2D)]
+                                  : [Colors.white, const Color(0xFFF8F9FA)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isDarkMode
+                                    ? Colors.black.withOpacity(0.3)
+                                    : Colors.black.withOpacity(0.08),
+                                blurRadius: 24,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              // Currency and period selectors
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
                 // Currency selector
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Center(
-                    child: InkWell(
+                                  InkWell(
                       onTap: () {
                         setState(() {
                           _showCurrencySelector = true;
                         });
                       },
-                      borderRadius: BorderRadius.circular(24),
+                                    borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: colorScheme.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(24),
+                                        color: theme.colorScheme.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: theme.colorScheme.primary.withOpacity(0.3),
+                                          width: 1,
+                                        ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               _selectedCurrency?.flag ?? '',
-                              style: const TextStyle(fontSize: 18),
+                                            style: const TextStyle(fontSize: 16),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Text(
-                              _selectedCurrency?.name ?? 'Select Currency',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w500,
+                                            _selectedCurrency?.code ?? 'USD',
+                                            style: theme.textTheme.bodySmall?.copyWith(
+                                              fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(width: 4),
                             Icon(
-                              Icons.keyboard_arrow_down,
-                              color: colorScheme.onSurface,
-                              size: 20,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Total outflow section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'TOTAL OUTFLOW',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _selectedCurrency?.symbol ?? '\$',
-                            style: theme.textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Flexible(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                NumberFormat('#,##0.00', 'en_US').format(totalSpending),
-                                style: theme.textTheme.displayLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                                            Icons.expand_more,
+                              size: 16,
+                              color: theme.colorScheme.primary,
                           ),
                         ],
                       ),
-                    ],
                   ),
                 ),
 
-                const SizedBox(height: 24),
-
-                // Time period selector
-                Center(
-                  child: InkWell(
+                                  // Period selector
+                                  InkWell(
                     onTap: () {
                       setState(() {
-                        _showFilterOptions = true;
+                                        _showPeriodSelector = true;
                       });
                     },
-                    borderRadius: BorderRadius.circular(20),
+                                    borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: colorScheme.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
+                                        color: theme.colorScheme.secondary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: theme.colorScheme.secondary.withOpacity(0.3),
+                                          width: 1,
+                                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                                          Icon(
+                                            Icons.calendar_today,
+                                            size: 14,
+                                            color: theme.colorScheme.secondary,
+                                          ),
+                                          const SizedBox(width: 6),
                           Text(
                             _selectedPeriod,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w500,
+                                            style: theme.textTheme.bodySmall?.copyWith(
+                                              fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(width: 4),
                           Icon(
-                            Icons.keyboard_arrow_down,
-                            color: colorScheme.onSurface,
-                            size: 20,
+                                            Icons.expand_more,
+                            size: 16,
+                                            color: theme.colorScheme.secondary,
                           ),
                         ],
                       ),
                     ),
                   ),
+                                ],
                 ),
 
-                const SizedBox(height: 24),
+                              const SizedBox(height: 32),
 
-                // Spending comparison card
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.shadow.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.black,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.trending_down,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          filteredSubscriptions.isEmpty 
-                              ? 'No subscription data available'
-                              : 'Total of ${filteredSubscriptions.length} active subscriptions',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Categories section
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Categories',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          child: categorySpending.isEmpty
-                              ? Center(
-                                  child: Column(
+                              // Total amount
+                              Text(
+                                'Total Spending',
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              AnimatedBuilder(
+                                animation: _chartAnimation,
+                                builder: (context, child) {
+                                  return Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 80,
-                                        height: 80,
-                                        decoration: BoxDecoration(
-                                          color: colorScheme.surfaceContainerHighest,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Icon(
-                                          Icons.receipt_outlined,
-                                          size: 32,
-                                          color: colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
+                                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                                    textBaseline: TextBaseline.alphabetic,
+                      children: [
                                       Text(
-                                        'No transaction to show',
-                                        style: theme.textTheme.bodyLarge?.copyWith(
-                                          color: colorScheme.onSurface.withOpacity(0.7),
-                                        ),
-                                      ),
-                                    ],
+                                        _selectedCurrency?.symbol ?? '\$',
+                                        style: theme.textTheme.headlineMedium?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: theme.colorScheme.primary,
+                          ),
+                        ),
+                                      Text(
+                                        NumberFormat('#,##0.00').format(totalSpending * _chartAnimation.value),
+                                        style: theme.textTheme.displaySmall?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: -1,
+                                          color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                                  );
+                                },
+                ),
+                              const SizedBox(height: 8),
+                            Text(
+                                '${filteredSubscriptions.length} active subscriptions',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                ),
                                   ),
-                                )
-                              : Column(
-                                  children: [
-                                    // Pie chart for category distribution
-                                    if (categorySpending.isNotEmpty)
-                                      SizedBox(
-                                        height: 200,
-                                        child: PieChart(
-                                          PieChartData(
-                                            sections: sortedCategories.map((category) {
-                                              final value = categorySpending[category]!;
-                                              final percentage = value / totalSpending * 100;
-                                              final index = sortedCategories.indexOf(category);
-                                              
-                                              return PieChartSectionData(
-                                                color: _getCategoryColor(category, index),
-                                                value: value,
-                                                title: '${percentage.toStringAsFixed(0)}%',
-                                                radius: 80,
-                                                titleStyle: const TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.white,
-                                                ),
-                                              );
-                                            }).toList(),
-                                            sectionsSpace: 2,
-                                            centerSpaceRadius: 40,
-                                            startDegreeOffset: 180,
+                                ],
+                              ),
+                            ),
+                        
+                        const SizedBox(height: 32),
+                        
+                        // Category breakdown
+                        if (categorySpending.isNotEmpty) ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                'Category Breakdown',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
                                           ),
                                         ),
-                                      ),
-                                    
-                                    const SizedBox(height: 24),
-                                    
-                                    // Category list
-                                    Expanded(
-                                      child: ListView.builder(
-                                        itemCount: sortedCategories.length,
-                                        itemBuilder: (context, index) {
-                                          final category = sortedCategories[index];
-                                          final amount = categorySpending[category]!;
-                                          final percentage = amount / totalSpending * 100;
-                                          
-                                          return Padding(
-                                            padding: const EdgeInsets.only(bottom: 12),
-                                            child: Row(
-                                              children: [
-                                                Container(
-                                                  width: 16,
-                                                  height: 16,
-                                                  decoration: BoxDecoration(
-                                                    color: _getCategoryColor(category, index),
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                Expanded(
-                                                  child: Text(
-                                                    category,
-                                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                                      fontWeight: FontWeight.w500,
-                                                    ),
-                                                  ),
-                                                ),
-                                                Text(
-                                                  '${_selectedCurrency?.symbol}${NumberFormat('#,##0.00', 'en_US').format(amount)}',
-                                                  style: theme.textTheme.bodyLarge?.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  '(${percentage.toStringAsFixed(1)}%)',
-                                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                                    color: theme.colorScheme.onSurface.withOpacity(0.6),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      ),
+                                        Text(
+                                '${sortedCategories.length} categories',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                          const SizedBox(height: 24),
+                          
+                          // Donut chart
+                          Container(
+                            height: 280,
+                                                  decoration: BoxDecoration(
+                              color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                  color: isDarkMode
+                                      ? Colors.black.withOpacity(0.3)
+                                      : Colors.black.withOpacity(0.08),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 8),
+                                                      ),
+                                                    ],
+                                                  ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: AnimatedBuilder(
+                                animation: _chartAnimation,
+                                builder: (context, child) {
+                                  return Stack(
+                                                      children: [
+                                      PieChart(
+                                        PieChartData(
+                                          sections: sortedCategories.map((category) {
+                                            final value = categorySpending[category]!;
+                                            final percentage = value / totalSpending * 100;
+                                            final color = _getCategoryColor(category);
+                                            
+                                            return PieChartSectionData(
+                                              color: color,
+                                              value: value * _chartAnimation.value,
+                                              title: '',
+                                              radius: 65,
+                                            );
+                                          }).toList(),
+                                          sectionsSpace: 3,
+                                          centerSpaceRadius: 60,
+                                          startDegreeOffset: -90,
+                                        ),
+                                      ),
+                                      // Center content
+                                                          Center(
+                                                              child: Column(
+                                                                mainAxisSize: MainAxisSize.min,
+                                                                children: [
+                                            Icon(
+                                              Icons.donut_large,
+                                              color: theme.colorScheme.primary.withOpacity(0.3),
+                                              size: 32,
+                                            ),
+                                            const SizedBox(height: 4),
+                                                                  Text(
+                                                                    'Total',
+                                                                    style: theme.textTheme.bodySmall?.copyWith(
+                                                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                                                  ),
+                                            ),
+                                            Text(
+                                              '${_selectedCurrency?.symbol}${NumberFormat.compact().format(totalSpending)}',
+                                              style: theme.textTheme.titleMedium?.copyWith(
+                                                                        fontWeight: FontWeight.bold,
+                                                color: theme.colorScheme.primary,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                            ),
+                                                          ),
+                                                      ],
+                                                  );
+                                                },
+                                              ),
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Category list
+                          ...sortedCategories.map((category) {
+                                                      final amount = categorySpending[category]!;
+                                                      final percentage = amount / totalSpending * 100;
+                            final color = _getCategoryColor(category);
+                                                      
+                                                                                                              return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                                                        decoration: BoxDecoration(
+                                color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: isDarkMode
+                                        ? Colors.black.withOpacity(0.3)
+                                        : Colors.black.withOpacity(0.05),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                                                        ),
+                                                        child: Row(
+                                                          children: [
+                                                            // Color indicator
+                                                            Container(
+                                    width: 48,
+                                    height: 48,
+                                                              decoration: BoxDecoration(
+                                                                color: color,
+                                      borderRadius: BorderRadius.circular(12),
+                                                              ),
+                                    child: Center(
+                                      child: Icon(
+                                        _getCategoryIcon(category),
+                                        color: Colors.white,
+                                        size: 24,
+                                                            ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                                            
+                                  // Category info
+                                                            Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                                                category,
+                                          style: theme.textTheme.titleMedium?.copyWith(
+                                                                  fontWeight: FontWeight.w600,
+                                                                ),
+                                                              ),
+                                        const SizedBox(height: 4),
+                                                            Text(
+                                          '${percentage.toStringAsFixed(1)}% of total',
+                                                              style: theme.textTheme.bodySmall?.copyWith(
+                                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                  ),
+                                  
+                                  // Amount
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        '${_selectedCurrency?.symbol}${NumberFormat('#,##0.00').format(amount)}',
+                                        style: theme.textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: color,
+                                                  ),
+                                                ),
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: color.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          _getPeriodLabel(),
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: color,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                      ),
+                          ),
                         ),
                       ],
-                    ),
-                  ),
                 ),
               ],
             ),
-
-            // Filter overlay
-            if (_showFilterOptions)
-              Positioned.fill(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showFilterOptions = false;
-                    });
-                  },
-                  child: Container(
-                    color: Colors.black.withOpacity(0.3),
-                    child: Column(
-                      children: [
-                        const Spacer(),
+                            );
+                          }).toList(),
+                        ] else ...[
+                          // Empty state
                         Container(
+                            height: 400,
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.surface,
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                              color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+                              borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, -2),
+                                  color: isDarkMode
+                                      ? Colors.black.withOpacity(0.3)
+                                      : Colors.black.withOpacity(0.08),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 8),
                               ),
                             ],
                           ),
+                            child: Center(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                                child: Text(
-                                  'Filter by',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                              
-                              // Search bar
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 24),
-                                child: TextField(
-                                  controller: _searchController,
-                                  decoration: InputDecoration(
-                                    hintText: 'Search here',
-                                    hintStyle: TextStyle(
-                                      color: theme.colorScheme.onSurface.withOpacity(0.3),
-                                      fontSize: 16,
+                                  Container(
+                                    width: 80,
+                                    height: 80,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          theme.colorScheme.primary.withOpacity(0.2),
+                                          theme.colorScheme.secondary.withOpacity(0.2),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      shape: BoxShape.circle,
                                     ),
-                                    filled: true,
-                                    fillColor: theme.colorScheme.surfaceContainerHighest,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 14,
+                                    child: Icon(
+                                      Icons.analytics_outlined,
+                                      size: 40,
+                                      color: theme.colorScheme.primary,
                                     ),
                                   ),
-                                ),
-                              ),
-
                               const SizedBox(height: 24),
-
-                              // Time period options
-                              _buildFilterOption('This Week', 'This Week', theme),
-                              _buildFilterOption('This Month', 'This Month', theme),
-                              _buildFilterOption('Last Month', 'Last Month', theme),
-                              _buildFilterOption('Last 6 months', 'Last 6 months', theme),
-                              _buildFilterOption('Last 12 months', 'Last 12 months', theme),
+                                  Text(
+                                    'No Data Available',
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Add subscriptions to see insights',
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                               
                               const SizedBox(height: 24),
                             ],
+                    ),
                           ),
                         ),
                       ],
                     ),
-                  ),
+            
+            // Period selector overlay
+            if (_showPeriodSelector)
+              _buildOverlay(
+                title: 'Select Period',
+                onClose: () => setState(() => _showPeriodSelector = false),
+                child: Column(
+                  children: [
+                    _buildPeriodOption('This Week', theme),
+                    _buildPeriodOption('This Month', theme),
+                    _buildPeriodOption('Last Month', theme),
+                    _buildPeriodOption('Last 6 months', theme),
+                    _buildPeriodOption('This Year', theme),
+                  ],
                 ),
               ),
 
             // Currency selector overlay
             if (_showCurrencySelector)
-              Positioned.fill(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showCurrencySelector = false;
-                    });
-                  },
-                  child: Container(
-                    color: Colors.black.withOpacity(0.3),
-                    child: Column(
-                      children: [
-                        const Spacer(),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surface,
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, -2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                                child: Text(
-                                  'Select Currency',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                              
-                              // Currency list
-                              SizedBox(
-                                height: 300,
-                                child: ListView.builder(
-                                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                                  itemCount: CurrencyUtils.getAllCurrencies().length,
-                                  itemBuilder: (context, index) {
-                                    // Get sorted currencies with selected one at the top
-                                    final currencies = _getSortedCurrencies();
-                                    final currency = currencies[index];
-                                    return _buildCurrencyOption(currency, theme);
-                                  },
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 24),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+              _buildOverlay(
+                title: 'Select Currency',
+                onClose: () => setState(() => _showCurrencySelector = false),
+                child: SizedBox(
+                  height: 400,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    itemCount: CurrencyUtils.getAllCurrencies().length,
+                    itemBuilder: (context, index) {
+                      final currency = CurrencyUtils.getAllCurrencies()[index];
+                      return _buildCurrencyOption(currency, theme);
+                    },
                   ),
                 ),
               ),
@@ -726,50 +699,129 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       ),
     );
   }
+  
+  Widget _buildOverlay({
+    required String title,
+    required VoidCallback onClose,
+    required Widget child,
+  }) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    return Positioned.fill(
+      child: GestureDetector(
+        onTap: onClose,
+                  child: Container(
+          color: Colors.black.withOpacity(0.5),
+                    child: Column(
+                      children: [
+                        const Spacer(),
+              GestureDetector(
+                onTap: () {}, // Prevent closing when tapping content
+                child: Container(
+                          decoration: BoxDecoration(
+                    color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                      // Handle
+                      Center(
+                        child: Container(
+                          margin: const EdgeInsets.only(top: 12),
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.onSurface.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ),
+                              
+                      // Title
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Row(
+                          children: [
+                            Text(
+                              title,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              onPressed: onClose,
+                              icon: Icon(
+                                Icons.close,
+                                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                      ),
+                      
+                      // Content
+                      child,
+                    ],
+                  ),
+                ),
+              ),
+          ],
+          ),
+        ),
+      ),
+    );
+  }
 
-  Widget _buildFilterOption(String text, String value, ThemeData theme) {
-    final isSelected = _selectedPeriod == value;
+  Widget _buildPeriodOption(String period, ThemeData theme) {
+    final isSelected = _selectedPeriod == period;
+    
     return InkWell(
       onTap: () {
         setState(() {
-          _selectedPeriod = value;
-          _updateDateRange(value);
-          _showFilterOptions = false;
+          _selectedPeriod = period;
+          _showPeriodSelector = false;
         });
+        // Restart animation
+        _chartAnimationController.reset();
+        _chartAnimationController.forward();
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : Colors.transparent,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primary.withOpacity(0.1)
+              : Colors.transparent,
+        ),
         child: Row(
           children: [
+            Icon(
+              _getPeriodIcon(period),
+              color: isSelected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface.withOpacity(0.5),
+              size: 20,
+            ),
+            const SizedBox(width: 16),
             Expanded(
               child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: theme.colorScheme.onSurface,
+                period,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: isSelected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface,
                 ),
               ),
             ),
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface.withOpacity(0.1),
-                  width: 2,
-                ),
-                color: isSelected ? theme.colorScheme.primary : Colors.transparent,
-              ),
-              child: isSelected
-                  ? Icon(
-                      Icons.check,
-                      size: 16,
-                      color: theme.colorScheme.onPrimary,
-                    )
-                  : null,
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                color: theme.colorScheme.primary,
+                size: 20,
             ),
           ],
         ),
@@ -779,6 +831,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   Widget _buildCurrencyOption(Currency currency, ThemeData theme) {
     final isSelected = _selectedCurrency?.code == currency.code;
+    
     return InkWell(
       onTap: () {
         setState(() {
@@ -787,14 +840,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: theme.colorScheme.onSurface.withOpacity(0.2),
-              width: 1,
-            ),
-          ),
+          color: isSelected
+              ? theme.colorScheme.primary.withOpacity(0.1)
+              : Colors.transparent,
         ),
         child: Row(
           children: [
@@ -809,17 +859,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 children: [
                   Text(
                     currency.name,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: theme.colorScheme.onSurface,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                     ),
                   ),
                   Text(
-                    currency.code,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    '${currency.code} (${currency.symbol})',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.5),
                     ),
                   ),
                 ],
@@ -829,7 +876,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               Icon(
                 Icons.check_circle,
                 color: theme.colorScheme.primary,
-                size: 24,
+                size: 20,
               ),
           ],
         ),
@@ -837,32 +884,63 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     );
   }
 
-  // Helper method to sort currencies with default currency at the top
-  List<Currency> _getSortedCurrencies() {
-    final allCurrencies = CurrencyUtils.getAllCurrencies();
-    final settingsService = Provider.of<SettingsService>(context, listen: false);
-    final defaultCurrencyCode = settingsService.getCurrencyCode() ?? 'USD';
-    final selectedCurrencyCode = _selectedCurrency?.code ?? '';
-    
-    // Create a new list to avoid modifying the original
-    final sortedCurrencies = List<Currency>.from(allCurrencies);
-    
-    // First, find the selected currency (if different from default) and move it to position 1
-    if (selectedCurrencyCode != defaultCurrencyCode) {
-      final selectedIndex = sortedCurrencies.indexWhere((c) => c.code == selectedCurrencyCode);
-      if (selectedIndex > 0) {
-        final selectedCurrency = sortedCurrencies.removeAt(selectedIndex);
-        sortedCurrencies.insert(1, selectedCurrency);
-      }
+  IconData _getPeriodIcon(String period) {
+    switch (period) {
+      case 'This Week':
+        return Icons.view_week;
+      case 'This Month':
+        return Icons.calendar_view_month;
+      case 'Last Month':
+        return Icons.history;
+      case 'Last 6 months':
+        return Icons.date_range;
+      case 'This Year':
+        return Icons.calendar_today;
+      default:
+        return Icons.calendar_today;
     }
-    
-    // Then, find the default currency and move it to the top (position 0)
-    final defaultIndex = sortedCurrencies.indexWhere((c) => c.code == defaultCurrencyCode);
-    if (defaultIndex > 0) {
-      final defaultCurrency = sortedCurrencies.removeAt(defaultIndex);
-      sortedCurrencies.insert(0, defaultCurrency);
+  }
+  
+  String _getPeriodLabel() {
+    switch (_selectedPeriod) {
+      case 'This Week':
+        return 'per week';
+      case 'This Month':
+      case 'Last Month':
+        return 'per month';
+      case 'Last 6 months':
+        return 'per 6 months';
+      case 'This Year':
+        return 'per year';
+      default:
+        return 'per month';
     }
-    
-    return sortedCurrencies;
+  }
+  
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'entertainment':
+        return Icons.movie_outlined;
+      case 'music':
+        return Icons.music_note_outlined;
+      case 'streaming':
+        return Icons.play_circle_outline;
+      case 'fitness':
+        return Icons.fitness_center_outlined;
+      case 'productivity':
+        return Icons.work_outline;
+      case 'news':
+        return Icons.newspaper_outlined;
+      case 'education':
+        return Icons.school_outlined;
+      case 'cloud storage':
+        return Icons.cloud_outlined;
+      case 'gaming':
+        return Icons.sports_esports_outlined;
+      case 'food & drink':
+        return Icons.restaurant_outlined;
+      default:
+        return Icons.category_outlined;
+    }
   }
 } 

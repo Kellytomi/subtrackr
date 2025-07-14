@@ -22,10 +22,14 @@ class UpdateManager {
   /// Checks if the device supports Shorebird updates
   Future<bool> isUpdateAvailable() async {
     try {
+      debugPrint('🔍 Checking for Shorebird updates...');
       final status = await _updater.checkForUpdate();
-      return status == UpdateStatus.outdated;
+      debugPrint('🔍 Update status: $status');
+      final hasUpdate = status == UpdateStatus.outdated;
+      debugPrint('🔍 Has update available: $hasUpdate');
+      return hasUpdate;
     } catch (e) {
-      debugPrint('Error checking for updates: $e');
+      debugPrint('❌ Error checking for updates: $e');
       return false;
     }
   }
@@ -33,10 +37,13 @@ class UpdateManager {
   /// Gets the current installed patch version
   Future<int?> getCurrentPatchVersion() async {
     try {
+      debugPrint('🔍 Reading current patch version...');
       final patch = await _updater.readCurrentPatch();
-      return patch?.number;
+      final patchNumber = patch?.number;
+      debugPrint('🔍 Current patch: ${patchNumber ?? 'Base version (no patches)'}');
+      return patchNumber;
     } catch (e) {
-      debugPrint('Error reading current patch: $e');
+      debugPrint('❌ Error reading current patch: $e');
       return null;
     }
   }

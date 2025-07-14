@@ -50,7 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     
     // Setup animations
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
     
@@ -71,7 +71,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -79,78 +78,91 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     // Get currency details
     final currency = CurrencyUtils.getCurrencyByCode(_currencyCode) ?? 
         CurrencyUtils.getAllCurrencies().first;
-    
-
 
     return Scaffold(
+      backgroundColor: isDarkMode ? const Color(0xFF0F0F0F) : const Color(0xFFF8F9FA),
       body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            // Modern app bar
+            SliverToBoxAdapter(
+              child: Container(
+                padding: const EdgeInsets.all(24),
         child: Column(
-          children: [
-            // Clean Header
-            Container(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                border: Border(
-                  bottom: BorderSide(
-                    color: colorScheme.outline.withOpacity(0.1),
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Settings',
-                    style: TextStyle(
-                      fontSize: 32,
+                      style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.5,
-                      color: colorScheme.onSurface,
                     ),
                   ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceVariant.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.tune_rounded,
-                      size: 24,
-                      color: colorScheme.onSurfaceVariant,
+                    const SizedBox(height: 8),
+                    Text(
+                      'Manage your preferences',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.7),
                     ),
                   ),
                 ],
+                ),
               ),
             ),
             
-            // Settings Content
-            Expanded(
+            // Settings content
+            SliverToBoxAdapter(
               child: FadeTransition(
                 opacity: _fadeAnimation,
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
                   children: [
                     // User Profile Section
-                    _buildUserProfileSection(),
+                      _buildModernUserProfileSection(),
                     
                     const SizedBox(height: 24),
                     
-                    // Subscription Management
-                    _buildModernSection(
-                      title: 'Subscription Management',
-                      icon: Icons.manage_accounts_rounded,
-                      color: colorScheme.primary,
+                      // Quick Actions
+                      _buildQuickActions(),
+                      
+                      const SizedBox(height: 32),
+                      
+                      // Settings sections
+                      _buildSettingSection(
+                        title: 'General',
+                        icon: Icons.tune_rounded,
                       children: [
-                        _buildModernTile(
+                          _buildSettingTile(
+                            icon: Icons.palette_outlined,
+                            title: 'Appearance',
+                            subtitle: _getThemeModeText(_themeMode),
+                            onTap: _showThemeSelector,
+                            trailing: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                _getThemeModeIcon(_themeMode),
+                                color: colorScheme.primary,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                          _buildSettingTile(
+                            icon: Icons.attach_money_rounded,
                           title: 'Default Currency',
-                          subtitle: '${currency.flag} ${currency.code} - ${currency.name}',
-                          icon: Icons.currency_exchange_rounded,
-                          iconColor: colorScheme.tertiary,
+                            subtitle: '${currency.name} (${currency.code})',
                           onTap: _showCurrencySelector,
-                          trailing: Text(
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: colorScheme.tertiary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
                             currency.symbol,
                             style: TextStyle(
                               fontSize: 16,
@@ -159,135 +171,51 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                             ),
                           ),
                         ),
-                        _buildModernTile(
+                          ),
+                          _buildSettingTile(
+                            icon: Icons.sort_rounded,
                           title: 'Sort Subscriptions',
                           subtitle: _getSortOptionText(_sortOption),
-                          icon: Icons.sort_rounded,
-                          iconColor: colorScheme.primary,
                           onTap: _showSortSelector,
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              _getSortOptionText(_sortOption),
-                              style: TextStyle(
-                                color: colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ),
-                        _buildModernTile(
-                          title: 'Auto-Categorization',
-                          subtitle: 'Automatically categorize new subscriptions',
-                          icon: Icons.auto_awesome_rounded,
-                          iconColor: Colors.purple,
-                          onTap: () {
-                            // TODO: Implement auto-categorization settings
-                            _showComingSoonSnackBar('Auto-categorization settings');
-                          },
-                          trailing: Switch(
-                            value: true, // TODO: Connect to actual setting
-                            onChanged: (value) {
-                              // TODO: Implement toggle
-                            },
-                          ),
-                        ),
-                        _buildModernTile(
-                          title: 'Price Alerts',
-                          subtitle: 'Get notified about price changes',
-                          icon: Icons.trending_up_rounded,
-                          iconColor: Colors.orange,
-                          onTap: () {
-                            _showComingSoonSnackBar('Price alert settings');
-                          },
-                          trailing: Switch(
-                            value: true, // TODO: Connect to actual setting
-                            onChanged: (value) {
-                              // TODO: Implement toggle
-                            },
-                          ),
                         ),
                       ],
                     ),
                     
                     const SizedBox(height: 24),
                     
-                    // Notifications & Reminders
-                    _buildModernSection(
-                      title: 'Notifications & Reminders',
-                      icon: Icons.notifications_active_rounded,
-                      color: Colors.blue,
+                      _buildSettingSection(
+                        title: 'Notifications',
+                        icon: Icons.notifications_rounded,
                       children: [
-                        _buildModernTile(
-                          title: 'Renewal Notifications',
+                          _buildSettingTile(
+                            icon: Icons.notification_important_outlined,
+                            title: 'Renewal Reminders',
                           subtitle: _notificationsEnabled 
-                              ? 'Enabled at ${_formatTimeOfDay(_notificationTime)}' 
-                              : 'Disabled',
-                          icon: Icons.notification_important_rounded,
-                          iconColor: _notificationsEnabled ? Colors.blue : Colors.grey,
-                          onTap: () {
-                            if (_notificationsEnabled) {
-                              _showTimePicker();
-                            } else {
-                              _toggleNotifications(!_notificationsEnabled);
-                            }
-                          },
+                                ? 'Get notified before renewals' 
+                                : 'Notifications disabled',
+                            onTap: () => _toggleNotifications(!_notificationsEnabled),
                           trailing: Switch(
                             value: _notificationsEnabled,
                             onChanged: _toggleNotifications,
+                              activeColor: colorScheme.primary,
                           ),
                         ),
                         if (_notificationsEnabled)
-                          _buildModernTile(
+                            _buildSettingTile(
+                              icon: Icons.access_time_rounded,
                             title: 'Notification Time',
-                            subtitle: 'When to receive daily reminders',
-                            icon: Icons.schedule_rounded,
-                            iconColor: Colors.orange,
+                              subtitle: 'Daily at ${_formatTimeOfDay(_notificationTime)}',
                             onTap: _showTimePicker,
                             trailing: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: Colors.orange.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                                  borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Text(
-                                _formatTimeOfDay(_notificationTime),
-                                style: TextStyle(
-                                  color: Colors.orange.shade700,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ),
-                        _buildModernTile(
-                          title: 'Smart Reminders',
-                          subtitle: 'AI-powered renewal predictions',
-                          icon: Icons.psychology_rounded,
-                          iconColor: Colors.purple,
-                          onTap: () {
-                            _showComingSoonSnackBar('Smart reminders');
-                          },
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.purple.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.purple.withOpacity(0.3)),
-                            ),
-                            child: Text(
-                              'BETA',
-                              style: TextStyle(
-                                color: Colors.purple.shade700,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
-                              ),
+                                child: Icon(
+                                  Icons.schedule,
+                                  color: Colors.orange,
+                                  size: 20,
                             ),
                           ),
                         ),
@@ -296,143 +224,83 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     
                     const SizedBox(height: 24),
                     
-                    // Smart Features
-                    _buildModernSection(
-                      title: 'Smart Features',
-                      icon: Icons.auto_awesome,
-                      color: Colors.orange,
+                      _buildSettingSection(
+                        title: 'Cloud & Backup',
+                        icon: Icons.cloud_rounded,
                       children: [
-                        _buildModernTile(
-                          title: 'Email Detection',
-                          subtitle: 'Auto-detect subscriptions from Gmail',
-                          icon: Icons.email_outlined,
-                          iconColor: Colors.orange,
-                          onTap: () {
-                            Navigator.pushNamed(context, '/email-detection');
-                          },
-                        ),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Cloud Sync & Backup
-                    _buildModernSection(
-                      title: 'Cloud Sync & Backup',
-                      icon: Icons.cloud_sync_rounded,
-                      color: Colors.green,
-                      children: [
-                        _buildModernTile(
-                          title: 'Sync Subscriptions',
-                          subtitle: 'Manually sync your data with the cloud',
+                          _buildSettingTile(
+                            icon: Icons.cloud_sync_outlined,
+                            title: 'Auto Backup',
+                            subtitle: _autoSyncEnabled 
+                                ? 'Changes are backed up automatically'
+                                : 'Manual backup only',
+                            onTap: () => _toggleAutoSync(!_autoSyncEnabled),
+                            trailing: Switch(
+                              value: _autoSyncEnabled,
+                              onChanged: _toggleAutoSync,
+                              activeColor: Colors.green,
+                            ),
+                          ),
+                          _buildSettingTile(
                           icon: Icons.sync_rounded,
-                          iconColor: Colors.blue,
+                            title: 'Sync Now',
+                            subtitle: 'Manually sync with cloud',
                           onTap: _syncWithCloud,
                           trailing: _isSyncing
-                              ? SizedBox(
+                                ? const SizedBox(
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
                                   ),
                                 )
                               : Icon(
                                   Icons.sync,
-                                  color: Colors.blue,
+                                    color: colorScheme.primary,
                                   size: 20,
                                 ),
                         ),
-                        _buildModernTile(
+                          _buildSettingTile(
+                            icon: Icons.cloud_download_outlined,
                           title: 'Restore Backup',
-                          subtitle: 'Replace local data with cloud backup',
-                          icon: Icons.cloud_download_rounded,
-                          iconColor: Colors.purple,
+                            subtitle: 'Replace local data with cloud',
                           onTap: _restoreFromCloud,
-                          trailing: Icon(Icons.download, color: Colors.purple, size: 20),
-                        ),
-                        _buildModernTile(
-                          title: 'Auto Backup',
-                          subtitle: _autoSyncEnabled 
-                              ? 'Automatically backup changes to cloud'
-                              : 'Manual backup only',
-                          icon: Icons.cloud_upload_rounded,
-                          iconColor: _autoSyncEnabled ? Colors.green : Colors.grey,
-                          onTap: () {
-                            _toggleAutoSync(!_autoSyncEnabled);
-                          },
-                          trailing: Switch(
-                            value: _autoSyncEnabled,
-                            onChanged: _toggleAutoSync,
+                            trailing: const Icon(
+                              Icons.download,
+                              color: Colors.purple,
+                              size: 20,
                           ),
                         ),
-
                       ],
                     ),
                     
                     const SizedBox(height: 24),
                     
-                    // Appearance & Display
-                    _buildModernSection(
-                      title: 'Appearance & Display',
-                      icon: Icons.palette_rounded,
-                      color: Colors.teal,
+                      _buildSettingSection(
+                        title: 'Smart Features',
+                        icon: Icons.auto_awesome,
                       children: [
-                        _buildModernTile(
-                          title: 'Theme',
-                          subtitle: _getThemeModeText(_themeMode),
-                          icon: _getThemeModeIcon(_themeMode),
-                          iconColor: _getThemeModeColor(_themeMode, isDarkMode, colorScheme),
-                          onTap: _showThemeSelector,
+                          _buildSettingTile(
+                            icon: Icons.email_outlined,
+                            title: 'Email Detection',
+                            subtitle: 'Auto-detect subscriptions from Gmail',
+                            onTap: () => Navigator.pushNamed(context, '/email-detection'),
                           trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: colorScheme.secondaryContainer,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _getThemeModeIcon(_themeMode),
-                                  size: 16,
-                                  color: colorScheme.onSecondaryContainer,
+                                gradient: LinearGradient(
+                                  colors: [Colors.orange, Colors.deepOrange],
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _getThemeModeText(_themeMode),
+                                borderRadius: BorderRadius.circular(8),
+                            ),
+                              child: const Text(
+                                'NEW',
                                   style: TextStyle(
-                                    color: colorScheme.onSecondaryContainer,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
-                                  ),
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        _buildModernTile(
-                          title: 'Chart Style',
-                          subtitle: 'Customize statistics appearance',
-                          icon: Icons.bar_chart_rounded,
-                          iconColor: Colors.green,
-                          onTap: () {
-                            _showComingSoonSnackBar('Chart customization');
-                          },
-                        ),
-                        _buildModernTile(
-                          title: 'Compact View',
-                          subtitle: 'Show more subscriptions per screen',
-                          icon: Icons.view_compact_rounded,
-                          iconColor: Colors.indigo,
-                          onTap: () {
-                            _showComingSoonSnackBar('Compact view settings');
-                          },
-                          trailing: Switch(
-                            value: false, // TODO: Connect to actual setting
-                            onChanged: (value) {
-                              // TODO: Implement toggle
-                            },
+                              ),
                           ),
                         ),
                       ],
@@ -440,79 +308,144 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     
                     const SizedBox(height: 24),
                     
-                    // Help & Support
-                    _buildModernSection(
-                      title: 'Help & Support',
-                      icon: Icons.help_center_rounded,
-                      color: Colors.deepPurple,
+                      _buildSettingSection(
+                        title: 'Help & About',
+                        icon: Icons.help_outline_rounded,
                       children: [
-                        _buildModernTile(
+                          _buildSettingTile(
+                            icon: Icons.school_outlined,
                           title: 'Tutorial & Tips',
-                          subtitle: 'Learn how to use SubTrackr effectively',
-                          icon: Icons.school_rounded,
-                          iconColor: Colors.deepPurple,
+                            subtitle: 'Learn how to use SubTrackr',
                           onTap: _resetAppTips,
                         ),
+                          _buildSettingTile(
+                            icon: Icons.info_outline,
+                            title: 'About SubTrackr',
+                            subtitle: 'Version & update info',
+                            onTap: _showAboutDialog,
+                        ),
                       ],
                     ),
+                    
+                      // Debug section (only in debug mode)
+                      if (kDebugMode) ...[
+                        const SizedBox(height: 24),
+                        _buildSettingSection(
+                          title: 'Debug Tools',
+                          icon: Icons.bug_report,
+                          children: [
+                            _buildSettingTile(
+                              icon: Icons.notifications_active,
+                              title: 'Test Notification',
+                              subtitle: 'Send a test notification',
+                              onTap: () => _sendTestNotification(5),
+                            ),
+                      ],
+                    ),
+                      ],
                     
                     const SizedBox(height: 24),
                     
                     // Danger Zone
-                    _buildModernSection(
-                      title: 'Danger Zone',
-                      icon: Icons.warning_rounded,
-                      color: Colors.red,
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.red.withOpacity(0.1),
+                              Colors.orange.withOpacity(0.05),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.red.withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildModernTile(
-                          title: 'Delete Account & Data',
-                          subtitle: 'Permanently delete account and all data',
-                          icon: Icons.person_remove_rounded,
-                          iconColor: Colors.red,
-                          onTap: _deleteAccountAndData,
-                          trailing: Icon(
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
                             Icons.warning_rounded,
                             color: Colors.red,
                             size: 20,
                           ),
                         ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Danger Zone',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red,
+                          ),
+                        ),
                       ],
                     ),
-                    
-                    // Debug Tools (only in debug mode)
-                    if (kDebugMode) ...[
-                      const SizedBox(height: 24),
-                      _buildModernSection(
-                        title: 'Debug Tools',
-                        icon: Icons.developer_mode_rounded,
-                        color: Colors.red,
+                            const SizedBox(height: 16),
+                            InkWell(
+                              onTap: _deleteAccountAndData,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
                         children: [
-                          _buildModernTile(
-                            title: 'Test Notifications',
-                            subtitle: 'Send test notifications',
-                            icon: Icons.bug_report_rounded,
-                            iconColor: Colors.red,
-                            onTap: () => _sendTestNotification(5),
+                                    Icon(
+                                      Icons.delete_forever,
+                                      color: Colors.red.shade700,
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Delete Account & Data',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.red.shade700,
                           ),
-
-                        ],
                       ),
-                    ],
-                    
-                    const SizedBox(height: 32),
-                    
-                    // App Info
-                    _buildModernSection(
-                      title: 'App Information',
-                      icon: Icons.info_outline_rounded,
-                      color: colorScheme.primary,
-                      children: [
-                        _buildAppInfoTile(colorScheme),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Permanently delete everything',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.red.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.chevron_right,
+                                      color: Colors.red.shade700,
+                                    ),
                       ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                     ),
                     
                     const SizedBox(height: 40),
                   ],
+                  ),
                 ),
               ),
             ),
@@ -522,92 +455,111 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildUserProfileSection() {
+  Widget _buildModernUserProfileSection() {
     return FutureBuilder<Map<String, String>?>(
       future: _getUserInfo(),
       builder: (context, snapshot) {
         final theme = Theme.of(context);
-        final colorScheme = theme.colorScheme;
+        final isDarkMode = theme.brightness == Brightness.dark;
         final isSignedIn = snapshot.hasData && snapshot.data!['email'] != null;
         final isCloudSyncEnabled = snapshot.hasData && snapshot.data!['isSupabaseSignedIn'] == 'true';
         
         return Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                colorScheme.primary.withOpacity(0.1),
-                colorScheme.secondary.withOpacity(0.05),
-              ],
+              colors: isDarkMode
+                  ? [const Color(0xFF1E1E1E), const Color(0xFF2D2D2D)]
+                  : [Colors.white, const Color(0xFFF8F9FA)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: colorScheme.outline.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: isDarkMode
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.08),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
             ),
+            ],
           ),
           child: Column(
             children: [
-              // Profile Header
+              // Profile info
               Row(
                 children: [
-                  // Profile Avatar
+                  // Avatar
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 72,
+                    height: 72,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [colorScheme.primary, colorScheme.secondary],
+                        colors: [
+                          theme.colorScheme.primary,
+                          theme.colorScheme.secondary,
+                        ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.colorScheme.primary.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: ClipOval(
                       child: isSignedIn && snapshot.data!['photoUrl'] != null
                           ? Image.network(
                               snapshot.data!['photoUrl']!,
-                              width: 60,
-                              height: 60,
+                              width: 72,
+                              height: 72,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => _buildAvatarFallback(snapshot, colorScheme),
+                              errorBuilder: (context, error, stackTrace) => 
+                                  _buildAvatarFallback(snapshot, theme.colorScheme),
                             )
-                          : _buildAvatarFallback(snapshot, colorScheme),
+                          : _buildAvatarFallback(snapshot, theme.colorScheme),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 20),
                   
-                  // Profile Info
+                  // User info
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Expanded(
+                            Flexible(
                               child: Text(
                                 isSignedIn ? snapshot.data!['name']! : 'Guest User',
-                                style: TextStyle(
-                                  fontSize: 20,
+                                style: const TextStyle(
+                                  fontSize: 22,
                                   fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
                                 ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (isSignedIn) ...[
-                              IconButton(
-                                onPressed: () => _showEditNameDialog(snapshot.data!['name']!),
-                                icon: Icon(
-                                  Icons.edit,
-                                  size: 18,
-                                  color: colorScheme.primary,
-                                ),
-                                tooltip: 'Edit Name',
-                                style: IconButton.styleFrom(
-                                  backgroundColor: colorScheme.primary.withOpacity(0.1),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () => _showEditNameDialog(snapshot.data!['name']!),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
                                   padding: const EdgeInsets.all(4),
-                                  minimumSize: const Size(32, 32),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                  Icons.edit,
+                                    size: 16,
+                                    color: theme.colorScheme.primary,
+                                ),
                                 ),
                               ),
                             ],
@@ -615,67 +567,94 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          isSignedIn ? snapshot.data!['email']! : 'Sign in to sync across devices',
+                          isSignedIn ? snapshot.data!['email']! : 'Sign in to sync',
                           style: TextStyle(
                             fontSize: 14,
-                            color: colorScheme.onSurface.withOpacity(0.7),
+                            color: theme.colorScheme.onSurface.withOpacity(0.7),
                           ),
-                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                      ],
-                    ),
-                  ),
-                  
-                  // Status Indicator
+                        const SizedBox(height: 8),
+                        // Sync status
                   Container(
-                    padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
                       color: isCloudSyncEnabled 
                           ? Colors.green.withOpacity(0.1)
                           : isSignedIn 
                               ? Colors.orange.withOpacity(0.1)
-                              : colorScheme.surface,
+                                    : theme.colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isCloudSyncEnabled 
                             ? Colors.green.withOpacity(0.3)
                             : isSignedIn 
                                 ? Colors.orange.withOpacity(0.3)
-                                : colorScheme.outline.withOpacity(0.2),
+                                      : theme.colorScheme.outline.withOpacity(0.2),
+                              width: 1,
                       ),
                     ),
-                    child: Icon(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
                       isCloudSyncEnabled
-                          ? Icons.cloud_done_rounded
+                                    ? Icons.cloud_done
                           : isSignedIn
-                              ? Icons.cloud_sync_rounded
-                              : Icons.cloud_off_rounded,
+                                        ? Icons.cloud_sync
+                                        : Icons.cloud_off,
                       color: isCloudSyncEnabled
                           ? Colors.green
                           : isSignedIn
                               ? Colors.orange
-                              : colorScheme.outline,
-                      size: 20,
+                                        : theme.colorScheme.outline,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isCloudSyncEnabled
+                                    ? 'Cloud sync active'
+                                    : isSignedIn
+                                        ? 'Email access only'
+                                        : 'Offline mode',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isCloudSyncEnabled
+                                      ? Colors.green
+                                      : isSignedIn
+                                          ? Colors.orange
+                                          : theme.colorScheme.outline,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
               
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               
-              // Action Buttons
+              // Action button
               if (!isSignedIn) ...[
-                // Sign In Button
                 SizedBox(
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton.icon(
                     onPressed: _signInWithGoogle,
-                    icon: const Icon(Icons.login, size: 20),
-                    label: const Text('Sign In with Google'),
+                    icon: Image.asset(
+                      'assets/logos/google.png',
+                      width: 20,
+                      height: 20,
+                      errorBuilder: (context, error, stackTrace) => 
+                          const Icon(Icons.login, size: 20),
+                    ),
+                    label: const Text('Sign in with Google'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
+                      backgroundColor: theme.colorScheme.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -683,107 +662,26 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     ),
                   ),
                 ),
-              ] else ...[
-                // Status Information
-                Row(
-                  children: [
-                    // Email Access Status
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.green.withOpacity(0.2),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Email Access',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.green,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Connected',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Cloud Sync Status/Action
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: isCloudSyncEnabled ? null : _signInWithGoogle,
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: isCloudSyncEnabled 
-                                ? Colors.green.withOpacity(0.1)
-                                : Colors.orange.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isCloudSyncEnabled 
-                                  ? Colors.green.withOpacity(0.2)
-                                  : Colors.orange.withOpacity(0.2),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Cloud Sync',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: isCloudSyncEnabled ? Colors.green : Colors.orange,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                isCloudSyncEnabled ? 'Connected' : 'Tap to enable',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // Sign Out Button at the bottom
+              ] else if (!isCloudSyncEnabled) ...[
                 SizedBox(
                   width: double.infinity,
                   height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _signInWithGoogle,
+                    icon: const Icon(Icons.cloud_sync, size: 20),
+                    label: const Text('Enable Cloud Sync'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                      ),
+                          ),
+                        ),
+                            ),
+              ] else ...[
+                SizedBox(
+                  width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: _showLogoutDialog,
                     icon: const Icon(Icons.logout, size: 18),
@@ -805,268 +703,96 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildAvatarFallback(AsyncSnapshot<Map<String, String>?> snapshot, ColorScheme colorScheme) {
-    return Center(
-      child: snapshot.hasData && snapshot.data!['name'] != null
-          ? Text(
-              snapshot.data!['name']!.split(' ').map((name) => name[0]).take(2).join().toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            )
-          : const Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 30,
-            ),
-    );
-  }
-
-  Future<void> _showLogoutDialog() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out? Your data will remain on this device, but cloud sync will be disabled.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Sign Out'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      await _signOut();
-    }
-  }
-
-  Future<void> _signOut() async {
-    try {
-      final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
-      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-      
-      // Stop real-time sync
-      subscriptionProvider.stopRealTimeSync();
-      
-      // Sign out from cloud services
-      await cloudSyncService.signOut();
-      
-      setState(() {}); // Trigger rebuild
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
+  Widget _buildQuickActions() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    return Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 8),
-              Text('Successfully signed out'),
-            ],
-          ),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-    } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.error, color: Colors.white),
-              const SizedBox(width: 8),
-              Text('Error signing out: $error'),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-    }
-  }
-
-  Future<Map<String, String>?> _getUserInfo() async {
-    try {
-      final authService = SupabaseAuthService();
-      final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
-      final googleUser = authService.currentUser;
-      final supabaseUser = cloudSyncService.currentUser;
-      
-      // Check Google user first, then fall back to Supabase user
-      if (googleUser != null) {
-        // Prioritize manually set 'full_name' over Google's 'name' to preserve user edits
-        final manualName = googleUser.userMetadata?['full_name']?.toString();
-        final googleName = googleUser.userMetadata?['name']?.toString();
-        final fallbackName = googleUser.email?.split('@')[0] ?? 'User';
-        
-        final result = <String, String>{
-          'name': manualName ?? googleName ?? fallbackName,
-          'email': googleUser.email ?? '',
-          'photoUrl': googleUser.userMetadata?['avatar_url']?.toString() ?? '',
-          'isSupabaseSignedIn': 'true',
-        };
-        return result;
-      } else if (supabaseUser != null) {
-        // Supabase user exists but Google user is null
-        final manualName = supabaseUser.userMetadata?['full_name']?.toString();
-        final googleName = supabaseUser.userMetadata?['name']?.toString();
-        final fallbackName = supabaseUser.email?.split('@')[0] ?? 'User';
-        
-        final result = <String, String>{
-          'name': manualName ?? googleName ?? fallbackName,
-          'email': supabaseUser.email ?? '',
-          'photoUrl': supabaseUser.userMetadata?['avatar_url']?.toString() ?? '',
-          'isSupabaseSignedIn': 'true',
-        };
-        return result;
-      }
-      
-      return null;
-    } catch (e) {
-      print('Error getting user info: $e');
-      return null;
-    }
-  }
-
-  Future<void> _signInWithGoogle() async {
-    try {
-      final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
-      
-      // Show loading indicator
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        Expanded(
+          child: _buildQuickActionCard(
+            icon: Icons.update,
+            label: 'Check Updates',
+            color: Colors.blue,
+            onTap: _checkForUpdates,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  'Signing in and enabling cloud sync...',
-                  style: TextStyle(color: Colors.white),
+          child: _buildQuickActionCard(
+            icon: Icons.sync,
+            label: 'Sync Now',
+            color: Colors.green,
+            onTap: _syncWithCloud,
                 ),
               ),
             ],
-          ),
-          backgroundColor: Theme.of(context).primaryColor,
-          duration: Duration(seconds: 10),
-        ),
-      );
-      
-      final success = await cloudSyncService.signInWithGoogle();
-      
-      // Clear the loading snackbar
-      ScaffoldMessenger.of(context).clearSnackBars();
-      
-      if (success) {
-        print('✅ Signed in successfully and linked to Firebase');
-        
-        if (mounted) {
-          // Start real-time sync for the newly signed-in user
-          final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-          await subscriptionProvider.startRealTimeSync();
-          
-          // Reload subscriptions to get latest cloud data
-          await subscriptionProvider.loadSubscriptions();
-          
-          // Wait a moment for all services to update their state
-          await Future.delayed(const Duration(milliseconds: 500));
-          
-          if (mounted) {
-            setState(() {}); // Trigger rebuild
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    Icon(Icons.cloud_done, color: Colors.white),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Successfully connected! Real-time sync is now active.',
-                        style: TextStyle(color: Colors.white),
-                      ),
+    );
+  }
+
+  Widget _buildQuickActionCard({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: isDarkMode
+                  ? Colors.black.withOpacity(0.3)
+                  : Colors.black.withOpacity(0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                backgroundColor: Colors.green,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            );
-          }
-        }
-      } else {
-        print('❌ Sign in was cancelled or failed');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
+        child: Column(
               children: [
-                Icon(Icons.warning, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Sign in was cancelled or failed',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
           ),
-        );
-      }
-    } catch (error) {
-      print('❌ Error signing in: $error');
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.error, color: Colors.white),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Error signing in: $error',
-                  style: TextStyle(color: Colors.white),
-                ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
               ),
             ],
           ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
-    }
   }
 
-  Widget _buildModernSection({
+  Widget _buildSettingSection({
     required String title,
     required IconData icon,
-    required Color color,
     required List<Widget> children,
   }) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1074,25 +800,17 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           padding: const EdgeInsets.only(bottom: 12),
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
+              Icon(
                   icon,
-                  size: 22,
-                  color: color,
+                size: 20,
+                color: theme.colorScheme.primary,
                 ),
-              ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Text(
                 title,
-                style: TextStyle(
-                  fontSize: 20,
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: theme.colorScheme.onSurface.withOpacity(0.8),
                 ),
               ),
             ],
@@ -1100,11 +818,17 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         ),
         Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+            color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+            boxShadow: [
+              BoxShadow(
+                color: isDarkMode
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
             ),
+            ],
           ),
           child: Column(
             children: children,
@@ -1114,19 +838,17 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildModernTile({
+  Widget _buildSettingTile({
+    required IconData icon,
     required String title,
     required String subtitle,
-    required IconData icon,
-    required Color iconColor,
     required VoidCallback onTap,
     Widget? trailing,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
@@ -1134,15 +856,15 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   icon,
-                  size: 18,
-                  color: iconColor,
+                color: theme.colorScheme.primary,
+                size: 20,
                 ),
               ),
               const SizedBox(width: 16),
@@ -1152,51 +874,48 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   children: [
                     Text(
                       title,
-                      style: TextStyle(
-                        fontSize: 14,
+                    style: theme.textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: colorScheme.onSurface.withOpacity(0.7),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
                       ),
                     ),
                   ],
                 ),
               ),
-              if (trailing != null) ...[
-                const SizedBox(width: 12),
-                trailing,
-              ] else
+            if (trailing != null)
+              trailing
+            else
                 Icon(
-                  Icons.chevron_right_rounded,
-                  color: colorScheme.onSurface.withOpacity(0.4),
+                Icons.chevron_right,
+                color: theme.colorScheme.onSurface.withOpacity(0.3),
                 ),
             ],
-          ),
         ),
       ),
     );
   }
 
-  void _showComingSoonSnackBar(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.upcoming_rounded, color: Colors.white),
-            const SizedBox(width: 8),
-            Text('$feature coming soon!'),
-          ],
-        ),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  Widget _buildAvatarFallback(AsyncSnapshot<Map<String, String>?> snapshot, ColorScheme colorScheme) {
+    return Center(
+      child: snapshot.hasData && snapshot.data!['name'] != null
+          ? Text(
+              snapshot.data!['name']!.split(' ').map((name) => name[0]).take(2).join().toUpperCase(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            )
+          : const Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 36,
       ),
     );
   }
@@ -1223,232 +942,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  Color _getThemeModeColor(ThemeMode mode, bool isDarkMode, ColorScheme colorScheme) {
-    switch (mode) {
-      case ThemeMode.system:
-        return colorScheme.tertiary;
-      case ThemeMode.light:
-        return colorScheme.primary;
-      case ThemeMode.dark:
-        return colorScheme.secondary;
-    }
-  }
-
   String _formatTimeOfDay(TimeOfDay time) {
     final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
     final minute = time.minute.toString().padLeft(2, '0');
     final period = time.period == DayPeriod.am ? 'AM' : 'PM';
     return '$hour:$minute $period';
-  }
-
-  Future<void> _showThemeSelector() async {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    
-    final result = await showModalBottomSheet<ThemeMode>(
-      context: context,
-      backgroundColor: colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 16, bottom: 16),
-              child: Text(
-                'Select Theme',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black,
-                ),
-              ),
-            ),
-            _buildThemeOption(ThemeMode.system, 'System default', Icons.brightness_auto, colorScheme),
-            const SizedBox(height: 8),
-            _buildThemeOption(ThemeMode.light, 'Light mode', Icons.light_mode_rounded, colorScheme),
-            const SizedBox(height: 8),
-            _buildThemeOption(ThemeMode.dark, 'Dark mode', Icons.dark_mode_rounded, colorScheme),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-    
-    if (result != null) {
-      setState(() {
-        _themeMode = result;
-      });
-      
-      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-      await themeProvider.setThemeMode(result);
-    }
-  }
-
-  Widget _buildThemeOption(ThemeMode mode, String title, IconData icon, ColorScheme colorScheme) {
-    final isSelected = _themeMode == mode;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    Color iconColor;
-    
-    switch (mode) {
-      case ThemeMode.system:
-        iconColor = colorScheme.tertiary;
-        break;
-      case ThemeMode.light:
-        iconColor = colorScheme.primary;
-        break;
-      case ThemeMode.dark:
-        iconColor = colorScheme.secondary;
-        break;
-    }
-    
-    return InkWell(
-      onTap: () {
-        Navigator.pop(context, mode);
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? iconColor.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? iconColor : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-      child: Row(
-        children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: iconColor),
-            ),
-          const SizedBox(width: 16),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isDark ? Colors.white : Colors.black,
-              ),
-            ),
-            const Spacer(),
-            if (isSelected)
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: iconColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check,
-                  color: Colors.white,
-                  size: 14,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showTimePicker() async {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    final result = await showTimePicker(
-      context: context,
-      initialTime: _notificationTime,
-      builder: (context, child) {
-        return Theme(
-          data: theme.copyWith(
-            timePickerTheme: TimePickerThemeData(
-              dayPeriodShape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              hourMinuteShape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    
-    if (result != null) {
-      // Update local state
-      setState(() {
-        _notificationTime = result;
-      });
-      
-      // Save to settings
-      final settingsService = Provider.of<SettingsService>(context, listen: false);
-      await settingsService.setNotificationTime(result);
-      
-      // Reschedule notifications with the new time
-      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-      await subscriptionProvider.rescheduleAllNotifications();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Notification time updated'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-    }
-  }
-
-  Future<void> _toggleNotifications(bool value) async {
-    setState(() {
-      _notificationsEnabled = value;
-    });
-    
-    final settingsService = Provider.of<SettingsService>(context, listen: false);
-    await settingsService.setNotificationsEnabled(value);
-    
-    // Reschedule or cancel notifications based on the new setting
-    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-    await subscriptionProvider.rescheduleAllNotifications();
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(value ? 'Notifications enabled' : 'Notifications disabled'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
-  Future<void> _toggleAutoSync(bool value) async {
-    setState(() {
-      _autoSyncEnabled = value;
-    });
-    
-    final settingsService = Provider.of<SettingsService>(context, listen: false);
-    await settingsService.setAutoSyncEnabled(value);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(value ? 'Auto backup enabled' : 'Auto backup disabled'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
   }
 
   String _getSortOptionText(String sortOption) {
@@ -1466,54 +964,227 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  Future<void> _showSortSelector() async {
+  // Show theme selector with modern design
+  Future<void> _showThemeSelector() async {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     
-    final result = await showDialog<String>(
+    final result = await showModalBottomSheet<ThemeMode>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sort Subscriptions'),
-        content: Column(
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<String>(
-              title: const Text('Date Added (Newest First)'),
-              subtitle: const Text('Most recently added subscriptions first'),
-              value: AppConstants.SORT_BY_DATE_ADDED,
-              groupValue: _sortOption,
-              onChanged: (value) => Navigator.pop(context, value),
+          crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Choose Theme',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildThemeOption(
+                ThemeMode.system,
+                'System default',
+                'Follow device theme',
+                Icons.brightness_auto,
+              ),
+              const SizedBox(height: 12),
+              _buildThemeOption(
+                ThemeMode.light,
+                'Light mode',
+                'Always use light theme',
+                Icons.light_mode_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildThemeOption(
+                ThemeMode.dark,
+                'Dark mode',
+                'Always use dark theme',
+                Icons.dark_mode_rounded,
+              ),
+              const SizedBox(height: 24),
+          ],
+          ),
+        ),
+      ),
+    );
+    
+    if (result != null) {
+      setState(() {
+        _themeMode = result;
+      });
+      
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      await themeProvider.setThemeMode(result);
+    }
+  }
+
+  Widget _buildThemeOption(
+    ThemeMode mode,
+    String title,
+    String subtitle,
+    IconData icon,
+  ) {
+    final theme = Theme.of(context);
+    final isSelected = _themeMode == mode;
+    
+    return InkWell(
+      onTap: () => Navigator.pop(context, mode),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? theme.colorScheme.primary.withOpacity(0.1)
+              : theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected 
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outline.withOpacity(0.2),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+      child: Row(
+        children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: theme.colorScheme.primary,
+              ),
             ),
-            RadioListTile<String>(
-              title: const Text('Name (A-Z)'),
-              subtitle: const Text('Alphabetical order'),
-              value: AppConstants.SORT_BY_NAME,
-              groupValue: _sortOption,
-              onChanged: (value) => Navigator.pop(context, value),
+          const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+            Text(
+              title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+              ),
             ),
-            RadioListTile<String>(
-              title: const Text('Amount (Highest First)'),
-              subtitle: const Text('By monthly cost'),
-              value: AppConstants.SORT_BY_AMOUNT,
-              groupValue: _sortOption,
-              onChanged: (value) => Navigator.pop(context, value),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            RadioListTile<String>(
-              title: const Text('Renewal Date (Soonest First)'),
-              subtitle: const Text('By next renewal date'),
-              value: AppConstants.SORT_BY_RENEWAL_DATE,
-              groupValue: _sortOption,
-              onChanged: (value) => Navigator.pop(context, value),
-            ),
+            if (isSelected)
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
           ],
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: colorScheme.primary)),
+      ),
+    );
+  }
+
+  // Show sort selector with modern design
+  Future<void> _showSortSelector() async {
+    final theme = Theme.of(context);
+    
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(2),
+              ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Sort Subscriptions By',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildSortOption(
+                AppConstants.SORT_BY_DATE_ADDED,
+                'Date Added',
+                'Newest first',
+                Icons.calendar_today,
+              ),
+              const SizedBox(height: 12),
+              _buildSortOption(
+                AppConstants.SORT_BY_NAME,
+                'Name',
+                'Alphabetical order',
+                Icons.sort_by_alpha,
+              ),
+              const SizedBox(height: 12),
+              _buildSortOption(
+                AppConstants.SORT_BY_AMOUNT,
+                'Amount',
+                'Highest cost first',
+                Icons.attach_money,
+              ),
+              const SizedBox(height: 12),
+              _buildSortOption(
+                AppConstants.SORT_BY_RENEWAL_DATE,
+                'Renewal Date',
+                'Soonest first',
+                Icons.event,
           ),
-        ],
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
       ),
     );
     
@@ -1532,134 +1203,516 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         SnackBar(
           content: Text('Sorting changed to ${_getSortOptionText(result)}'),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          backgroundColor: Colors.green,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
   }
 
+  Widget _buildSortOption(
+    String value,
+    String title,
+    String subtitle,
+    IconData icon,
+  ) {
+    final theme = Theme.of(context);
+    final isSelected = _sortOption == value;
+    
+    return InkWell(
+      onTap: () => Navigator.pop(context, value),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? theme.colorScheme.primary.withOpacity(0.1)
+              : theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected 
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outline.withOpacity(0.2),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Currency selector
   Future<void> _showCurrencySelector() async {
     final result = await Navigator.push<Currency>(
       context,
-      MaterialPageRoute(
-        builder: (context) => CurrencySelectorScreen(initialCurrencyCode: _currencyCode),
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => 
+            ModernCurrencySelectorScreen(initialCurrencyCode: _currencyCode),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(0.0, 1.0);
+          const end = Offset.zero;
+          const curve = Curves.ease;
+          
+          var tween = Tween(begin: begin, end: end).chain(
+            CurveTween(curve: curve),
+          );
+          
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
       ),
     );
     
     if (result != null) {
-      setState(() {
+    setState(() {
         _currencyCode = result.code;
+    });
+    
+    final settingsService = Provider.of<SettingsService>(context, listen: false);
+      await settingsService.setCurrencyCode(result.code);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text('Currency updated to ${result.name}'),
+        behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+  }
+
+  // Time picker
+  Future<void> _showTimePicker() async {
+    final result = await showTimePicker(
+      context: context,
+      initialTime: _notificationTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            timePickerTheme: TimePickerThemeData(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    
+    if (result != null) {
+    setState(() {
+        _notificationTime = result;
+    });
+    
+    final settingsService = Provider.of<SettingsService>(context, listen: false);
+      await settingsService.setNotificationTime(result);
+      
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      await subscriptionProvider.rescheduleAllNotifications();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: const Text('Notification time updated'),
+        behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+  }
+
+  // Show about dialog
+  Future<void> _showAboutDialog() async {
+    final theme = Theme.of(context);
+    final versionInfo = await _getVersionInfo();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.subscriptions_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text('SubTrackr'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Version ${versionInfo['appVersion']}',
+              style: theme.textTheme.bodyLarge,
+            ),
+            if (versionInfo['hasPatch'] == true && versionInfo['patchNumber'] != null) ...[
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.green.withOpacity(0.3),
+                  ),
+                ),
+                child: Text(
+                  'Patch #${versionInfo['patchNumber']} applied',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            const Text('Track your subscriptions with ease'),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _checkForUpdates,
+                icon: const Icon(Icons.update, size: 18),
+                label: const Text('Check for Updates'),
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+    
+  // All the method implementations from the original file
+  Future<void> _toggleNotifications(bool value) async {
+      setState(() {
+      _notificationsEnabled = value;
       });
       
       final settingsService = Provider.of<SettingsService>(context, listen: false);
-      await settingsService.setCurrencyCode(result.code);
+    await settingsService.setNotificationsEnabled(value);
+      
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+    await subscriptionProvider.rescheduleAllNotifications();
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Currency updated to ${result.name}'),
+        content: Text(value ? 'Notifications enabled' : 'Notifications disabled'),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        backgroundColor: value ? Colors.green : Colors.orange,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+  }
+
+  Future<void> _toggleAutoSync(bool value) async {
+      setState(() {
+      _autoSyncEnabled = value;
+      });
+      
+      final settingsService = Provider.of<SettingsService>(context, listen: false);
+    await settingsService.setAutoSyncEnabled(value);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+        content: Text(value ? 'Auto backup enabled' : 'Auto backup disabled'),
+          behavior: SnackBarBehavior.floating,
+        backgroundColor: value ? Colors.green : Colors.orange,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
-  }
 
-  Future<void> _sendTestNotification(int delaySeconds) async {
-    final notificationService = Provider.of<NotificationService>(context, listen: false);
-    
-    if (delaySeconds == 0) {
-      // Send immediate notification
-      await notificationService.showTestNotification();
+  Future<Map<String, String>?> _getUserInfo() async {
+    try {
+      final authService = SupabaseAuthService();
+      final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
+      final googleUser = authService.currentUser;
+      final supabaseUser = cloudSyncService.currentUser;
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Test notification sent immediately!'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+      if (googleUser != null) {
+        final manualName = googleUser.userMetadata?['full_name']?.toString();
+        final googleName = googleUser.userMetadata?['name']?.toString();
+        final fallbackName = googleUser.email?.split('@')[0] ?? 'User';
+        
+        return {
+          'name': manualName ?? googleName ?? fallbackName,
+          'email': googleUser.email ?? '',
+          'photoUrl': googleUser.userMetadata?['avatar_url']?.toString() ?? '',
+          'isSupabaseSignedIn': 'true',
+        };
+      } else if (supabaseUser != null) {
+        final manualName = supabaseUser.userMetadata?['full_name']?.toString();
+        final googleName = supabaseUser.userMetadata?['name']?.toString();
+        final fallbackName = supabaseUser.email?.split('@')[0] ?? 'User';
+        
+        return {
+          'name': manualName ?? googleName ?? fallbackName,
+          'email': supabaseUser.email ?? '',
+          'photoUrl': supabaseUser.userMetadata?['avatar_url']?.toString() ?? '',
+          'isSupabaseSignedIn': 'true',
+        };
       }
-    } else {
-      // Schedule notification
-      final scheduledDate = DateTime.now().add(Duration(seconds: delaySeconds));
-      await notificationService.scheduleNotification(
-        id: 9999,
-        title: 'Test Notification',
-        body: 'This test notification was scheduled for ${delaySeconds}s ago!',
-        scheduledDate: scheduledDate,
-      );
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Test notification scheduled for ${delaySeconds}s from now!'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
+      return null;
+    } catch (e) {
+      print('Error getting user info: $e');
+      return null;
     }
   }
 
-  Future<void> _resetAppTips() async {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+  Future<void> _signInWithGoogle() async {
+    try {
+      final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
     
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Signing in and enabling cloud sync...',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Theme.of(context).primaryColor,
+          duration: const Duration(seconds: 10),
+        ),
+      );
+      
+      final success = await cloudSyncService.signInWithGoogle();
+      
+      ScaffoldMessenger.of(context).clearSnackBars();
+      
+      if (success) {
+      if (mounted) {
+          final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+          await subscriptionProvider.startRealTimeSync();
+          await subscriptionProvider.loadSubscriptions();
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          if (mounted) {
+            setState(() {});
+            
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.cloud_done, color: Colors.white),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text('Successfully connected! Real-time sync is now active.'),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+          }
+      }
+    } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.warning, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Sign in was cancelled or failed'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+      );
+      }
+    } catch (error) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Error signing in: $error'),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+    }
+  }
+
+  Future<void> _showLogoutDialog() async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'Reset App Tips',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
-          ),
-        ),
-        content: const Text(
-          'This will reset all app tips and tutorials. You will see the first-time user guides again when you navigate through the app.',
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out? Your data will remain on this device, but cloud sync will be disabled.'),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context, false);
-            },
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: colorScheme.primary),
-            ),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, true);
-            },
+            onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text('Reset Tips'),
+            child: const Text('Sign Out'),
           ),
         ],
       ),
     );
     
     if (result == true) {
-      await TipsHelper.resetAllTips();
+      await _signOut();
+    }
+  }
+
+  Future<void> _signOut() async {
+    try {
+      final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      
+      subscriptionProvider.stopRealTimeSync();
+      await cloudSyncService.signOut();
+      
+      setState(() {});
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('App tips have been reset'),
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Successfully signed out'),
+            ],
+          ),
+          backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error, color: Colors.white),
+              const SizedBox(width: 8),
+              Text('Error signing out: $error'),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
   }
 
-  // Cloud sync methods
   Future<void> _syncWithCloud() async {
     if (!mounted) return;
     
@@ -1674,36 +1727,35 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       if (!cloudSyncService.isUserSignedIn) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
+            content: const Row(
               children: [
                 Icon(Icons.warning, color: Colors.white),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text('Please sign in with Google to sync'),
               ],
             ),
             backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
         return;
       }
       
-      // Reload subscriptions to trigger sync
       await subscriptionProvider.loadSubscriptions();
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
+          content: const Row(
             children: [
               Icon(Icons.cloud_done, color: Colors.white),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text('Sync completed successfully'),
             ],
           ),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     } catch (e) {
@@ -1711,14 +1763,14 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         SnackBar(
           content: Row(
             children: [
-              Icon(Icons.error, color: Colors.white),
+              const Icon(Icons.error, color: Colors.white),
               const SizedBox(width: 8),
               Text('Sync failed: $e'),
             ],
           ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     } finally {
@@ -1730,167 +1782,26 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  Future<void> _deleteAccountAndData() async {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Delete Account & Data',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.red,
-          ),
-        ),
-        content: const Text(
-          '⚠️ This will permanently:\n\n'
-          '• Delete your account\n'
-          '• Remove ALL subscription data from cloud\n'
-          '• Clear ALL local data\n'
-          '• Sign you out from this device\n\n'
-          '⚠️ IMPORTANT: Other devices may remain signed in until you manually sign out or the session expires.\n\n'
-          'This action cannot be undone!',
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: colorScheme.primary),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Delete Everything'),
-          ),
-        ],
-      ),
-    );
-    
-    if (result == true) {
-      try {
-        final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
-        final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-        
-        if (!cloudSyncService.isUserSignedIn) {
-          _showSnackBar('Please sign in to delete account');
-          return;
-        }
-        
-        // Show loading indicator
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('Deleting account and all data...'),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 10),
-          ),
-        );
-        
-        // Stop real-time sync
-        subscriptionProvider.stopRealTimeSync();
-        
-        // Delete account and all associated data
-        await cloudSyncService.deleteAccount();
-        
-        // Clear the loading snackbar
-        ScaffoldMessenger.of(context).clearSnackBars();
-        
-        if (mounted) {
-          // Force UI rebuild to reflect signed-out state
-          setState(() {});
-          
-          // Wait a moment for the auth state to propagate
-          await Future.delayed(const Duration(milliseconds: 500));
-          
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.white),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text('Account and all data deleted successfully. You have been signed out from this device. Remember to sign out from other devices manually.'),
-                    ),
-                  ],
-                ),
-                backgroundColor: Colors.green,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                duration: Duration(seconds: 5),
-              ),
-            );
-          }
-        }
-        
-      } catch (e) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        _showSnackBar('Error deleting account: $e');
-      }
-    }
-  }
-
   Future<void> _restoreFromCloud() async {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'Restore from Cloud',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
-          ),
-        ),
-        content: const Text(
-          'This will replace all your local subscriptions with data from your cloud backup. Local changes that haven\'t been backed up will be lost.\n\nAre you sure you want to continue?',
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Restore from Cloud'),
+        content: const Text('This will replace all your local subscriptions with data from your cloud backup. Local changes that haven\'t been backed up will be lost.\n\nAre you sure you want to continue?'),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context, false);
-            },
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: colorScheme.primary),
-            ),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, true);
-            },
+            onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.purple,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Restore'),
           ),
@@ -1906,40 +1817,38 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         if (!cloudSyncService.isUserSignedIn) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Row(
+              content: const Row(
                 children: [
                   Icon(Icons.warning, color: Colors.white),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   Text('Please sign in with Google to restore'),
                 ],
               ),
               backgroundColor: Colors.orange,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           );
           return;
         }
         
-        // Get subscriptions from cloud using the repository
         final repository = Provider.of<DualSubscriptionRepository>(context, listen: false);
         final cloudSubscriptions = await repository.getAllSubscriptions();
         
-        // Replace local data with cloud data
         await subscriptionProvider.restoreFromBackup(cloudSubscriptions);
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
-                Icon(Icons.cloud_done, color: Colors.white),
+                const Icon(Icons.cloud_done, color: Colors.white),
                 const SizedBox(width: 8),
                 Text('Successfully restored ${cloudSubscriptions.length} subscriptions from backup'),
               ],
             ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       } catch (e) {
@@ -1947,21 +1856,268 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           SnackBar(
             content: Row(
               children: [
-                Icon(Icons.error, color: Colors.white),
+                const Icon(Icons.error, color: Colors.white),
                 const SizedBox(width: 8),
                 Text('Restore failed: $e'),
               ],
             ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
     }
   }
 
-  // Get app version information dynamically with Shorebird patch info
+  Future<void> _sendTestNotification(int delaySeconds) async {
+    final notificationService = Provider.of<NotificationService>(context, listen: false);
+    
+    if (delaySeconds == 0) {
+      await notificationService.showTestNotification();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Test notification sent immediately!'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } else {
+      final scheduledDate = DateTime.now().add(Duration(seconds: delaySeconds));
+      await notificationService.scheduleNotification(
+        id: 9999,
+        title: 'Test Notification',
+        body: 'This test notification was scheduled for ${delaySeconds}s ago!',
+        scheduledDate: scheduledDate,
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Test notification scheduled for ${delaySeconds}s from now!'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _resetAppTips() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Reset App Tips'),
+        content: const Text('This will reset all app tips and tutorials. You will see the first-time user guides again when you navigate through the app.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Reset Tips'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result == true) {
+      await TipsHelper.resetAllTips();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('App tips have been reset'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteAccountAndData() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text(
+          'Delete Account & Data',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.red,
+          ),
+        ),
+        content: const Text(
+          '⚠️ This will permanently:\n\n'
+          '• Delete your account\n'
+          '• Remove ALL subscription data from cloud\n'
+          '• Clear ALL local data\n'
+          '• Sign you out from this device\n\n'
+          '⚠️ IMPORTANT: Other devices may remain signed in until you manually sign out or the session expires.\n\n'
+          'This action cannot be undone!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Delete Everything'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result == true) {
+      try {
+        final cloudSyncService = Provider.of<SupabaseCloudSyncService>(context, listen: false);
+        final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+        
+        if (!cloudSyncService.isUserSignedIn) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please sign in to delete account'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Deleting account and all data...',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 10),
+          ),
+        );
+        
+        subscriptionProvider.stopRealTimeSync();
+        await cloudSyncService.deleteAccount();
+        
+        ScaffoldMessenger.of(context).clearSnackBars();
+        
+        if (mounted) {
+          setState(() {});
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text('Account and all data deleted successfully.'),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                duration: const Duration(seconds: 5),
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting account: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showEditNameDialog(String currentName) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => _EditNameDialog(currentName: currentName),
+    );
+
+    if (result != null && result != currentName) {
+      await _updateUserName(result);
+    }
+  }
+
+  Future<void> _updateUserName(String newName) async {
+      try {
+      final response = await Supabase.instance.client.auth.updateUser(
+        UserAttributes(
+          data: {'full_name': newName},
+            ),
+          );
+
+      if (response.user != null) {
+        if (mounted) {
+          setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Name updated to $newName'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        }
+      } else {
+        throw Exception('Failed to update user profile');
+      }
+      } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating name: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
+  }
+
   Future<Map<String, dynamic>> _getVersionInfo() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
@@ -1976,8 +2132,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         'hasUpdate': (patchInfo['hasUpdate'] as bool?) ?? false,
       };
     } catch (e) {
-      print('Error getting version info: $e');
-      // Fallback to hardcoded version if everything fails
       return {
         'appVersion': '1.0.5+7',
         'patchNumber': null,
@@ -1988,16 +2142,15 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  /// Check for app updates using Shorebird
   Future<void> _checkForUpdates() async {
     final updateManager = UpdateManager();
     
-    // Show initial checking dialog
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           title: Row(
             children: [
               Icon(Icons.system_update, color: Theme.of(context).primaryColor),
@@ -2005,12 +2158,12 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               const Text('Checking for Updates'),
             ],
           ),
-          content: Column(
+          content: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              const Text('Checking for available patches...'),
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Checking for available patches...'),
             ],
           ),
         );
@@ -2018,30 +2171,21 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
 
     try {
-      // Check for Shorebird updates
       final hasUpdate = await updateManager.isUpdateAvailable();
-      final patchInfo = await updateManager.getPatchInfo();
       
-      // Close checking dialog
       if (mounted) Navigator.of(context).pop();
       
       if (hasUpdate) {
-        // Show update available dialog
         _showUpdateAvailableDialog();
       } else {
-        // Show no updates available
         _showNoUpdatesDialog();
       }
     } catch (error) {
-      // Close checking dialog
       if (mounted) Navigator.of(context).pop();
-      
-      // Show error dialog
       _showUpdateErrorDialog(error.toString());
     }
   }
 
-  /// Show update available dialog with Shorebird download
   void _showUpdateAvailableDialog() {
     showDialog(
       context: context,
@@ -2052,11 +2196,12 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             bool isDownloading = false;
             
             return AlertDialog(
-              title: Row(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              title: const Row(
                 children: [
                   Icon(Icons.new_releases, color: Colors.green),
-                  const SizedBox(width: 8),
-                  const Text('Patch Available'),
+                  SizedBox(width: 8),
+                  Text('Patch Available'),
                 ],
               ),
               content: Column(
@@ -2091,11 +2236,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       final updateManager = UpdateManager();
                       await updateManager.downloadUpdate(context);
                       
-                      // Close dialog and show completion
                       if (mounted) Navigator.of(context).pop();
                       _showUpdateCompleteDialog();
                     } catch (e) {
-                      // Close dialog and show error
                       if (mounted) Navigator.of(context).pop();
                       _showUpdateErrorDialog('Failed to download patch: $e');
                     }
@@ -2103,6 +2246,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: isDownloading 
                       ? const SizedBox(
@@ -2123,17 +2269,17 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  /// Show no updates available dialog
   void _showNoUpdatesDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Row(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
             children: [
               Icon(Icons.check_circle, color: Colors.green),
-              const SizedBox(width: 8),
-              const Text('Up to Date'),
+              SizedBox(width: 8),
+              Text('Up to Date'),
             ],
           ),
           content: FutureBuilder<Map<String, dynamic>>(
@@ -2173,6 +2319,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
               child: const Text('OK'),
             ),
           ],
@@ -2181,23 +2332,28 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  /// Show update error dialog
   void _showUpdateErrorDialog(String error) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Row(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
             children: [
               Icon(Icons.error, color: Colors.red),
-              const SizedBox(width: 8),
-              const Text('Update Check Failed'),
+              SizedBox(width: 8),
+              Text('Update Check Failed'),
             ],
           ),
           content: Text('Failed to check for updates: $error'),
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
               child: const Text('OK'),
             ),
           ],
@@ -2206,18 +2362,18 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  /// Show update complete dialog
   void _showUpdateCompleteDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Row(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
             children: [
               Icon(Icons.download_done, color: Colors.green),
-              const SizedBox(width: 8),
-              const Text('Patch Applied'),
+              SizedBox(width: 8),
+              Text('Patch Applied'),
             ],
           ),
           content: const Text('SubTrackr has been patched successfully! Restart the app to see the latest changes.'),
@@ -2226,9 +2382,10 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               onPressed: () {
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Patch applied! Restart manually when convenient.'),
+                  SnackBar(
+                    content: const Text('Patch applied! Restart manually when convenient.'),
                     backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 );
               },
@@ -2237,275 +2394,42 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                // Restart the app using restart_app plugin
                 Restart.restartApp();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
-              ),
-              child: const Text('Restart Now'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildAppInfoTile(ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceVariant.withOpacity(0.3),
+                shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colorScheme.outline.withOpacity(0.2),
         ),
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [colorScheme.primary, colorScheme.secondary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.subscriptions_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SubTrackr',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    FutureBuilder<Map<String, dynamic>>(
-                      future: _getVersionInfo(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return Text(
-                            'Loading version...',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: colorScheme.onSurface.withOpacity(0.7),
-                            ),
-                          );
-                        }
-                        
-                        final versionData = snapshot.data ?? {};
-                        final appVersion = versionData['appVersion'] ?? '1.0.5+7';
-                        final patchNumber = versionData['patchNumber'] as int?;
-                        final updateStatus = versionData['updateStatus'] ?? 'Unknown';
-                        final hasPatch = (versionData['hasPatch'] as bool?) ?? false;
-                        final hasUpdate = (versionData['hasUpdate'] as bool?) ?? false;
-                        
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Version $appVersion',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: colorScheme.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                            if (hasPatch && patchNumber != null) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                'Patch #$patchNumber applied',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.green.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: hasUpdate 
-                                        ? Colors.orange.withOpacity(0.1)
-                                        : Colors.green.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(
-                                      color: hasUpdate 
-                                          ? Colors.orange.withOpacity(0.3)
-                                          : Colors.green.withOpacity(0.3),
-                                      width: 0.5,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    hasUpdate ? 'Update available' : 'Up to date',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: hasUpdate 
-                                          ? Colors.orange.shade700
-                                          : Colors.green.shade700,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Icon(
-                                  hasUpdate ? Icons.update : Icons.check_circle,
-                                  size: 12,
-                                  color: hasUpdate 
-                                      ? Colors.orange.shade600
-                                      : Colors.green.shade600,
-                                ),
-                              ],
+              child: const Text('Restart Now'),
                             ),
                           ],
                         );
                       },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Track your subscriptions with ease',
-            style: TextStyle(
-              fontSize: 14,
-              color: colorScheme.onSurface.withOpacity(0.8),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _checkForUpdates,
-                  icon: Icon(Icons.system_update, size: 16),
-                  label: Text(
-                    'Check for Updates',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
-
-  Future<void> _showEditNameDialog(String currentName) async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => _EditNameDialog(currentName: currentName),
-    );
-
-    if (result != null && result != currentName) {
-      // Update the name in Supabase
-      await _updateUserName(result);
-    }
-  }
-
-  Future<void> _updateUserName(String newName) async {
-    try {
-      print('🔄 Updating user name to: $newName');
-      
-      // Update user metadata in Supabase (only full_name to avoid conflicts with Google Sign-In)
-      final response = await Supabase.instance.client.auth.updateUser(
-        UserAttributes(
-          data: {'full_name': newName},
-        ),
-      );
-
-      if (response.user != null) {
-        print('✅ User name updated successfully in Supabase');
-        if (mounted) {
-          setState(() {}); // Trigger rebuild to update the name in the UI
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Name updated to $newName'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          );
-        }
-      } else {
-        throw Exception('Failed to update user profile');
-      }
-    } catch (e) {
-      print('❌ Error updating user name: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating name: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
-    }
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
-
 }
 
-class CurrencySelectorScreen extends StatefulWidget {
+// Modern Currency Selector Screen
+class ModernCurrencySelectorScreen extends StatefulWidget {
   final String initialCurrencyCode;
   
-  const CurrencySelectorScreen({
+  const ModernCurrencySelectorScreen({
     super.key,
     required this.initialCurrencyCode,
   });
 
   @override
-  State<CurrencySelectorScreen> createState() => _CurrencySelectorScreenState();
+  State<ModernCurrencySelectorScreen> createState() => _ModernCurrencySelectorScreenState();
 }
 
-class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> with SingleTickerProviderStateMixin {
+class _ModernCurrencySelectorScreenState extends State<ModernCurrencySelectorScreen> {
   final TextEditingController _searchController = TextEditingController();
   late List<Currency> _allCurrencies;
   late List<Currency> _filteredCurrencies;
   late String _selectedCurrencyCode;
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
   
   @override
   void initState() {
@@ -2514,26 +2438,12 @@ class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> with Si
     _filteredCurrencies = List.from(_allCurrencies);
     _selectedCurrencyCode = widget.initialCurrencyCode;
     _searchController.addListener(_filterCurrencies);
-    
-    // Setup animations
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-    
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    );
-    
-    _animationController.forward();
   }
   
   @override
   void dispose() {
     _searchController.removeListener(_filterCurrencies);
     _searchController.dispose();
-    _animationController.dispose();
     super.dispose();
   }
   
@@ -2545,9 +2455,9 @@ class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> with Si
       } else {
         _filteredCurrencies = _allCurrencies
             .where((currency) => 
-                currency.code.toLowerCase().contains(query.toLowerCase()) ||
-                currency.name.toLowerCase().contains(query.toLowerCase()) ||
-                currency.symbol.toLowerCase().contains(query.toLowerCase()))
+                currency.code.toLowerCase().contains(query) ||
+                currency.name.toLowerCase().contains(query) ||
+                currency.symbol.toLowerCase().contains(query))
             .toList();
       }
     });
@@ -2556,59 +2466,61 @@ class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> with Si
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final isDarkMode = theme.brightness == Brightness.dark;
     
     return Scaffold(
+      backgroundColor: isDarkMode ? const Color(0xFF0F0F0F) : const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Column(
           children: [
             // Header
             Container(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                border: Border(
-                  bottom: BorderSide(
-                    color: colorScheme.outline.withOpacity(0.1),
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Row(
         children: [
                   IconButton(
                     icon: Icon(
-                      Icons.arrow_back_ios_rounded,
-                      color: isDark ? Colors.white : Colors.black,
+                          Icons.arrow_back,
+                          color: theme.colorScheme.onSurface,
                     ),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const SizedBox(width: 8),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                   Text(
                     'Select Currency',
-                    style: TextStyle(
-                      fontSize: 28,
+                              style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${_allCurrencies.length} currencies available',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface.withOpacity(0.6),
                     ),
                   ),
                 ],
               ),
             ),
-            
+                    ],
+                  ),
+                  const SizedBox(height: 20),
             // Search bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
+                  TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search currencies...',
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
-                  ),
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: isDarkMode 
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.black.withOpacity(0.05),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -2620,61 +2532,65 @@ class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> with Si
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide(
-                      color: colorScheme.primary,
-                      width: 1.5,
+                          color: theme.colorScheme.primary,
+                          width: 2,
                     ),
                 ),
-                filled: true,
-                  fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               ),
-              onChanged: (value) => _filterCurrencies(),
+                  ),
+                ],
             ),
           ),
             
             // Currency list
           Expanded(
-              child: FadeTransition(
-                opacity: _fadeAnimation,
             child: ListView.builder(
               itemCount: _filteredCurrencies.length,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
               itemBuilder: (context, index) {
                 final currency = _filteredCurrencies[index];
                 final isSelected = currency.code == _selectedCurrencyCode;
                 
-                    return Card(
+                  return Container(
                       margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 0,
+                      border: Border.all(
                       color: isSelected 
-                          ? colorScheme.primary.withOpacity(0.1)
-                          : theme.colorScheme.surface,
+                            ? theme.colorScheme.primary
+                            : Colors.transparent,
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isDarkMode
+                              ? Colors.black.withOpacity(0.3)
+                              : Colors.black.withOpacity(0.05),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
                       child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedCurrencyCode = currency.code;
-                    });
-                    
-                    // Return the selected currency to the previous screen
-                    Navigator.pop(context, currency);
-                  },
+                      onTap: () => Navigator.pop(context, currency),
                         borderRadius: BorderRadius.circular(16),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(8),
+                              width: 48,
+                              height: 48,
                                 decoration: BoxDecoration(
-                                  color: colorScheme.primary.withOpacity(0.1),
+                                color: theme.colorScheme.primary.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
+                              child: Center(
                                 child: Text(
                                   currency.flag,
                                   style: const TextStyle(fontSize: 24),
+                                ),
                                 ),
                               ),
                               const SizedBox(width: 16),
@@ -2683,19 +2599,16 @@ class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> with Si
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '${currency.code} - ${currency.name}',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                        color: isDark ? Colors.white : Colors.black,
+                                    currency.name,
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      'Symbol: ${currency.symbol}',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: (isDark ? Colors.white : Colors.black).withOpacity(0.7),
+                                    '${currency.code} • ${currency.symbol}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurface.withOpacity(0.6),
                                       ),
                                     ),
                                   ],
@@ -2705,7 +2618,7 @@ class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> with Si
                                 Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: colorScheme.primary,
+                                  color: theme.colorScheme.primary,
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -2720,7 +2633,6 @@ class _CurrencySelectorScreenState extends State<CurrencySelectorScreen> with Si
                       ),
                     );
                   },
-                ),
             ),
           ),
         ],
@@ -2757,56 +2669,43 @@ class _EditNameDialogState extends State<_EditNameDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
 
     return AlertDialog(
-      title: Text(
-        'Edit Name',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: isDark ? Colors.white : Colors.black,
-        ),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: const Text('Edit Name'),
       content: TextField(
         controller: _nameController,
         decoration: InputDecoration(
           hintText: 'Enter your name',
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
+            borderSide: BorderSide(
+              color: theme.colorScheme.outline.withOpacity(0.3),
+            ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
-              color: colorScheme.primary,
-              width: 1.5,
+              color: theme.colorScheme.primary,
+              width: 2,
             ),
           ),
-          filled: true,
-          fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
-          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         ),
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, null),
-          child: Text(
-            'Cancel',
-            style: TextStyle(color: colorScheme.primary),
-          ),
+          child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: () => Navigator.pop(context, _nameController.text),
           style: ElevatedButton.styleFrom(
-            backgroundColor: colorScheme.primary,
-            foregroundColor: colorScheme.onPrimary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           child: const Text('Save'),
         ),

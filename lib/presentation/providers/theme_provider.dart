@@ -27,6 +27,8 @@ class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
     // Update system UI overlay style when system brightness changes
     if (_themeMode == ThemeMode.system) {
       _updateStatusBarStyle(_themeMode);
+      // Notify listeners so UI updates when system brightness changes
+      notifyListeners();
     }
     super.didChangePlatformBrightness();
   }
@@ -35,12 +37,32 @@ class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
   ThemeMode get themeMode => _themeMode;
   
   // Get the current theme data
-  ThemeData get themeData => _themeMode == ThemeMode.dark 
-      ? AppTheme.darkTheme 
-      : AppTheme.lightTheme;
+  ThemeData get themeData {
+    if (_themeMode == ThemeMode.dark) {
+      return AppTheme.darkTheme;
+    } else if (_themeMode == ThemeMode.light) {
+      return AppTheme.lightTheme;
+    } else {
+      // System default - check system brightness
+      final systemBrightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+      return systemBrightness == Brightness.dark 
+          ? AppTheme.darkTheme 
+          : AppTheme.lightTheme;
+    }
+  }
   
   // Check if dark mode is enabled
-  bool get isDarkMode => _themeMode == ThemeMode.dark;
+  bool get isDarkMode {
+    if (_themeMode == ThemeMode.dark) {
+      return true;
+    } else if (_themeMode == ThemeMode.light) {
+      return false;
+    } else {
+      // System default - check system brightness
+      final systemBrightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+      return systemBrightness == Brightness.dark;
+    }
+  }
   
   // Initialize theme from saved settings
   Future<void> loadTheme() async {
