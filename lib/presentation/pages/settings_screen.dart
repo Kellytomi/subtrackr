@@ -130,7 +130,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       // Quick Actions
                       _buildQuickActions(),
                       
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 8),
                       
                       // Settings sections
                       _buildSettingSection(
