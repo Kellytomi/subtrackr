@@ -169,6 +169,14 @@ class SubscriptionProvider extends ChangeNotifier {
       if (_supabaseCloudSyncService.isUserSignedIn) {
         print('🔄 User is signed in, performing background sync...');
         
+        // IMPORTANT: Clear loading state immediately if we have no local data to show
+        // This prevents infinite loading when user has no subscriptions
+        if (localSubscriptions.isEmpty) {
+          _isLoading = false;
+          notifyListeners();
+          print('✅ Cleared loading state - no local subscriptions to show');
+        }
+        
         // Don't block UI - sync in background
         _performBackgroundSync();
       } else {
@@ -232,6 +240,12 @@ class SubscriptionProvider extends ChangeNotifier {
       
       print('✅ Background sync completed - UI updated with ${_subscriptions.length} subscriptions');
       
+      // If still no subscriptions after sync, ensure loading state is cleared
+      if (_subscriptions.isEmpty && _isLoading) {
+        _isLoading = false;
+        print('✅ Cleared loading state after sync - no subscriptions found');
+      }
+      
     } catch (e) {
       print('⚠️ Background sync failed, keeping local data: $e');
       // Don't update error state since user already has local data displayed
@@ -260,8 +274,8 @@ class SubscriptionProvider extends ChangeNotifier {
         // DualSubscriptionRepository already handles both local and cloud storage
         await _repository.addSubscription(subscription);
         
-        // Schedule notification if active
-        if (subscription.status == AppConstants.STATUS_ACTIVE) {
+        // Schedule notification if active (but skip for tutorial examples)
+        if (subscription.status == AppConstants.STATUS_ACTIVE && subscription.id != 'tutorial_example') {
           _scheduleNotification(subscription);
         }
       } catch (repositoryError) {
@@ -726,8 +740,8 @@ class SubscriptionProvider extends ChangeNotifier {
     
     switch (sortOption) {
       case AppConstants.SORT_BY_DATE_ADDED:
-        // Sort by start date descending (most recent first)
-        subscriptions.sort((a, b) => b.startDate.compareTo(a.startDate));
+        // Sort by creation date descending (most recently added first)
+        subscriptions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         break;
       case AppConstants.SORT_BY_NAME:
         // Sort alphabetically
@@ -743,7 +757,7 @@ class SubscriptionProvider extends ChangeNotifier {
         break;
       default:
         // Default to date added
-        subscriptions.sort((a, b) => b.startDate.compareTo(a.startDate));
+        subscriptions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
   }
 

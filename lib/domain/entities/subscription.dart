@@ -18,6 +18,7 @@ class Subscription {
   final int notificationDays; // Days before renewal to send notification
   final List<DateTime>? paymentHistory;
   final String currencyCode; // Currency code (e.g., USD, EUR, NGN)
+  final DateTime createdAt; // When the subscription was added to the app
   
   Subscription({
     String? id,
@@ -36,7 +37,9 @@ class Subscription {
     this.notificationDays = AppConstants.DEFAULT_NOTIFICATION_DAYS_BEFORE_RENEWAL,
     this.paymentHistory,
     this.currencyCode = 'USD', // Default to USD
-  }) : id = id ?? const Uuid().v4();
+    DateTime? createdAt,
+  }) : id = id ?? const Uuid().v4(),
+       createdAt = createdAt ?? DateTime.now();
   
   // Create a copy of this subscription with some fields updated
   Subscription copyWith({
@@ -55,6 +58,7 @@ class Subscription {
     int? notificationDays,
     List<DateTime>? paymentHistory,
     String? currencyCode,
+    DateTime? createdAt,
   }) {
     return Subscription(
       id: id,
@@ -73,6 +77,7 @@ class Subscription {
       notificationDays: notificationDays ?? this.notificationDays,
       paymentHistory: paymentHistory ?? this.paymentHistory,
       currencyCode: currencyCode ?? this.currencyCode,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
   
@@ -95,6 +100,7 @@ class Subscription {
       'notificationDays': notificationDays,
       'paymentHistory': paymentHistory?.map((date) => date.millisecondsSinceEpoch).toList(),
       'currencyCode': currencyCode,
+      'createdAt': createdAt.millisecondsSinceEpoch,
     };
   }
   

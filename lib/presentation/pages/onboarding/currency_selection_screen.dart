@@ -5,6 +5,7 @@ import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/data/services/notification_service.dart';
+import 'package:subtrackr/data/services/onesignal_service.dart';
 
 class CurrencySelectionScreen extends StatefulWidget {
   const CurrencySelectionScreen({super.key});
@@ -29,6 +30,24 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
     
     // Default to USD initially
     _selectedCurrency = _allCurrencies.first;
+  }
+
+  /// Request all notification permissions after onboarding
+  Future<void> _requestNotificationPermissions() async {
+    try {
+      // Request local notification permissions (for subscription reminders)
+      final notificationService = Provider.of<NotificationService>(context, listen: false);
+      final localPermissionGranted = await notificationService.requestPermissions();
+      
+      // Request OneSignal notification permissions (for promotional notifications)
+      final oneSignalPermissionGranted = await OneSignalService.requestPermission();
+      
+      debugPrint('🔔 Local notifications permission: $localPermissionGranted');
+      debugPrint('🔔 OneSignal notifications permission: $oneSignalPermissionGranted');
+    } catch (e) {
+      debugPrint('❌ Error requesting notification permissions: $e');
+      // Continue even if notification permissions fail
+    }
   }
 
   @override
@@ -263,9 +282,8 @@ class _CurrencySelectionScreenState extends State<CurrencySelectionScreen> {
                     // Mark onboarding as complete
                     settingsService.setOnboardingComplete(true);
                     
-                    // Request notification permissions
-                    final notificationService = Provider.of<NotificationService>(context, listen: false);
-                    await notificationService.requestPermissions();
+                    // Request all notification permissions after onboarding
+                    await _requestNotificationPermissions();
                     
                     // Navigate to home screen
                     Navigator.pushReplacementNamed(context, AppConstants.HOME_ROUTE);

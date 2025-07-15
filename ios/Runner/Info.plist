@@ -71,5 +71,13 @@
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
+	<!-- OneSignal Configuration -->
+	<key>OSOneSignalAppId</key>
+	<string>16a85cc9-6fb3-4990-a922-479d2ad77ea1</string>
+	<!-- Required for push notifications on iOS -->
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This allows us to send you relevant offers and updates about your subscriptions.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We use location to send you relevant offers in your area.</string>
 </dict>
 </plist>

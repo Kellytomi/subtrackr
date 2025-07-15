@@ -7,6 +7,7 @@ import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/core/utils/date_utils.dart';
 import 'package:subtrackr/core/utils/text_formatters.dart';
+import 'package:subtrackr/core/utils/form_validation_mixin.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
@@ -19,8 +20,7 @@ class AddSubscriptionScreen extends StatefulWidget {
   State<AddSubscriptionScreen> createState() => _AddSubscriptionScreenState();
 }
 
-class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with SingleTickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
+class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with SingleTickerProviderStateMixin, FormValidationMixin {
   final _nameController = TextEditingController();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -102,6 +102,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
     _amountController.dispose();
     _descriptionController.dispose();
     _websiteController.dispose();
+    disposeFormValidation();
     _animationController.dispose();
     super.dispose();
   }
@@ -380,7 +381,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : Form(
-                key: _formKey,
+                                        key: formKey,
                 child: Column(
                   children: [
                     // Modern header
@@ -589,6 +590,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
     final isDarkMode = theme.brightness == Brightness.dark;
     
     return Container(
+      key: getFieldKey('name'),
       decoration: BoxDecoration(
         color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -604,6 +606,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
       ),
       child: TextFormField(
         controller: _nameController,
+        focusNode: getFocusNode('name'),
         decoration: InputDecoration(
           labelText: 'Subscription Name',
           hintText: 'e.g. Netflix, Spotify',
@@ -611,33 +614,19 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
             Icons.subscriptions_outlined,
             color: theme.colorScheme.primary,
           ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary,
-              width: 2,
-            ),
-          ),
+          border: getErrorBorder('name'),
+          enabledBorder: getErrorBorder('name'),
+          focusedBorder: getFocusedBorder(),
+          errorBorder: getErrorBorder('name'),
+          focusedErrorBorder: getFocusedBorder(),
           filled: true,
           fillColor: Colors.transparent,
         ),
         textCapitalization: TextCapitalization.words,
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Please enter a name';
-          }
-          return null;
-        },
+        validator: (value) => validateRequired(value, 'name', customMessage: 'Please enter a subscription name'),
         onChanged: (_) {
-          setState(() {});
+          clearFieldError('name');
+          // Don't validate entire form, just clear the specific field error
         },
       ),
     );
@@ -802,6 +791,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
         // Amount field
         Expanded(
           child: Container(
+            key: getFieldKey('amount'),
             decoration: BoxDecoration(
               color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -817,6 +807,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
             ),
             child: TextFormField(
               controller: _amountController,
+              focusNode: getFocusNode('amount'),
               decoration: InputDecoration(
                 labelText: 'Amount',
                 hintText: '0.00',
@@ -826,38 +817,24 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
                   fontWeight: FontWeight.w600,
                   color: theme.colorScheme.primary,
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(
-                    color: theme.colorScheme.primary,
-                    width: 2,
-                  ),
-                ),
+                border: getErrorBorder('amount'),
+                enabledBorder: getErrorBorder('amount'),
+                focusedBorder: getFocusedBorder(),
+                errorBorder: getErrorBorder('amount'),
+                focusedErrorBorder: getFocusedBorder(),
                 filled: true,
                 fillColor: Colors.transparent,
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter an amount';
-                }
-                try {
-                  final amount = double.parse(value.replaceAll(',', ''));
-                  if (amount <= 0) {
-                    return 'Amount must be greater than 0';
-                  }
-                } catch (e) {
-                  return 'Please enter a valid number';
-                }
-                return null;
+              validator: (value) => validateNumber(
+                value, 
+                'amount', 
+                customMessage: 'Please enter the subscription amount',
+                minValue: 0.01,
+              ),
+              onChanged: (_) {
+                clearFieldError('amount');
+                // Don't validate entire form, just clear the specific field error
               },
               inputFormatters: [
                 ThousandsSeparatorInputFormatter(),
@@ -1370,74 +1347,96 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> with Sing
     );
   }
 
-  void _saveSubscription() {
-    if (_formKey.currentState!.validate()) {
-      final name = _nameController.text.trim();
-      final amount = double.parse(_amountController.text.replaceAll(RegExp(r'[^0-9\.]'), ''));
-      final description = _descriptionController.text.trim();
-      final website = _websiteController.text.trim();
-      
-      int? customBillingDays;
-      if (_billingCycle == AppConstants.BILLING_CYCLE_CUSTOM) {
-        customBillingDays = int.parse(_customDaysController.text);
-      }
-      
-      DateTime calculatedRenewalDate;
-      
-      if (_lastPaymentDate != null) {
-        calculatedRenewalDate = _renewalDate ?? _calculateRenewalFromLastPayment();
-      } else {
-        final shouldSkipPastDates = DateTime.now().difference(_startDate).inDays > 1;
-        calculatedRenewalDate = AppDateUtils.calculateNextRenewalDate(
-          _startDate,
-          _billingCycle,
-          customBillingDays,
-          shouldSkipPastDates,
-        );
-      }
-      
-      debugPrint('DEBUG: Creating subscription: startDate: $_startDate, renewalDate: $calculatedRenewalDate, lastPaymentDate: $_lastPaymentDate');
-      debugPrint('DEBUG: Days since start date: ${DateTime.now().difference(_startDate).inDays}');
-      
-      final subscription = Subscription(
-        name: name,
-        amount: amount,
-        description: description.isNotEmpty ? description : null,
-        website: website.isNotEmpty ? website : null,
-        currencyCode: _currencyCode,
-        billingCycle: _billingCycle,
-        startDate: _startDate,
-        renewalDate: calculatedRenewalDate,
-        category: _category,
-        customBillingDays: customBillingDays,
-        logoUrl: _logoUrl,
-        notificationsEnabled: _notificationsEnabled,
-        notificationDays: _notificationDays,
-        status: AppConstants.STATUS_ACTIVE,
-      );
-      
-      if (_lastPaymentDate != null) {
-        final List<DateTime> paymentHistory = [_lastPaymentDate!];
-        final subscriptionWithHistory = subscription.copyWith(
-          paymentHistory: paymentHistory,
-        );
-        Provider.of<SubscriptionProvider>(context, listen: false).addSubscription(subscriptionWithHistory);
-      } else {
-        Provider.of<SubscriptionProvider>(context, listen: false).addSubscription(subscription);
-      }
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Subscription added successfully'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.green,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-      
-      Navigator.pop(context);
+  Future<void> _saveSubscription() async {
+    // Use the validation mixin's comprehensive validation
+    final isValid = await validateFormAndScroll();
+    
+    if (!isValid) {
+      return; // Errors handled by mixin
     }
+
+    // Parse and validate amount
+    final amountText = _amountController.text.replaceAll(',', '');
+    double amount;
+    try {
+      amount = double.parse(amountText);
+      if (amount <= 0) {
+        await scrollToField('amount', 'Amount must be greater than 0');
+        return;
+      }
+    } catch (e) {
+      await scrollToField('amount', 'Please enter a valid amount');
+      return;
+    }
+
+    final name = _nameController.text.trim();
+    
+    final description = _descriptionController.text.trim();
+    final website = _websiteController.text.trim();
+    
+    int? customBillingDays;
+    if (_billingCycle == AppConstants.BILLING_CYCLE_CUSTOM) {
+      customBillingDays = int.parse(_customDaysController.text);
+    }
+    
+    DateTime calculatedRenewalDate;
+    
+    if (_lastPaymentDate != null) {
+      calculatedRenewalDate = _renewalDate ?? _calculateRenewalFromLastPayment();
+    } else {
+      final shouldSkipPastDates = DateTime.now().difference(_startDate).inDays > 1;
+      calculatedRenewalDate = AppDateUtils.calculateNextRenewalDate(
+        _startDate,
+        _billingCycle,
+        customBillingDays,
+        shouldSkipPastDates,
+      );
+    }
+    
+    debugPrint('DEBUG: Creating subscription: startDate: $_startDate, renewalDate: $calculatedRenewalDate, lastPaymentDate: $_lastPaymentDate');
+    debugPrint('DEBUG: Days since start date: ${DateTime.now().difference(_startDate).inDays}');
+    
+    final subscription = Subscription(
+      name: name,
+      amount: amount,
+      description: description.isNotEmpty ? description : null,
+      website: website.isNotEmpty ? website : null,
+      currencyCode: _currencyCode,
+      billingCycle: _billingCycle,
+      startDate: _startDate,
+      renewalDate: calculatedRenewalDate,
+      category: _category,
+      customBillingDays: customBillingDays,
+      logoUrl: _logoUrl,
+      notificationsEnabled: _notificationsEnabled,
+      notificationDays: _notificationDays,
+      status: AppConstants.STATUS_ACTIVE,
+    );
+    
+    if (_lastPaymentDate != null) {
+      final List<DateTime> paymentHistory = [_lastPaymentDate!];
+      final subscriptionWithHistory = subscription.copyWith(
+        paymentHistory: paymentHistory,
+      );
+      Provider.of<SubscriptionProvider>(context, listen: false).addSubscription(subscriptionWithHistory);
+    } else {
+      Provider.of<SubscriptionProvider>(context, listen: false).addSubscription(subscription);
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Subscription added successfully'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.green,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+    
+    Navigator.pop(context);
   }
+  
+
+
 
   DateTime _calculateRenewalFromLastPayment() {
     if (_lastPaymentDate == null) return _startDate;

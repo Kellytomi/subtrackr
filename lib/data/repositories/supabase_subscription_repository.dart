@@ -42,6 +42,7 @@ class SupabaseSubscriptionRepository {
             logoUrl: data['logo_url'] as String?,
             category: data['category'] as String?,
             currencyCode: (data['currency_code'] as String?) ?? 'USD',
+            createdAt: DateTime.parse((data['created_at'] as String?) ?? DateTime.now().toIso8601String()),
           );
           subscriptions.add(subscription);
         } catch (e) {
@@ -89,6 +90,7 @@ class SupabaseSubscriptionRepository {
             logoUrl: data['logo_url'] as String?,
             category: data['category'] as String?,
             currencyCode: (data['currency_code'] as String?) ?? 'USD',
+            createdAt: DateTime.parse((data['created_at'] as String?) ?? DateTime.now().toIso8601String()),
           );
           subscriptions.add(subscription);
         } catch (e) {
@@ -180,6 +182,7 @@ class SupabaseSubscriptionRepository {
           logoUrl: response['logo_url'] as String?,
           category: response['category'] as String?,
           currencyCode: (response['currency_code'] as String?) ?? 'USD',
+          createdAt: DateTime.parse((response['created_at'] as String?) ?? DateTime.now().toIso8601String()),
         );
       }
       

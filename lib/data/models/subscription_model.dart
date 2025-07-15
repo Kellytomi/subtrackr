@@ -52,6 +52,9 @@ class SubscriptionModel extends HiveObject {
   
   @HiveField(15)
   final String currencyCode;
+  
+  @HiveField(16)
+  final DateTime createdAt;
 
   SubscriptionModel({
     required this.id,
@@ -70,6 +73,7 @@ class SubscriptionModel extends HiveObject {
     required this.notificationDays,
     this.paymentHistory,
     this.currencyCode = 'USD',
+    required this.createdAt,
   });
 
   // Convert from domain entity to Hive model
@@ -91,6 +95,7 @@ class SubscriptionModel extends HiveObject {
       notificationDays: subscription.notificationDays,
       paymentHistory: subscription.paymentHistory,
       currencyCode: subscription.currencyCode,
+      createdAt: subscription.createdAt,
     );
   }
 
@@ -113,6 +118,7 @@ class SubscriptionModel extends HiveObject {
       notificationDays: notificationDays,
       paymentHistory: paymentHistory,
       currencyCode: currencyCode,
+      createdAt: createdAt,
     );
   }
 } 

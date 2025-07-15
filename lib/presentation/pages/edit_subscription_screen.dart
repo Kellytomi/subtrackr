@@ -7,6 +7,7 @@ import 'package:subtrackr/core/constants/app_constants.dart';
 import 'package:subtrackr/core/utils/currency_utils.dart';
 import 'package:subtrackr/core/utils/date_utils.dart';
 import 'package:subtrackr/core/utils/text_formatters.dart';
+import 'package:subtrackr/core/utils/form_validation_mixin.dart';
 import 'package:subtrackr/data/services/logo_service.dart';
 import 'package:subtrackr/data/services/settings_service.dart';
 import 'package:subtrackr/domain/entities/subscription.dart';
@@ -19,8 +20,7 @@ class EditSubscriptionScreen extends StatefulWidget {
   State<EditSubscriptionScreen> createState() => _EditSubscriptionScreenState();
 }
 
-class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with SingleTickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
+class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with SingleTickerProviderStateMixin, FormValidationMixin {
   final _nameController = TextEditingController();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -91,6 +91,7 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
     _descriptionController.dispose();
     _websiteController.dispose();
     _animationController.dispose();
+    disposeFormValidation();
     
     super.dispose();
   }
@@ -382,7 +383,7 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : Form(
-                key: _formKey,
+                                        key: formKey,
                 onWillPop: _onWillPop,
                 child: Column(
                   children: [
@@ -680,6 +681,7 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
     final isDarkMode = theme.brightness == Brightness.dark;
     
     return Container(
+      key: getFieldKey('name'),
       decoration: BoxDecoration(
         color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -695,6 +697,7 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
       ),
       child: TextFormField(
         controller: _nameController,
+        focusNode: getFocusNode('name'),
         decoration: InputDecoration(
           labelText: 'Subscription Name',
           hintText: 'e.g. Netflix, Spotify',
@@ -702,32 +705,18 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
             Icons.subscriptions_outlined,
             color: theme.colorScheme.primary,
           ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary,
-              width: 2,
-            ),
-          ),
+          border: getErrorBorder('name'),
+          enabledBorder: getErrorBorder('name'),
+          focusedBorder: getFocusedBorder(),
+          errorBorder: getErrorBorder('name'),
+          focusedErrorBorder: getFocusedBorder(),
           filled: true,
           fillColor: Colors.transparent,
         ),
         textCapitalization: TextCapitalization.words,
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Please enter a name';
-          }
-          return null;
-        },
+        validator: (value) => validateRequired(value, 'name', customMessage: 'Please enter a subscription name'),
         onChanged: (value) {
+          clearFieldError('name');
           setState(() {
             _hasChanges = true;
           });
@@ -895,6 +884,7 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
         // Amount field
         Expanded(
           child: Container(
+            key: getFieldKey('amount'),
             decoration: BoxDecoration(
               color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -910,6 +900,7 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
             ),
             child: TextFormField(
               controller: _amountController,
+              focusNode: getFocusNode('amount'),
               decoration: InputDecoration(
                 labelText: 'Amount',
                 hintText: '0.00',
@@ -919,40 +910,23 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
                   fontWeight: FontWeight.w600,
                   color: theme.colorScheme.primary,
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(
-                    color: theme.colorScheme.primary,
-                    width: 2,
-                  ),
-                ),
+                border: getErrorBorder('amount'),
+                enabledBorder: getErrorBorder('amount'),
+                focusedBorder: getFocusedBorder(),
+                errorBorder: getErrorBorder('amount'),
+                focusedErrorBorder: getFocusedBorder(),
                 filled: true,
                 fillColor: Colors.transparent,
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter an amount';
-                }
-                try {
-                  final amount = double.parse(value.replaceAll(',', ''));
-                  if (amount <= 0) {
-                    return 'Amount must be greater than 0';
-                  }
-                } catch (e) {
-                  return 'Please enter a valid number';
-                }
-                return null;
-              },
+              validator: (value) => validateNumber(
+                value, 
+                'amount', 
+                customMessage: 'Please enter the subscription amount',
+                minValue: 0.01,
+              ),
               onChanged: (value) {
+                clearFieldError('amount');
                 setState(() {
                   _hasChanges = true;
                 });
@@ -1701,8 +1675,10 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> with Si
     );
   }
   
-  void _updateSubscription() {
-    if (_formKey.currentState!.validate() && _subscription != null) {
+  Future<void> _updateSubscription() async {
+    final isValid = await validateFormAndScroll();
+    
+    if (isValid && _subscription != null) {
       final amount = double.parse(_amountController.text.replaceAll(',', ''));
       
       final updatedSubscription = _subscription!.copyWith(

@@ -67,6 +67,8 @@ class AutoSyncService {
       if (cloudSubscriptions.isEmpty && localSubscriptions.isEmpty) {
         // Both are empty - nothing to sync
         print('✅ Both cloud and local are empty - nothing to sync');
+        _completeSyncProcess();
+        return;
       } else if (cloudSubscriptions.isEmpty && localSubscriptions.isNotEmpty) {
         // Cloud is empty but local has data - upload local to cloud (first sign-in scenario)
         print('📱 Cloud is empty but local has data - uploading local subscriptions to cloud');

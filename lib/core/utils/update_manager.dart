@@ -131,14 +131,30 @@ class UpdateManager {
     _showDownloadingBanner(context);
 
     try {
+      debugPrint('📥 Starting update download...');
       await _updater.update();
+      debugPrint('✅ Update download completed');
       
       if (!context.mounted) return;
       
+      // Double-check that the update was actually downloaded
+      final status = await getUpdateStatus();
+      debugPrint('🔍 Status after download: $status');
+      
       _hideCurrentBanner(context);
-      _showRestartBanner(context);
+      
+      if (status == UpdateStatus.restartRequired) {
+        _showRestartBanner(context);
+      } else {
+        // Something went wrong with the download
+        _showSnackBar(
+          context,
+          'Update may not have completed. Please try again.',
+          backgroundColor: Colors.orange,
+        );
+      }
     } catch (e) {
-      debugPrint('Update download failed: $e');
+      debugPrint('❌ Update download failed: $e');
       
       if (!context.mounted) return;
       
@@ -194,21 +210,28 @@ class UpdateManager {
     _isCheckingForUpdate = true;
 
     try {
-      // Wait for app to initialize
-      await Future.delayed(const Duration(seconds: 2));
+      // Wait longer for app to fully initialize and for any previous 
+      // Shorebird patches to be properly applied
+      await Future.delayed(const Duration(seconds: 4));
       
       if (!context.mounted) return;
 
+      debugPrint('🔍 Checking update status on startup...');
       final status = await getUpdateStatus();
+      debugPrint('🔍 Startup update status: $status');
       
       if (status == UpdateStatus.restartRequired) {
+        debugPrint('🔄 Restart required - showing dialog');
         _showAutoRestartDialog(context);
       } else if (status == UpdateStatus.outdated) {
+        debugPrint('📥 Update available - showing dialog');
         _showAutoUpdateDialog(context);
+      } else {
+        debugPrint('✅ No updates needed at startup');
       }
       // If no updates, don't show anything (silent)
     } catch (e) {
-      debugPrint('Auto-update check failed: $e');
+      debugPrint('❌ Auto-update check failed: $e');
     } finally {
       _isCheckingForUpdate = false;
     }
@@ -275,7 +298,7 @@ class UpdateManager {
                         
                         if (context.mounted) {
                           Navigator.of(context).pop();
-                          _restartApp();
+                          await _restartApp();
                         }
                       }
                     } catch (e) {
@@ -345,9 +368,9 @@ class UpdateManager {
               child: const Text('Later'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop();
-                _restartApp();
+                await _restartApp();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
@@ -477,7 +500,7 @@ class UpdateManager {
             child: const Text('Later'),
           ),
           ElevatedButton(
-            onPressed: () => _restartApp(),
+            onPressed: () async => await _restartApp(),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
@@ -509,12 +532,21 @@ class UpdateManager {
     ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
   }
 
-  /// Restarts the application
-  void _restartApp() {
+  /// Restarts the application with improved reliability
+  Future<void> _restartApp() async {
     try {
+      debugPrint('🔄 Initiating app restart...');
+      
+      // Give a small delay to ensure any pending operations complete
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      // Force a final status check before restart to ensure patch is ready
+      final status = await getUpdateStatus();
+      debugPrint('🔍 Final status before restart: $status');
+      
       Restart.restartApp();
     } catch (e) {
-      debugPrint('Failed to restart app: $e');
+      debugPrint('❌ Failed to restart app: $e');
       // Fallback: You might want to show a message asking user to manually restart
     }
   }

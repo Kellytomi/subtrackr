@@ -116,11 +116,11 @@ class AppTheme {
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _errorColorLight),
+        borderSide: const BorderSide(color: _errorColorLight, width: 2),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _errorColorLight, width: 2),
+        borderSide: const BorderSide(color: _errorColorLight, width: 3),
       ),
       filled: true,
       fillColor: Colors.white,
@@ -206,11 +206,11 @@ class AppTheme {
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _errorColorDark),
+        borderSide: const BorderSide(color: _errorColorDark, width: 2),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _errorColorDark, width: 2),
+        borderSide: const BorderSide(color: _errorColorDark, width: 3),
       ),
       filled: true,
       fillColor: _surfaceColorDark,

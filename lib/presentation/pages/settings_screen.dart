@@ -341,17 +341,29 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                             _buildSettingTile(
                               icon: Icons.notifications_active,
                               title: 'Test Local Notification',
-                              subtitle: 'Send a test subscription reminder',
+                              subtitle: 'Send a test subscription reminder (5s delay)',
                               onTap: () => _sendTestNotification(5),
+                            ),
+                            _buildSettingTile(
+                              icon: Icons.notifications_none,
+                              title: 'Test Instant Notification',
+                              subtitle: 'Send an immediate local notification',
+                              onTap: () => _sendTestNotification(0),
                             ),
                             _buildSettingTile(
                               icon: Icons.campaign_outlined,
                               title: 'Test Push Notification',
-                              subtitle: 'Get OneSignal Player ID for testing',
+                              subtitle: 'Get OneSignal Player ID for push testing',
                               onTap: _testOneSignalNotification,
                             ),
-                      ],
-                    ),
+                            _buildSettingTile(
+                              icon: Icons.auto_awesome,
+                              title: 'Check Notification Permissions',
+                              subtitle: 'Verify local & push notification status',
+                              onTap: _checkNotificationPermissions,
+                            ),
+                          ],
+                        ),
                       ],
                     
                     const SizedBox(height: 24),
@@ -1878,6 +1890,30 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   Future<void> _sendTestNotification(int delaySeconds) async {
     final notificationService = Provider.of<NotificationService>(context, listen: false);
     
+    // Check if notifications are enabled first
+    final notificationsEnabled = await notificationService.areNotificationsEnabled();
+    debugPrint('🔔 Notifications enabled: $notificationsEnabled');
+    
+    if (!notificationsEnabled) {
+      // Request permissions if not enabled
+      final permissionGranted = await notificationService.requestPermissions();
+      debugPrint('🔔 Permission request result: $permissionGranted');
+      
+      if (!permissionGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Notification permissions are required for this feature'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.orange,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+        return;
+      }
+    }
+    
     if (delaySeconds == 0) {
       await notificationService.showTestNotification();
       
@@ -1915,9 +1951,29 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
 
   Future<void> _testOneSignalNotification() async {
     try {
+      // Get OneSignal user ID first
       final userId = await OneSignalService.getUserId();
       final hasPermission = await OneSignalService.hasPermission();
       
+      if (!hasPermission) {
+        // Request permission first
+        final permissionGranted = await OneSignalService.requestPermission();
+        if (!permissionGranted) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('OneSignal permissions are required for push notifications'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            );
+          }
+          return;
+        }
+      }
+      
+      // Show dialog with OneSignal information and send test notification
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -1926,7 +1982,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             children: [
               Icon(Icons.campaign, color: Colors.blue),
               SizedBox(width: 8),
-              Text('OneSignal Test Info'),
+              Text('OneSignal Test'),
             ],
           ),
           content: Column(
@@ -1946,7 +2002,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 'To test push notifications:\n'
                 '1. Copy the Player ID above\n'
                 '2. Go to OneSignal dashboard\n'
-                '3. Send test message to this Player ID',
+                '3. Send a test notification to this Player ID\n'
+                '4. Or use the API to send notifications',
                 style: TextStyle(fontSize: 13),
               ),
             ],
@@ -1957,25 +2014,41 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               child: const Text('Close'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
+                // Copy Player ID to clipboard
                 if (userId != null) {
-                  Clipboard.setData(ClipboardData(text: userId));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Player ID copied to clipboard')),
-                  );
+                  await Clipboard.setData(ClipboardData(text: userId));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Player ID copied to clipboard!'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: Colors.green,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    );
+                  }
                 }
                 Navigator.pop(context);
               },
-              child: const Text('Copy ID'),
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Copy Player ID'),
             ),
           ],
         ),
       );
+      
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('OneSignal test failed: $e'),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
@@ -2511,9 +2584,48 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               child: const Text('Later'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop();
-                Restart.restartApp();
+                
+                // Show a brief loading state
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Row(
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Text('Restarting app...'),
+                      ],
+                    ),
+                    backgroundColor: Colors.blue,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+                
+                // Wait a moment to show the message, then restart
+                await Future.delayed(const Duration(milliseconds: 500));
+                
+                try {
+                  Restart.restartApp();
+                } catch (e) {
+                  // Fallback: show manual restart instruction
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Please manually close and reopen the app to apply the update.'),
+                        backgroundColor: Colors.orange,
+                        duration: const Duration(seconds: 5),
+                      ),
+                    );
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
@@ -2559,9 +2671,48 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               child: const Text('Later'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop();
-                Restart.restartApp();
+                
+                // Show a brief loading state
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Row(
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Text('Restarting app...'),
+                      ],
+                    ),
+                    backgroundColor: Colors.orange,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+                
+                // Wait a moment to show the message, then restart
+                await Future.delayed(const Duration(milliseconds: 500));
+                
+                try {
+                  Restart.restartApp();
+                } catch (e) {
+                  // Fallback: show manual restart instruction
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Please manually close and reopen the app to apply the update.'),
+                        backgroundColor: Colors.orange,
+                        duration: const Duration(seconds: 5),
+                      ),
+                    );
+                  }
+                }
               },
                   style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
@@ -2576,6 +2727,113 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         );
       },
     );
+  }
+
+  Future<void> _checkNotificationPermissions() async {
+    try {
+      final notificationService = Provider.of<NotificationService>(context, listen: false);
+      
+      // Check local notifications
+      final localEnabled = await notificationService.areNotificationsEnabled();
+      
+      // Check OneSignal permissions
+      final oneSignalEnabled = await OneSignalService.hasPermission();
+      final oneSignalUserId = await OneSignalService.getUserId();
+      
+      // Get pending notifications count
+      final pendingNotifications = await notificationService.getPendingNotifications();
+      
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue),
+                SizedBox(width: 8),
+                Text('Notification Status'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Local Notifications:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('Status: ${localEnabled ? "✅ Enabled" : "❌ Disabled"}'),
+                Text('Pending: ${pendingNotifications.length} notifications'),
+                const SizedBox(height: 16),
+                const Text('Push Notifications (OneSignal):', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('Status: ${oneSignalEnabled ? "✅ Enabled" : "❌ Disabled"}'),
+                Text('Player ID: ${oneSignalUserId ?? "Not available"}'),
+                const SizedBox(height: 16),
+                if (!localEnabled || !oneSignalEnabled) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange),
+                    ),
+                    child: const Text(
+                      '⚠️ Some notification permissions are disabled. Tap "Request Permissions" to enable them.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+              if (!localEnabled || !oneSignalEnabled)
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    
+                    if (!localEnabled) {
+                      await notificationService.requestPermissions();
+                    }
+                    if (!oneSignalEnabled) {
+                      await OneSignalService.requestPermission();
+                    }
+                    
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Notification permissions requested'),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: Colors.blue,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Request Permissions'),
+                ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to check permissions: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
   }
 }
 

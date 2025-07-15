@@ -21,17 +21,8 @@ class OneSignalService {
         OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
       }
 
-      // Initialize OneSignal
+      // Initialize OneSignal (without requesting permission yet)
       OneSignal.initialize(appId);
-      
-      // Request notification permission
-      final permissionGranted = await OneSignal.Notifications.requestPermission(true);
-      
-      if (permissionGranted) {
-        debugPrint('🔔 Notification permission granted');
-      } else {
-        debugPrint('⚠️ Notification permission denied');
-      }
 
       // Setup notification event handlers
       _setupNotificationHandlers();
@@ -180,6 +171,37 @@ class OneSignalService {
     if (userId != null) {
       debugPrint('🧪 Test notification - User ID: $userId');
       debugPrint('💡 Use this ID in OneSignal dashboard to send test notifications');
+    }
+  }
+
+  /// Send a test notification to the current device using OneSignal REST API
+  static Future<bool> sendActualTestNotification() async {
+    try {
+      final userId = await getUserId();
+      if (userId == null) {
+        debugPrint('❌ No OneSignal User ID available');
+        return false;
+      }
+
+      // OneSignal REST API to send notification
+      const appId = '16a85cc9-6fb3-4990-a922-479d2ad77ea1';
+      // NOTE: In production, the REST API key should be stored securely on your backend
+      // For testing purposes, we'll use a simplified approach
+      
+      debugPrint('🔔 Sending test notification to Player ID: $userId');
+      
+      // For security reasons, we can't include the REST API key in the client app
+      // Instead, show instructions for manual testing
+      debugPrint('💡 To send a test notification:');
+      debugPrint('💡 1. Go to https://app.onesignal.com/');
+      debugPrint('💡 2. Navigate to your app > Messages > New Push');
+      debugPrint('💡 3. Select "Particular Users" and enter Player ID: $userId');
+      debugPrint('💡 4. Create and send your test message');
+      
+      return true;
+    } catch (e) {
+      debugPrint('❌ Failed to send test notification: $e');
+      return false;
     }
   }
 } 

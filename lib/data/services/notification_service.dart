@@ -38,11 +38,12 @@ class NotificationService {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     
-    final DarwinInitializationSettings initializationSettingsIOS =
-        const DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
+    // For iOS, request permissions during initialization
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
     );
     
     final InitializationSettings initializationSettings = InitializationSettings(
@@ -64,6 +65,8 @@ class NotificationService {
               AndroidFlutterLocalNotificationsPlugin>()
           ?.createNotificationChannel(_channel);
     }
+    
+    debugPrint('✅ NotificationService initialized for ${Platform.operatingSystem}');
   }
   
   Future<bool> requestPermissions() async {
@@ -76,6 +79,7 @@ class NotificationService {
             badge: true,
             sound: true,
           );
+      debugPrint('iOS notification permissions granted: $result');
       return result ?? false;
     } else if (Platform.isAndroid) {
       final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
@@ -87,6 +91,26 @@ class NotificationService {
       final bool? granted = await androidImplementation?.requestNotificationsPermission();
       debugPrint('Android notification permissions granted: $granted');
       
+      return granted ?? false;
+    }
+    return false;
+  }
+
+  /// Check if notifications are enabled
+  Future<bool> areNotificationsEnabled() async {
+    if (Platform.isIOS) {
+      final result = await _flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>()
+          ?.checkPermissions();
+      return result?.isEnabled ?? false;
+    } else if (Platform.isAndroid) {
+      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+          _flutterLocalNotificationsPlugin
+              .resolvePlatformSpecificImplementation<
+                  AndroidFlutterLocalNotificationsPlugin>();
+      
+      final bool? granted = await androidImplementation?.areNotificationsEnabled();
       return granted ?? false;
     }
     return false;
@@ -176,7 +200,7 @@ class NotificationService {
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           payload: payload,
         );
-        debugPrint('Notification scheduled successfully');
+        debugPrint('Notification scheduled successfully for ${Platform.operatingSystem}');
       } catch (e) {
         if (e is PlatformException && e.code == 'exact_alarms_not_permitted') {
           debugPrint('Exact alarms not permitted, requesting permission...');

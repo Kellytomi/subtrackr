@@ -58,11 +58,29 @@ class _MainLayoutState extends State<MainLayout> {
   
   // Navigate to subscription details for tutorial
   void _navigateToSubscriptionTutorial() async {
-    // First, we need to add the example subscription to the provider
+    // Check if user already has subscriptions - if they do, skip tutorial example
     final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+    final hasExistingSubscriptions = subscriptionProvider.subscriptions.isNotEmpty;
+    
+    if (hasExistingSubscriptions) {
+      // Use an existing subscription for tutorial instead of creating a temporary one
+      final existingSubscription = subscriptionProvider.subscriptions.first;
+      await Navigator.pushNamed(
+        context,
+        AppConstants.SUBSCRIPTION_DETAILS_ROUTE,
+        arguments: {
+          'id': existingSubscription.id,
+          'isTutorialMode': true,
+        },
+      );
+      return;
+    }
+    
+    // Only create temporary subscription if user has no subscriptions yet
     final exampleSubscription = _createExampleSubscription();
     
-    // Add to provider temporarily for tutorial
+    // Add to provider temporarily for tutorial (but don't trigger notifications)
+    print('📚 Creating temporary tutorial subscription: ${exampleSubscription.name}');
     await subscriptionProvider.addSubscription(exampleSubscription);
     
     // Navigate with subscription ID
@@ -76,6 +94,7 @@ class _MainLayoutState extends State<MainLayout> {
     );
     
     // Clean up: remove the example subscription after tutorial
+    print('📚 Cleaning up temporary tutorial subscription: ${exampleSubscription.id}');
     await subscriptionProvider.deleteSubscription(exampleSubscription.id);
   }
 
